@@ -66,6 +66,7 @@ public struct PreviewInboxView: View {
 public struct FilmLibraryView: View {
     @State private var store = PlanAndTaskStore.shared
     @State private var search = ""
+    @State private var showSearch = false
     @State private var rematchTarget: (plan: ScrapePlan, group: PlanGroup)? = nil
     @State private var policyTarget: (plan: ScrapePlan, group: PlanGroup)? = nil
     @State private var assetsTarget: (plan: ScrapePlan, group: PlanGroup)? = nil
@@ -84,7 +85,9 @@ public struct FilmLibraryView: View {
         let tvs = filtered.filter { $0.1.kind == "tv" }
         let cols = filtered.filter { $0.1.kind == "collection" }
 
-        List {
+        VStack(spacing: 0) {
+            CollapsibleSearchBar(text: $search, isPresented: $showSearch, prompt: "搜索片名或年份")
+            List {
             if filtered.isEmpty {
                 ContentUnavailableView("暂无已识别影视库", systemImage: "film.stack", description: Text("完成扫描后，所有识别出的电影、剧集与合集会归类展示于此。"))
             } else {
@@ -104,10 +107,19 @@ public struct FilmLibraryView: View {
                     }
                 }
             }
+            }
         }
-        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "搜索片名或年份")
         .navigationTitle("影视库总览")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+        }
         .sheet(isPresented: Binding(get: { rematchTarget != nil }, set: { if !$0 { rematchTarget = nil } })) {
             if let t = rematchTarget {
                 let livePlan = store.plans.first(where: { $0.id == t.plan.id }) ?? t.plan

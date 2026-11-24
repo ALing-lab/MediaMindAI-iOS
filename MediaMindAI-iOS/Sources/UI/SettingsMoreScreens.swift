@@ -181,6 +181,7 @@ public struct DiagnosticLogView: View {
     @State private var activity = NetLog.Activity()
     @State private var onlyErrors = false
     @State private var searchQuery = ""
+    @State private var showSearch = false
     @State private var exportHint: String?
 
     public init() {}
@@ -195,7 +196,9 @@ public struct DiagnosticLogView: View {
     }
 
     public var body: some View {
-        List {
+        VStack(spacing: 0) {
+            CollapsibleSearchBar(text: $searchQuery, isPresented: $showSearch, prompt: "按标签或关键字搜索日志")
+            List {
             Section {
                 Toggle("开启 2 MB 滚动落盘日志（net.log）", isOn: $settings.netLogFileEnabled)
                 if let last = activity.last, !last.isEmpty {
@@ -237,12 +240,17 @@ public struct DiagnosticLogView: View {
                     }
                 }
             }
+            }
         }
-        .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "按标签或关键字搜索日志")
         .navigationTitle("诊断日志")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
                 Button("导出并复制") {
                     Task { await exportAndCopy() }
                 }

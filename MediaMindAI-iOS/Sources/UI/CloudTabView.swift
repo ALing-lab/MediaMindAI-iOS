@@ -435,8 +435,16 @@ private struct CloudDirectoryBrowserView: View {
     @State private var scanTask: Task<Void, Never>?
     @State private var favorites: [FavoriteCloudFolder] = CloudFavoritesStore.load()
 
+    private var defaultRootId: String {
+        switch account.provider {
+        case .webdav: return "/"
+        case .guangya: return ""
+        case .p123: return "0"
+        }
+    }
+
     private var currentFolder: (id: String, name: String) {
-        pathStack.last ?? (account.provider == .webdav ? "/" : "0", account.label)
+        pathStack.last ?? (defaultRootId, account.label)
     }
 
     private var currentPathLabel: String {
@@ -624,7 +632,7 @@ private struct CloudDirectoryBrowserView: View {
         }
         .task {
             if pathStack.isEmpty {
-                let rootId = account.provider == .webdav ? "/" : "0"
+                let rootId = defaultRootId
                 if let fav = initialFavorite, fav.folderId != rootId {
                     pathStack = [(rootId, account.label), (fav.folderId, fav.folderName)]
                 } else {

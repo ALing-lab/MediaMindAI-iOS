@@ -15,6 +15,7 @@ public struct TaskItemsView: View {
     @State private var store = PlanAndTaskStore.shared
     @State private var filter: Filter = .all
     @State private var query = ""
+    @State private var showSearch = false
     @State private var selectedFailedIds: Set<String> = []
     @State private var retryHint: String?
 
@@ -46,6 +47,7 @@ public struct TaskItemsView: View {
         let activeSelection = selectedFailedIds.intersection(failedSet)
 
         VStack(spacing: 0) {
+            CollapsibleSearchBar(text: $query, isPresented: $showSearch, prompt: "搜索文件名")
             Picker("状态筛选", selection: $filter) {
                 ForEach(Filter.allCases) { f in Text(f.rawValue).tag(f) }
             }
@@ -136,17 +138,21 @@ public struct TaskItemsView: View {
                 }
             }
         }
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "搜索文件名")
         .navigationTitle("任务操作明细")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if selectedFailedIds.isEmpty {
                 selectedFailedIds = failedSet
             }
         }
         .toolbar {
-            if !failedActions.isEmpty, let plan = linkedPlan {
-                ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                if !failedActions.isEmpty, let plan = linkedPlan {
                     Button("重试选中 (\(activeSelection.count))") {
                         retrySelected(plan: plan, selectedIds: activeSelection)
                     }

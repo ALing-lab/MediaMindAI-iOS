@@ -22,9 +22,9 @@ public enum ImageQualityOption: String, CaseIterable, Codable, Sendable {
 
     public var label: String {
         switch self {
-        case .compact: return "省流 (w500)"
-        case .standard: return "高清 (w780/w1280)"
-        case .original: return "原图 (original)"
+        case .compact: return "省流"
+        case .standard: return "高清"
+        case .original: return "原图"
         }
     }
 

@@ -241,6 +241,19 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
 }
 
 public extension DefaultPolicies {
+    /// 设置首页「整理与命名策略」右侧状态摘要：重命名与整理 / 只重命名 / 只整理 / 已关闭。
+    var organizeSummaryLabel: String {
+        guard organizeEnabled else { return "已关闭" }
+        let hasRename = renameFiles || renameFolders
+        let hasOrganize = seasonFolders || adaptiveDirectory
+        switch (hasRename, hasOrganize) {
+        case (true, true): return "重命名与整理"
+        case (true, false): return "只重命名"
+        case (false, true): return "只整理"
+        case (false, false): return "已关闭"
+        }
+    }
+
     /// 将第 2 层任务策略覆写合并到当前全局策略副本，供完整任务策略页展示与实时编辑。
     func applying(_ override: PolicyOverride?) -> DefaultPolicies {
         guard let ov = override else { return self }

@@ -14,12 +14,15 @@ public struct SettingsTabView: View {
                 Color(.systemGroupedBackground).ignoresSafeArea()
                 TopAmbientGlow()
                 List {
-                Section("外观") {
+                Section("外观主题") {
                     Picker("外观主题", selection: $settings.themeMode) {
                         ForEach(AppThemeMode.allCases, id: \.self) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
 
                 Section("识别与网络") {
@@ -45,7 +48,7 @@ public struct SettingsTabView: View {
                     NavigationLink {
                         DefaultPolicyScreen(initialCategory: .organize)
                     } label: {
-                        LabeledContent("整理与命名策略", value: settings.policies.movieNaming.fileTmdbStyle)
+                        LabeledContent("整理与命名策略", value: settings.policies.organizeSummaryLabel)
                     }
                     NavigationLink {
                         DefaultPolicyScreen(initialCategory: .scrape)
@@ -330,7 +333,7 @@ private struct RetentionZoneView: View {
 
 private struct AiDiagnosticsAndRulesView: View {
     @State private var snapshot = AiRecognitionDiagnostics.Snapshot()
-    @State private var rules: [DistilledRule] = []
+    @State private var ruleCount: Int = 0
 
     var body: some View {
         List {
@@ -358,47 +361,169 @@ private struct AiDiagnosticsAndRulesView: View {
                 }
             }
 
-            Section("本地蒸馏规则库（\(rules.count) 条）") {
-                if rules.isEmpty {
-                    Text("AI 识别或手动修正后会自动沉淀混淆片名规则，下次扫描零消耗直接命中。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(rules) { r in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(r.pattern) → \(r.targetTitle)").font(.subheadline.bold())
-                            Text("\(r.mediaType.uppercased())" + (r.tmdbId.map { " · TMDB \($0)" } ?? ""))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .onDelete { idxs in
-                        let ids = idxs.compactMap { rules.indices.contains($0) ? rules[$0].id : nil }
-                        rules.removeAll { ids.contains($0.id) }
-                        Task {
-                            for id in ids { await AiRuleDistiller.shared.delete(id: id) }
-                            rules = await AiRuleDistiller.shared.allRules()
-                        }
-                    }
+            Section {
+                NavigationLink {
+                    DistilledRulesLibraryView()
+                } label: {
+                    LabeledContent("本地蒸馏规则库", value: "\(ruleCount) 条")
                 }
+            } header: {
+                Text("本地蒸馏规则")
+            } footer: {
+                Text("AI 识别或手动修正后会自动沉淀混淆片名规则，下次扫描零消耗直接命中。")
             }
         }
         .navigationTitle("AI 规则与诊断")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
+        .task {
+            snapshot = await AiRecognitionDiagnostics.shared.snapshot()
+            ruleCount = await AiRuleDistiller.shared.count()
+        }
+        .onAppear {
+            Task {
+                ruleCount = await AiRuleDistiller.shared.count()
+            }
+        }
+    }
+}
+
+private struct DistilledRulesLibraryView: View {
+    private enum TypeFilter: String, CaseIterable {
+        case all = "全部"
+        case movie = "电影"
+        case tv = "剧集"
+    }
+
+    @State private var rules: [DistilledRule] = []
+    @State private var searchQuery = ""
+    @State private var showSearch = false
+    @State private var typeFilter: TypeFilter = .all
+    @State private var showClearConfirm = false
+
+    private var filteredRules: [DistilledRule] {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return rules.filter { r in
+            switch typeFilter {
+            case .all: break
+            case .movie: if r.mediaType != "movie" { return false }
+            case .tv: if r.mediaType != "tv" { return false }
+            }
+            guard !q.isEmpty else { return true }
+            if r.pattern.lowercased().contains(q) || r.targetTitle.lowercased().contains(q) {
+                return true
+            }
+            if let tid = r.tmdbId, String(tid).contains(q) {
+                return true
+            }
+            return false
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            CollapsibleSearchBar(
+                text: $searchQuery,
+                isPresented: $showSearch,
+                prompt: "搜索原始片名、目标片名或 TMDB ID"
+            )
+
             if !rules.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("清空规则", role: .destructive) {
-                        Task {
-                            await AiRuleDistiller.shared.clear()
-                            rules = []
+                Picker("类型筛选", selection: $typeFilter) {
+                    ForEach(TypeFilter.allCases, id: \.self) { f in
+                        Text(f.rawValue).tag(f)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+
+            if rules.isEmpty {
+                ContentUnavailableView(
+                    "暂无本地蒸馏规则",
+                    systemImage: "sparkles.rectangle.stack",
+                    description: Text("AI 识别或手动修正后会自动沉淀混淆片名规则，下次扫描零消耗直接命中。")
+                )
+            } else if filteredRules.isEmpty {
+                ContentUnavailableView(
+                    "未找到匹配规则",
+                    systemImage: "magnifyingglass",
+                    description: Text("试试更换关键字或切换类型筛选。")
+                )
+            } else {
+                List {
+                    Section("共 \(filteredRules.count) 条规则" + (filteredRules.count == rules.count ? "" : "（总计 \(rules.count) 条）")) {
+                        ForEach(filteredRules) { r in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(r.pattern) → \(r.targetTitle)")
+                                    .font(.subheadline.bold())
+                                HStack(spacing: 6) {
+                                    Text(r.mediaType == "movie" ? "电影" : "剧集")
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(MMTheme.accent.opacity(0.15), in: Capsule())
+                                        .foregroundStyle(MMTheme.accent)
+                                    if let tid = r.tmdbId {
+                                        Text("TMDB \(tid)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(r.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .onDelete { idxs in
+                            let current = filteredRules
+                            let ids = idxs.compactMap { current.indices.contains($0) ? current[$0].id : nil }
+                            rules.removeAll { ids.contains($0.id) }
+                            Task {
+                                for id in ids { await AiRuleDistiller.shared.delete(id: id) }
+                                rules = await AiRuleDistiller.shared.allRules()
+                            }
                         }
                     }
                 }
             }
         }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("本地蒸馏规则库")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !rules.isEmpty {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSearch.toggle()
+                            if !showSearch { searchQuery = "" }
+                        }
+                    } label: {
+                        Image(systemName: showSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                    }
+                    Button("清空", role: .destructive) {
+                        showClearConfirm = true
+                    }
+                }
+            }
+        }
+        .alert("清空全部蒸馏规则？", isPresented: $showClearConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("全部清空", role: .destructive) {
+                Task {
+                    await AiRuleDistiller.shared.clear()
+                    rules = []
+                    searchQuery = ""
+                    showSearch = false
+                }
+            }
+        } message: {
+            Text("将删除当前已沉淀的 \(rules.count) 条本地规则，后续扫描遇到对应混淆片名时会重新识别。")
+        }
         .task {
-            snapshot = await AiRecognitionDiagnostics.shared.snapshot()
             rules = await AiRuleDistiller.shared.allRules()
         }
     }

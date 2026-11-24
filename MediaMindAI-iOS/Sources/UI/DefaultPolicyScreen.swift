@@ -109,6 +109,8 @@ public struct DefaultPolicyScreen: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             } footer: {
                 Text(isTaskScope
                      ? "当前为任务策略（第 2 层）：仅覆盖本次识别任务，不影响全局默认设置，所有修改实时生效。"

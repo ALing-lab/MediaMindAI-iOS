@@ -201,3 +201,64 @@ public struct TopAmbientGlow: View {
         .allowsHitTesting(false)
     }
 }
+
+/// 按需展开搜索条：默认收起不占版面、推入过渡零重影；点右上角放大镜后平滑展开并自动聚焦。
+public struct CollapsibleSearchBar: View {
+    @Binding public var text: String
+    @Binding public var isPresented: Bool
+    public let prompt: String
+    @FocusState private var focused: Bool
+
+    public init(text: Binding<String>, isPresented: Binding<Bool>, prompt: String) {
+        self._text = text
+        self._isPresented = isPresented
+        self.prompt = prompt
+    }
+
+    public var body: some View {
+        if isPresented {
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField(prompt, text: $text)
+                        .focused($focused)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                    if !text.isEmpty {
+                        Button {
+                            text = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                Button("取消") {
+                    focused = false
+                    text = ""
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isPresented = false
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(MMTheme.accent)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .padding(.bottom, 6)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    focused = true
+                }
+            }
+        }
+    }
+}

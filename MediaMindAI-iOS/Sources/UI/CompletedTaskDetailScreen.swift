@@ -7,6 +7,7 @@ public struct CompletedTaskDetailScreen: View {
 
     @State private var filter: DetailFilter = .all
     @State private var searchQuery = ""
+    @State private var showSearch = false
     @State private var rollingBack = false
     @State private var rollbackHint: String?
     @State private var retryHint: String?
@@ -81,7 +82,9 @@ public struct CompletedTaskDetailScreen: View {
     }
 
     public var body: some View {
-        List {
+        VStack(spacing: 0) {
+            CollapsibleSearchBar(text: $searchQuery, isPresented: $showSearch, prompt: "按文件名、操作类型或错误信息搜索")
+            List {
             Section("任务摘要") {
                 LabeledContent("来源", value: run.sourceLabel.isEmpty ? run.id : run.sourceLabel)
                 LabeledContent("网盘", value: run.provider)
@@ -144,6 +147,8 @@ public struct CompletedTaskDetailScreen: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
 
             if !filteredWalRows.isEmpty {
@@ -196,10 +201,19 @@ public struct CompletedTaskDetailScreen: View {
                     ContentUnavailableView("当前筛选下无明细记录", systemImage: "list.bullet.rectangle")
                 }
             }
+            }
         }
-        .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "按文件名、操作类型或错误信息搜索")
         .navigationTitle("任务详情")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+        }
         .confirmationDialog("确认撤销本次任务的全部已执行操作？", isPresented: $showRollbackConfirm, titleVisibility: .visible) {
             Button("确认逆序撤销", role: .destructive) {
                 Task { await runRollback() }
