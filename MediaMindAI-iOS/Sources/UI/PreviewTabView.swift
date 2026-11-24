@@ -12,6 +12,7 @@ public struct PreviewTabView: View {
     @State private var selectedPlanId: String?
     @State private var manualTab = false
     @State private var rematchTargets: [PlanGroup] = []
+    @State private var rematchSeasonFilter: Int? = nil
     @State private var showRematchSheet = false
     @State private var rematchApplying = false
     @State private var rematchError: String?
@@ -143,8 +144,9 @@ public struct PreviewTabView: View {
                                                             }
                                                         },
                                                         onToggleGroup: { on in toggleGroup(groupId: group.id, selected: on) },
-                                                        onRematch: {
+                                                        onRematch: { season in
                                                             rematchTargets = [group]
+                                                            rematchSeasonFilter = season
                                                             showRematchSheet = true
                                                         },
                                                         onParkRetention: {
@@ -156,6 +158,7 @@ public struct PreviewTabView: View {
                                                                 groupId: group.id,
                                                                 onRematch: {
                                                                     rematchTargets = [group]
+                                                                    rematchSeasonFilter = nil
                                                                     showRematchSheet = true
                                                                 },
                                                                 onEditPolicy: {
@@ -197,6 +200,7 @@ public struct PreviewTabView: View {
                                 Spacer()
                                 Button {
                                     rematchTargets = manual.filter { batchSelectedManualIds.contains($0.id) }
+                                    rematchSeasonFilter = nil
                                     showRematchSheet = true
                                 } label: {
                                     Text("批量匹配 (\(batchSelectedManualIds.count))")
@@ -238,11 +242,13 @@ public struct PreviewTabView: View {
                     }
                 } else {
                     ContentUnavailableView("暂无识别结果", systemImage: "eye", description: Text("请在「云盘」页面选择文件夹并开始扫描。"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 }
             }
             .searchable(text: $searchQuery, prompt: "搜索片名、文件夹或年份")
             .navigationTitle("识别结果")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 if let plan = activePlan {
                     if manualTab {
@@ -282,9 +288,13 @@ public struct PreviewTabView: View {
             .sheet(isPresented: $showRematchSheet, onDismiss: {
                 rematchApplying = false
                 rematchError = nil
+                rematchSeasonFilter = nil
             }) {
                 if let primary = rematchTargets.first {
-                    let targets = buildMatchTargetGroups(for: rematchTargets, plan: activePlan)
+                    let useTargetMode = primary.kind == "unmatched" || rematchSeasonFilter != nil
+                    let targets = useTargetMode
+                        ? buildMatchTargetGroups(for: rematchTargets, plan: activePlan, seasonFilter: rematchSeasonFilter)
+                        : []
                     let parsedPrimary = MediaParser.parse(primary.folderName)
                     ManualMatchSheet(
                         initialQuery: parsedPrimary.cleanTitle,
@@ -294,11 +304,18 @@ public struct PreviewTabView: View {
                         applyError: rematchError,
                         targetGroups: targets,
                         onApply: { picked in
-                            applyManualMatch(groups: rematchTargets, match: picked, overrides: [])
+                            if let s = rematchSeasonFilter {
+                                let seasonOverrides = targets.map {
+                                    GroupMatchOverride(key: $0.key, actionIds: $0.actionIds, season: s)
+                                }
+                                applyManualMatch(groups: rematchTargets, match: picked, overrides: seasonOverrides)
+                            } else {
+                                applyManualMatch(groups: rematchTargets, match: picked, overrides: [])
+                            }
                         },
-                        onApplyGroups: { picked, overrides in
+                        onApplyGroups: useTargetMode ? { picked, overrides in
                             applyManualMatch(groups: rematchTargets, match: picked, overrides: overrides)
-                        }
+                        } : nil
                     )
                 }
             }
@@ -341,14 +358,23 @@ public struct PreviewTabView: View {
                 }
             }
             .sheet(item: $editingAssetsGroup) { grp in
-                let fallback = PolicyResolver.resolve(isTv: grp.kind == "tv", global: AppSettings.shared.policies, task: activePlan?.taskPolicy, film: grp.policyOverride)
-                LibraryScrapeAssetsSheet(
-                    title: grp.title,
-                    isTv: grp.kind == "tv",
-                    initial: grp.policyOverride,
-                    fallback: fallback
-                ) { override in
-                    applyFilmPolicy(groupId: grp.id, override: override)
+                if let plan = activePlan {
+                    NavigationStack {
+                        DefaultPolicyScreen(
+                            initialCategory: .scrape,
+                            filmTitle: grp.title.isEmpty ? grp.folderName : grp.title,
+                            filmIsTv: grp.kind == "tv",
+                            taskOverride: plan.taskPolicy,
+                            filmOverride: grp.policyOverride
+                        ) { override in
+                            applyFilmPolicy(groupId: grp.id, override: override)
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("完成") { editingAssetsGroup = nil }
+                            }
+                        }
+                    }
                 }
             }
             .sheet(item: $editingFilmPolicyGroup) { grp in
@@ -413,7 +439,6 @@ public struct PreviewTabView: View {
             return
         }
         Task {
-            var movedCount = 0
             var movedIds: [String] = []
             for act in targets {
                 guard let fid = act.fileId, !fid.isEmpty else { continue }
@@ -424,7 +449,6 @@ public struct PreviewTabView: View {
                         fileId: fid, fileName: fname, originalParentId: origParent,
                         reason: "预览页手动移入保留区", drive: drive
                     )
-                    movedCount += 1
                     movedIds.append(act.id)
                 } catch {
                     await MainActor.run { errorMsg = "移入保留区失败（\(fname)）：\(error.localizedDescription)" }
@@ -450,19 +474,35 @@ public struct PreviewTabView: View {
         PlanAndTaskStore.shared.savePlan(PlanSelection.set(plan: plan, ids: ids, on: selected))
     }
 
-    private func buildMatchTargetGroups(for groups: [PlanGroup], plan: ScrapePlan?) -> [MatchTargetGroup] {
+    private func buildMatchTargetGroups(for groups: [PlanGroup], plan: ScrapePlan?, seasonFilter: Int? = nil) -> [MatchTargetGroup] {
         guard let plan else { return [] }
         return groups.map { grp in
-            let fileActions = plan.actions.filter { $0.groupId == grp.id && ($0.kind == "file" || $0.op == "unmatched") }
+            var seenFileKeys = Set<String>()
+            let allFiles = plan.actions.filter { act in
+                guard act.groupId == grp.id && (act.kind == "file" || act.op == "unmatched") else { return false }
+                return seenFileKeys.insert(act.fileId ?? act.id).inserted
+            }
+            let fileActions: [PlanAction]
+            if let seasonFilter {
+                let bySeason = allFiles.filter { act in
+                    let s = act.season ?? MediaParser.parse(act.oldName.isEmpty ? act.newName : act.oldName, folderHint: grp.folderName).season ?? 1
+                    return s == seasonFilter
+                }
+                fileActions = bySeason.isEmpty ? allFiles : bySeason
+            } else {
+                fileActions = allFiles
+            }
             let files = fileActions.map { MatchTargetGroup.FileItem(id: $0.id, name: $0.oldName.isEmpty ? $0.newName : $0.oldName) }
             let first = fileActions.first
+            let basePath = grp.folderPath ?? grp.folderName
+            let displayPath = seasonFilter.map { "\(basePath) · \($0 == 0 ? "特别篇" : "第 \($0) 季")" } ?? basePath
             return MatchTargetGroup(
-                key: grp.id,
-                folderPath: grp.folderPath ?? grp.folderName,
+                key: seasonFilter.map { "\(grp.id)-s\($0)" } ?? grp.id,
+                folderPath: displayPath,
                 actionIds: fileActions.map(\.id),
                 files: files,
                 sampleFileName: first?.oldName ?? "",
-                suggestedSeason: first?.season,
+                suggestedSeason: seasonFilter ?? first?.season,
                 suggestedYear: grp.year,
                 suggestedEpisode: first?.episode
             )
@@ -479,6 +519,7 @@ public struct PreviewTabView: View {
                 do {
                     var cur = plan
                     let hasFileOverrides = overrides.contains { !$0.actionIds.isEmpty }
+                    let beforeFlags = Set(cur.flags)
                     if hasFileOverrides {
                         cur = try await Scanner.replanTargetGroups(plan: cur, targets: overrides, info: match, drive: drive)
                     } else {
@@ -486,12 +527,17 @@ public struct PreviewTabView: View {
                             cur = try await Scanner.replanGroup(plan: cur, groupId: grp.id, info: match, drive: drive)
                         }
                     }
+                    let newFailFlag = cur.flags.first(where: { !beforeFlags.contains($0) && $0.contains("批量识别未完成") })
                     await MainActor.run {
                         PlanAndTaskStore.shared.savePlan(cur)
                         batchSelectedManualIds.removeAll()
                         rematchApplying = false
-                        rematchError = nil
-                        showRematchSheet = false
+                        if let failMsg = newFailFlag {
+                            rematchError = failMsg
+                        } else {
+                            rematchError = nil
+                            showRematchSheet = false
+                        }
                     }
                 } catch {
                     await MainActor.run {
@@ -549,7 +595,7 @@ public struct PreviewTabView: View {
                 await MainActor.run {
                     PlanAndTaskStore.shared.savePlan(replanned)
                     strategyApplying = false
-                    if let updated = replanned.groups.first(where: { $0.id == group.id }) {
+                    if editingStrategyGroup?.id == group.id, let updated = replanned.groups.first(where: { $0.id == group.id }) {
                         editingStrategyGroup = updated
                     }
                 }
@@ -584,6 +630,9 @@ public struct PreviewTabView: View {
             plan.groups[i].warn = nil
 
             let gid = plan.groups[i].id
+            plan.actions.removeAll { a in
+                a.groupId == gid && !a.done && a.op == "artwork" && a.mediaKind != nil && a.mediaKind != match.kind
+            }
             for aIdx in plan.actions.indices where plan.actions[aIdx].groupId == gid && plan.actions[aIdx].op == "unmatched" {
                 let old = plan.actions[aIdx].oldName
                 let (oldStem, ext) = MediaParser.splitNameExt(old)
@@ -667,7 +716,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
     let isBatchSelected: Bool
     let onToggleBatchManual: () -> Void
     let onToggleGroup: (Bool) -> Void
-    let onRematch: () -> Void
+    let onRematch: (Int?) -> Void
     let onParkRetention: () -> Void
     @ViewBuilder let detailDestination: () -> DetailDestination
 
@@ -694,10 +743,22 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
         }
     }
 
-    /// 仅保留视频/集文件条目（过滤季文件夹、海报、NFO、剧照等非集条目）。
+    /// 仅保留视频/集文件条目并按 fileId 去重（合并 rename + move，避免同一集重复计数）。
     private var episodeFileActions: [PlanAction] {
-        actions
-            .filter { $0.kind == "file" || $0.op == "unmatched" }
+        var merged: [String: PlanAction] = [:]
+        var order: [String] = []
+        for act in actions where act.kind == "file" || act.op == "unmatched" {
+            let key = act.fileId ?? act.id
+            if let existing = merged[key] {
+                if existing.op != "rename" && act.op == "rename" {
+                    merged[key] = act
+                }
+            } else {
+                merged[key] = act
+                order.append(key)
+            }
+        }
+        return order.compactMap { merged[$0] }
             .sorted { a, b in
                 let sa = resolvedSeason(for: a)
                 let sb = resolvedSeason(for: b)
@@ -805,9 +866,40 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                            Text("\(episodeFileActions.count) 个文件 · \(actions.count) 项整理操作" + (group.note.map { " · \($0)" } ?? ""))
-                                .font(.caption)
+                            if group.kind == "tv", !episodeFileActions.isEmpty {
+                                Text("已识别 \(max(1, seasonBuckets.count)) 季 \(episodeFileActions.count) 集")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if group.kind == "unmatched" {
+                                Text("同目录待手动识别")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            HStack(spacing: 10) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "film")
+                                        .font(.caption2)
+                                    Text("\(episodeFileActions.count)")
+                                        .font(.caption.monospacedDigit())
+                                }
                                 .foregroundStyle(.secondary)
+
+                                if let conf = group.confidence, !conf.isEmpty {
+                                    let confColor: Color = switch conf {
+                                    case "高": MMTheme.greenOk
+                                    case "手动": MMTheme.accent
+                                    case "中": .orange
+                                    default: MMTheme.redErr
+                                    }
+                                    Text("置信度：\(conf)")
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(confColor)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(confColor.opacity(0.14), in: Capsule())
+                                }
+                            }
 
                             if group.policyOverride != nil {
                                 Text("已启用影片级策略覆盖").font(.caption2).foregroundStyle(MMTheme.accent)
@@ -971,10 +1063,17 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                     .foregroundStyle(.secondary)
             }
 
+            let rematchSeason: Int? = (group.kind == "tv" && buckets.count > 1) ? activeSeasonNumber : nil
+            let rematchTitle: String = {
+                if let s = rematchSeason {
+                    return s == 0 ? "手动识别特别篇" : "手动识别第 \(s) 季"
+                }
+                return "手动识别"
+            }()
             Button {
-                onRematch()
+                onRematch(rematchSeason)
             } label: {
-                Label("手动识别", systemImage: "magnifyingglass")
+                Label(rematchTitle, systemImage: "magnifyingglass")
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
@@ -988,7 +1087,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
 
     @ViewBuilder
     private func episodeRowsList(_ items: [PlanAction]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let content = LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, act in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(act.newName.isEmpty ? act.oldName : act.newName)
@@ -999,7 +1098,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                         Text(act.oldName)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                            .lineLimit(1)
                     }
                 }
                 .padding(.vertical, 8)
@@ -1009,6 +1108,14 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                     Divider().opacity(0.4)
                 }
             }
+        }
+        if items.count > 5 {
+            ScrollView {
+                content
+            }
+            .frame(maxHeight: 280)
+        } else {
+            content
         }
     }
 }

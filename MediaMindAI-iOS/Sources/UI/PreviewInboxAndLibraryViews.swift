@@ -125,7 +125,7 @@ public struct FilmLibraryView: View {
                     group: grp,
                     provider: plan.provider,
                     posterUrl: posterUrl,
-                    fileCount: fileActions.count,
+                    fileCount: Set(fileActions.map { $0.fileId ?? $0.id }).count,
                     seasonCount: seasons.count,
                     organized: doneOrganize,
                     scraped: doneScrape,

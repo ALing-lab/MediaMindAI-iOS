@@ -6,6 +6,7 @@ public struct SettingsTabView: View {
     public init() {}
     @State private var settings = AppSettings.shared
     @State private var retention = RetentionZoneStore.shared
+    @State private var engineRetainedCount: Int = RetentionZoneEngine.shared.retainedRecords().count
     @State private var showClearConfirm = false
 
     public var body: some View {
@@ -60,12 +61,6 @@ public struct SettingsTabView: View {
                     } label: {
                         LabeledContent("剧集与归并策略", value: settings.policies.mergeSeries ? "自动归并" : "不归并")
                     }
-                    Toggle("同系列电影/多季自动归并", isOn: $settings.policies.mergeSeries)
-                    Picker("图片清晰度", selection: $settings.imageQuality) {
-                        ForEach(ImageQualityOption.allCases, id: \.self) { q in
-                            Text(q.label).tag(q)
-                        }
-                    }
                 }
 
                 Section("安全与数据") {
@@ -77,7 +72,7 @@ public struct SettingsTabView: View {
                     NavigationLink {
                         RetentionZoneView()
                     } label: {
-                        LabeledContent("保留区（暂存待处理文件）", value: "\(retention.items.count + RetentionZoneEngine.shared.retainedRecords().count) 项")
+                        LabeledContent("保留区（暂存待处理文件）", value: "\(retention.items.count + engineRetainedCount) 项")
                     }
                     NavigationLink {
                         StorageCacheView()
@@ -109,6 +104,7 @@ public struct SettingsTabView: View {
                 }
                 }
                 .scrollContentBackground(.hidden)
+                .onAppear { engineRetainedCount = RetentionZoneEngine.shared.retainedRecords().count }
             }
             .navigationTitle("设置")
             .confirmationDialog("清除全部本地计划、TMDB 与图片缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {

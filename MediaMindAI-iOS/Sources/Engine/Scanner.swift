@@ -136,8 +136,8 @@ public enum Scanner {
         let provider: any ScannerTmdbProvider = tmdbProvider ?? RealScannerTmdbProvider(tmdb: tmdb, ai: ai)
         if preflightTmdb {
             onProgress?("检查 TMDB 连接…", 0)
-            guard await tmdb.testConnectivity() else {
-                throw DriveError.network("无法连接 TMDB，请检查网络或镜像设置")
+            if case .failure(let err) = await tmdb.test() {
+                throw err
             }
         }
         let tvHooks = ScannerMovieLooseAndArtwork.makeTvAndBdmvHooks(
@@ -259,7 +259,8 @@ public enum Scanner {
                             visited: &visited,
                             actions: &actions,
                             groups: &groups,
-                            flags: &flags
+                            flags: &flags,
+                            parentFolderName: dir.fileName
                         )
                         continue
                     }
@@ -386,7 +387,7 @@ public enum Scanner {
         plan = SeriesMerger.mergeIfEnabled(plan, enabled: mergeEnabled, appendTag: appendTag)
         plan = await AdaptiveDirectoryPlanner.apply(plan: plan, policies: global, drive: drive)
         plan = await DuplicateRetentionPlanner.apply(plan: plan, policies: global, drive: drive)
-        plan = ManualConfirmation.applyGate(to: plan, standardSpec: true)
+        plan = ManualConfirmation.applyGate(to: plan, standardSpec: false)
 
         let conflicts = ConflictDetector.detect(in: plan.actions)
         for c in conflicts {
@@ -407,8 +408,6 @@ public enum Scanner {
                     disableIds.append(a.id)
                 } else if a.kind == "movie_nfo" || a.kind == "tvshow_nfo" {
                     if !eff.writeNfo { disableIds.append(a.id) }
-                } else if a.kind == "season_nfo" {
-                    if !eff.seasonNfo { disableIds.append(a.id) }
                 } else if a.kind == "episode_nfo" {
                     if !eff.episodeNfo { disableIds.append(a.id) }
                 } else if a.kind == "clearlogo" {
@@ -419,7 +418,7 @@ public enum Scanner {
                         disableIds.append(a.id)
                     } else if a.episode != nil && low.hasSuffix("-thumb.jpg") && !eff.downloadEpisodeThumb {
                         disableIds.append(a.id)
-                    } else if low.contains("season") && low.contains("poster") && !global.seasonPoster {
+                    } else if low.contains("season") && low.contains("poster") && !eff.seasonPoster {
                         disableIds.append(a.id)
                     } else if low.contains("poster") && !eff.downloadPoster {
                         disableIds.append(a.id)

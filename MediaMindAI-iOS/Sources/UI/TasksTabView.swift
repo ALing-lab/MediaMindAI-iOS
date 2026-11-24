@@ -23,7 +23,6 @@ public struct TasksTabView: View {
     @State private var showStopConfirm = false
     @State private var stoppingRun: TaskRun? = nil
     @State private var pendingDeleteRun: TaskRun? = nil
-    @State private var pendingCancelPlan: ScrapePlan? = nil
     @State private var copiedToast: String? = nil
 
     private var activeRun: TaskRun? {
@@ -31,23 +30,19 @@ public struct TasksTabView: View {
         return r
     }
 
-    /// 尚未执行完、且当前未在运行或排队中的识别计划（显示在「进行中」的待确认卡片）。
-    private var pendingPlans: [ScrapePlan] {
-        let runningPlanId = activeRun?.planId
-        let queuedPlanIds = Set(queue.items.map(\.planId))
-        return store.plans.filter { plan in
-            if plan.id == runningPlanId || queuedPlanIds.contains(plan.id) { return false }
-            return plan.actions.contains { !$0.done && $0.enabled && $0.op != "unmatched" }
-        }
+    /// 已暂停且尚未完成的任务记录（显示在「进行中」以便随时继续或取消）。
+    private var pausedRuns: [TaskRun] {
+        let activeId = activeRun?.id
+        return store.tasks.filter { $0.id != activeId && $0.status == "paused" }
     }
 
     private var activeCount: Int {
-        (activeRun != nil ? 1 : 0) + queue.items.count + pendingPlans.count
+        (activeRun != nil ? 1 : 0) + pausedRuns.count + queue.items.count
     }
 
     private var completedRuns: [TaskRun] {
         let activeId = activeRun?.id
-        return store.tasks.filter { $0.id != activeId }
+        return store.tasks.filter { $0.id != activeId && $0.status != "paused" }
     }
 
     public var body: some View {
@@ -67,75 +62,89 @@ public struct TasksTabView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 10)
 
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            if let copiedToast {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(MMTheme.greenOk)
-                                    Text(copiedToast)
-                                        .font(.caption)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            }
+                    let uncertain = journal.uncertainRows()
+                    let walUncertain = ReversibleWalStore.shared.uncertainRecords()
+                    let hasBanners = copiedToast != nil || reconcileHint != nil || !uncertain.isEmpty || !walUncertain.isEmpty
+                    let isTabEmpty = (selectedTab == .active && activeCount == 0) || (selectedTab == .completed && completedRuns.isEmpty)
 
-                            if let reconcileHint {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "info.circle.fill").foregroundStyle(MMTheme.accent)
-                                    Text(reconcileHint).font(.footnote)
-                                    Spacer()
-                                    Button("关闭") { self.reconcileHint = nil }
-                                        .font(.caption)
-                                        .foregroundStyle(MMTheme.accent)
-                                }
-                                .padding(12)
-                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            }
-
-                            let uncertain = journal.uncertainRows()
-                            let walUncertain = ReversibleWalStore.shared.uncertainRecords()
-                            if !uncertain.isEmpty || !walUncertain.isEmpty {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Label("检测到 \(uncertain.count + walUncertain.count) 条未收口操作日志（可能因断网或中断导致）", systemImage: "exclamationmark.triangle.fill")
-                                        .font(.footnote.weight(.medium))
-                                        .foregroundStyle(.orange)
-                                    Button {
-                                        Task { await runReconcile() }
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            if reconciling { ProgressView().controlSize(.small) }
-                                            Text(reconciling ? "核实中…" : "核实云端真实状态")
-                                                .font(.caption.weight(.semibold))
-                                        }
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(MMTheme.accent, in: Capsule())
-                                        .foregroundStyle(.white)
+                    if isTabEmpty && !hasBanners {
+                        ContentUnavailableView(
+                            selectedTab == .active ? "暂无进行中的任务" : "暂无已完成任务",
+                            systemImage: selectedTab == .active ? "bolt.circle" : "checkmark.circle",
+                            description: Text(selectedTab == .active
+                                              ? "在「预览」中点击「立即执行」后，任务卡片与实时进度会显示在这里。"
+                                              : "执行完成或已取消的任务记录会归档在这里，可随时查看日志与一键回滚。")
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                if let copiedToast {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(MMTheme.greenOk)
+                                        Text(copiedToast)
+                                            .font(.caption)
+                                        Spacer()
                                     }
-                                    .buttonStyle(.plain)
-                                    .disabled(reconciling)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(14)
-                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
 
-                            if selectedTab == .active {
-                                activeTabContent
-                            } else {
-                                completedTabContent
+                                if let reconcileHint {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "info.circle.fill").foregroundStyle(MMTheme.accent)
+                                        Text(reconcileHint).font(.footnote)
+                                        Spacer()
+                                        Button("关闭") { self.reconcileHint = nil }
+                                            .font(.caption)
+                                            .foregroundStyle(MMTheme.accent)
+                                    }
+                                    .padding(12)
+                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+
+                                if !uncertain.isEmpty || !walUncertain.isEmpty {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Label("检测到 \(uncertain.count + walUncertain.count) 条未收口操作日志（可能因断网或中断导致）", systemImage: "exclamationmark.triangle.fill")
+                                            .font(.footnote.weight(.medium))
+                                            .foregroundStyle(.orange)
+                                        Button {
+                                            Task { await runReconcile() }
+                                        } label: {
+                                            HStack(spacing: 6) {
+                                                if reconciling { ProgressView().controlSize(.small) }
+                                                Text(reconciling ? "核实中…" : "核实云端真实状态")
+                                                    .font(.caption.weight(.semibold))
+                                            }
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(MMTheme.accent, in: Capsule())
+                                            .foregroundStyle(.white)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(reconciling)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                }
+
+                                if selectedTab == .active {
+                                    activeTabContent
+                                } else {
+                                    completedTabContent
+                                }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 24)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 24)
                     }
                 }
             }
             .navigationTitle("任务中心")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .confirmationDialog("停止当前任务", isPresented: $showStopConfirm, titleVisibility: .visible) {
                 Button("停止并保留已完成项") {
                     let run = stoppingRun
@@ -191,21 +200,6 @@ public struct TasksTabView: View {
                 Text("选择停止方式：保留已完成项，或尝试把本轮已执行的云端操作逐条回滚。")
             }
             .confirmationDialog(
-                "确认取消该待执行任务？",
-                isPresented: Binding(get: { pendingCancelPlan != nil }, set: { if !$0 { pendingCancelPlan = nil } }),
-                titleVisibility: .visible
-            ) {
-                Button("取消任务", role: .destructive) {
-                    if let plan = pendingCancelPlan {
-                        store.deletePlan(id: plan.id)
-                    }
-                    pendingCancelPlan = nil
-                }
-                Button("返回", role: .cancel) { pendingCancelPlan = nil }
-            } message: {
-                Text("将移除本地待确认计划，不会改动云盘上的任何文件。")
-            }
-            .confirmationDialog(
                 "确认删除任务记录？",
                 isPresented: Binding(get: { pendingDeleteRun != nil }, set: { if !$0 { pendingDeleteRun = nil } }),
                 titleVisibility: .visible
@@ -232,7 +226,7 @@ public struct TasksTabView: View {
             ContentUnavailableView(
                 "暂无进行中的任务",
                 systemImage: "bolt.circle",
-                description: Text("在「云盘」扫描目录或在「预览」发起整理后，任务进度会显示在这里。")
+                description: Text("在「预览」中点击「立即执行」后，任务卡片与实时进度会显示在这里。")
             )
             .padding(.top, 48)
         } else {
@@ -240,12 +234,12 @@ public struct TasksTabView: View {
                 runningTaskCard(run)
             }
 
-            ForEach(queue.items) { item in
-                queuedTaskCard(item)
+            ForEach(pausedRuns) { run in
+                pausedTaskCard(run)
             }
 
-            ForEach(pendingPlans) { plan in
-                pendingPlanCard(plan)
+            ForEach(queue.items) { item in
+                queuedTaskCard(item)
             }
         }
     }
@@ -270,9 +264,15 @@ public struct TasksTabView: View {
 
     // MARK: - 1. 正在执行卡片
 
+    private func uniqueVideoCount(in plan: ScrapePlan?) -> Int? {
+        guard let plan else { return nil }
+        let keys = Set(plan.actions.filter { $0.kind == "file" }.map { $0.fileId ?? $0.id })
+        return keys.isEmpty ? nil : keys.count
+    }
+
     private func runningTaskCard(_ run: TaskRun) -> some View {
         let linkedPlan = store.plans.first(where: { $0.id == run.planId })
-        let fileCount = linkedPlan?.actions.filter { $0.kind == "file" }.count ?? run.total
+        let fileCount = uniqueVideoCount(in: linkedPlan) ?? run.total
         let folderCount = linkedPlan?.groups.count ?? 0
         let hasScrape = linkedPlan?.actions.contains(where: { $0.op == "artwork" && $0.selected }) ?? false
 
@@ -286,14 +286,13 @@ public struct TasksTabView: View {
 
             pipelineStepRow(steps: [
                 ("识别", .done),
-                ("待确认", .done),
                 ("整理", .active),
                 ("刮削", hasScrape ? .pending : .none)
             ])
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(run.message.isEmpty ? (engine.isPaused ? "已暂停执行" : "正在执行云端操作…") : run.message)
+                    Text(run.message.isEmpty ? (engine.isPaused ? "任务已暂停" : "正在执行云端操作…") : run.message)
                         .font(.caption)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -314,7 +313,7 @@ public struct TasksTabView: View {
                     stoppingRun = run
                     showStopConfirm = true
                 } label: {
-                    Text("停止任务")
+                    Text("取消任务")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(MMTheme.accent)
                         .padding(.horizontal, 16)
@@ -328,7 +327,101 @@ public struct TasksTabView: View {
                 Button {
                     engine.isPaused.toggle()
                 } label: {
-                    Text(engine.isPaused ? "继续执行" : "暂停执行")
+                    Text(engine.isPaused ? "继续任务" : "暂停任务")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background(MMTheme.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            cardFooterRow(fileCount: fileCount, folderCount: folderCount, extraCount: nil, date: run.startedAt)
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func pausedTaskCard(_ run: TaskRun) -> some View {
+        let linkedPlan = store.plans.first(where: { $0.id == run.planId })
+        let fileCount = uniqueVideoCount(in: linkedPlan) ?? run.total
+        let folderCount = linkedPlan?.groups.count ?? 0
+        let hasScrape = linkedPlan?.actions.contains(where: { $0.op == "artwork" && $0.selected }) ?? false
+
+        return VStack(alignment: .leading, spacing: 10) {
+            NavigationLink {
+                CompletedTaskDetailScreen(run: run)
+            } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    cardHeaderRow(
+                        taskId: run.id,
+                        subtitle: "\(providerDisplay(run.provider)) · \(run.sourceLabel.isEmpty ? run.planId : run.sourceLabel)",
+                        badgeText: "已暂停",
+                        badgeColor: .orange,
+                        showCopyButton: false
+                    )
+
+                    pipelineStepRow(steps: [
+                        ("识别", .done),
+                        ("整理", .active),
+                        ("刮削", hasScrape ? .pending : .none)
+                    ])
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("任务已暂停 · 已完成 \(run.completed)/\(run.total)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("查看详情 ›")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(MMTheme.accent)
+                        }
+                        ProgressView(value: Double(run.completed), total: Double(max(1, run.total)))
+                            .tint(.orange)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            HStack {
+                Button {
+                    var stopped = run
+                    stopped.status = "stopped"
+                    stopped.message = "已取消"
+                    stopped.finishedAt = Date()
+                    store.saveTask(stopped)
+                } label: {
+                    Text("取消任务")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(MMTheme.accent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.secondary.opacity(0.14), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    guard let pausedPlan = linkedPlan,
+                          let acct = AccountStore.shared.get(id: run.accountId),
+                          let drive = try? AccountStore.shared.buildDrive(for: acct) else {
+                        reconcileHint = "找不到原计划或云盘账号，无法继续任务"
+                        return
+                    }
+                    var superseded = run
+                    superseded.status = "stopped"
+                    superseded.message = "已发起续跑任务"
+                    store.saveTask(superseded)
+                    ExecutionEngine.shared.enqueueOrStart(plan: pausedPlan, drive: drive)
+                } label: {
+                    Text("继续任务")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 18)
@@ -357,7 +450,6 @@ public struct TasksTabView: View {
 
             pipelineStepRow(steps: [
                 ("识别", .done),
-                ("待确认", .done),
                 ("整理", .pending),
                 ("刮削", .pending)
             ])
@@ -383,97 +475,13 @@ public struct TasksTabView: View {
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - 3. 待确认计划卡片（对应参考图 1）
-
-    private func pendingPlanCard(_ plan: ScrapePlan) -> some View {
-        let rootPath = plan.roots.map(\.name).joined(separator: "、")
-        let fileCount = plan.actions.filter { $0.kind == "file" }.count
-        let folderCount = plan.groups.count
-        let selectedCount = plan.actions.filter { $0.selected && !$0.done && $0.op != "unmatched" }.count
-        let hasScrape = plan.actions.contains { $0.op == "artwork" && $0.enabled }
-
-        return VStack(alignment: .leading, spacing: 10) {
-            cardHeaderRow(
-                taskId: plan.id,
-                subtitle: "\(providerDisplay(plan.provider)) · \(rootPath.isEmpty ? "待确认计划" : rootPath)",
-                badgeText: "本机执行",
-                badgeColor: .blue
-            )
-
-            pipelineStepRow(steps: [
-                ("识别", .done),
-                ("待确认", .active),
-                ("整理", .pending),
-                ("刮削", hasScrape ? .pending : .none)
-            ])
-
-            Button {
-                onOpenPreview()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(MMTheme.accent)
-                    Text("识别完成，请确认结果后继续执行")
-                        .font(.caption)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Spacer()
-                    HStack(spacing: 2) {
-                        Text("去确认")
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MMTheme.accent)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 9)
-                .background(MMTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            HStack {
-                Button {
-                    pendingCancelPlan = plan
-                } label: {
-                    Text("取消任务")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(MMTheme.accent)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.secondary.opacity(0.14), in: Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Button {
-                    startPlan(plan)
-                } label: {
-                    Text(selectedCount > 0 ? "立即执行" : "去预览确认")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
-                        .background(MMTheme.accent, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-
-            cardFooterRow(fileCount: fileCount, folderCount: folderCount, extraCount: nil, date: plan.createdAt)
-        }
-        .padding(14)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
     // MARK: - 4. 已完成 / 已取消历史卡片（对应参考图 2）
 
     private func completedTaskCard(_ run: TaskRun) -> some View {
         let linkedPlan = store.plans.first(where: { $0.id == run.planId })
         let rows = journal.rows(forRunId: run.id)
         let walRows = ReversibleWalStore.shared.rows(taskId: run.id)
-        let fileCount = linkedPlan?.actions.filter { $0.kind == "file" }.count ?? max(run.total, rows.filter { $0.kind == "file" }.count)
+        let fileCount = uniqueVideoCount(in: linkedPlan) ?? max(run.total, rows.filter { $0.kind == "file" }.count)
         let folderCount = linkedPlan?.groups.count ?? rows.filter { $0.kind == "folder" }.count
         let artworkCount = rows.filter { $0.op == "artwork" }.count
         let isStopped = run.status == "stopped"
@@ -482,10 +490,9 @@ public struct TasksTabView: View {
         let hasRollback = journal.hasRollbackableRows(runId: run.id) || walRows.contains(where: { $0.state == "applied" })
 
         let steps: [(String, StepState)] = isStopped
-            ? [("识别", .cancelled), ("待确认", .cancelled), ("整理", .cancelled), ("刮削", .cancelled)]
+            ? [("识别", .cancelled), ("整理", .cancelled), ("刮削", .cancelled)]
             : [
                 ("识别", .done),
-                ("待确认", .done),
                 ("整理", run.failed > 0 && run.succeeded == 0 ? .failed : .done),
                 ("刮削", hasScrape ? .done : .none)
             ]
@@ -498,7 +505,8 @@ public struct TasksTabView: View {
                     taskId: run.id,
                     subtitle: "\(providerDisplay(run.provider)) · \(run.sourceLabel.isEmpty ? run.planId : run.sourceLabel)",
                     badgeText: "本机执行",
-                    badgeColor: .blue
+                    badgeColor: .blue,
+                    showCopyButton: false
                 )
 
                 pipelineStepRow(steps: steps)
@@ -596,21 +604,23 @@ public struct TasksTabView: View {
         case done, active, pending, cancelled, failed, none
     }
 
-    private func cardHeaderRow(taskId: String, subtitle: String, badgeText: String, badgeColor: Color) -> some View {
+    private func cardHeaderRow(taskId: String, subtitle: String, badgeText: String, badgeColor: Color, showCopyButton: Bool = true) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(taskId)
                     .font(.subheadline.monospaced().bold())
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Button {
-                    copyTaskId(taskId)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                if showCopyButton {
+                    Button {
+                        copyTaskId(taskId)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -704,20 +714,6 @@ public struct TasksTabView: View {
                 }
             }
         }
-    }
-
-    private func startPlan(_ plan: ScrapePlan) {
-        let selectedCount = plan.actions.filter { $0.selected && !$0.done && $0.op != "unmatched" }.count
-        guard selectedCount > 0 else {
-            onOpenPreview()
-            return
-        }
-        guard let acct = AccountStore.shared.accounts.first(where: { $0.id == plan.accountId }),
-              let drive = try? AccountStore.shared.buildDrive(for: acct) else {
-            reconcileHint = "找不到该计划对应的云盘账号，无法启动执行"
-            return
-        }
-        ExecutionEngine.shared.enqueueOrStart(plan: plan, drive: drive)
     }
 
     private static let shortDateFormatter: DateFormatter = {

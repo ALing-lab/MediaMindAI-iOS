@@ -3,7 +3,7 @@ import UIKit
 
 /// 任务执行结果详情页（参考图 3/4/5：顶部暖色结果头 + 每部作品海报与「已整理 / 已刮削」状态条 + 整理日志 / 刮削日志底部抽屉 + 重试与一键撤销回滚）。
 public struct CompletedTaskDetailScreen: View {
-    public let run: TaskRun
+    private let initialRun: TaskRun
 
     @State private var showLogSheet = false
     @State private var initialLogTab: TaskLogTab = .organize
@@ -13,7 +13,14 @@ public struct CompletedTaskDetailScreen: View {
     @State private var showRollbackConfirm = false
 
     public init(run: TaskRun) {
-        self.run = run
+        self.initialRun = run
+    }
+
+    private var run: TaskRun {
+        if ExecutionEngine.shared.currentRun?.id == initialRun.id, let live = ExecutionEngine.shared.currentRun {
+            return live
+        }
+        return PlanAndTaskStore.shared.tasks.first(where: { $0.id == initialRun.id }) ?? initialRun
     }
 
     private var journalRows: [JournalRow] {
@@ -39,7 +46,7 @@ public struct CompletedTaskDetailScreen: View {
 
     private var totalFileCount: Int {
         if let plan = matchingPlan {
-            let files = plan.actions.filter { $0.kind == "file" }.count
+            let files = Set(plan.actions.filter { $0.kind == "file" }.map { $0.fileId ?? $0.id }).count
             if files > 0 { return files }
         }
         return run.total
@@ -53,11 +60,11 @@ public struct CompletedTaskDetailScreen: View {
         ZStack(alignment: .top) {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            // 顶部暖金光晕渐变头（适配浅色/深色模式）
+            // 顶部暖金光晕渐变头（成功与未完成统一暖金渐变，适配浅色/深色模式）
             LinearGradient(
                 colors: [
-                    (isAllSucceeded ? Color.orange : (run.failed > 0 ? MMTheme.redErr : Color.secondary)).opacity(0.32),
-                    (isAllSucceeded ? Color.yellow : MMTheme.accent).opacity(0.10),
+                    Color(red: 1.0, green: 0.84, blue: 0.28).opacity(0.42),
+                    Color(red: 1.0, green: 0.90, blue: 0.50).opacity(0.14),
                     Color.clear
                 ],
                 startPoint: .top,
@@ -165,17 +172,19 @@ public struct CompletedTaskDetailScreen: View {
                         LinearGradient(
                             colors: isAllSucceeded
                                 ? [Color(red: 1.0, green: 0.84, blue: 0.35), MMTheme.accent]
-                                : (run.failed > 0
-                                    ? [MMTheme.redErr.opacity(0.85), MMTheme.redErr]
-                                    : [Color.secondary.opacity(0.45), Color.secondary.opacity(0.7)]),
+                                : [Color(red: 0.98, green: 0.67, blue: 0.50), Color(red: 0.92, green: 0.45, blue: 0.34)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 56, height: 56)
-                Image(systemName: isAllSucceeded ? "face.smiling" : (run.failed > 0 ? "exclamationmark.triangle.fill" : "minus.circle.fill"))
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(.white)
+                if isAllSucceeded {
+                    Image(systemName: "face.smiling")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(.white)
+                } else {
+                    SadFaceEmblem(size: 32, strokeColor: Color.black.opacity(0.75))
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -194,30 +203,48 @@ public struct CompletedTaskDetailScreen: View {
 
     private var heroTitle: String {
         if isAllSucceeded { return "全部成功" }
-        if run.status == "stopped" { return "已取消" }
-        if run.status == "paused" { return "已暂停" }
-        if run.failed > 0 { return "部分失败" }
-        return "执行完成"
+        return "任务未完成"
     }
 
     private var heroSubtitle: String {
         if isAllSucceeded {
             return "智能整理和刮削影视库，帮助你轻松管理媒体库，秒出海报墙"
         }
-        return "成功 \(run.succeeded) 项 · 失败 \(run.failed) 项 · 共 \(run.total) 项"
+        if run.status == "stopped" {
+            return run.failed > 0
+                ? "任务已手动停止（成功 \(run.succeeded) / 失败 \(run.failed) / 共 \(run.total)）"
+                : "任务已手动停止，尚有未完成操作（已完成 \(run.succeeded)/\(run.total)）"
+        }
+        if run.status == "paused" {
+            return run.failed > 0
+                ? "任务已暂停（成功 \(run.succeeded) / 失败 \(run.failed) / 共 \(run.total)）"
+                : "任务已暂停，可返回任务中心继续执行（已完成 \(run.succeeded)/\(run.total)）"
+        }
+        return "任务执行失败，请检查后重新尝试（成功 \(run.succeeded) / 失败 \(run.failed)）"
     }
 
     // MARK: - 单部作品整理/刮削结果卡（参考图 3）
 
     private func workResultCard(group g: PlanGroup, plan: ScrapePlan) -> some View {
         let groupActions = plan.actions.filter { $0.groupId == g.id }
+        let groupActionIds = Set(groupActions.map(\.id))
         let fileActions = groupActions.filter { $0.kind == "file" }
+        let uniqueFileCount = Set(fileActions.map { $0.fileId ?? $0.id }).count
         let seasons = Set(fileActions.compactMap(\.season))
-        let organizedDone = groupActions.contains { ($0.op == "rename" || $0.op == "move" || $0.op == "mkdir") && $0.done }
-            || journalRows.contains { $0.op != "artwork" && $0.status == .applied }
-        let scrapedDone = groupActions.contains { $0.op == "artwork" && $0.done }
-            || journalRows.contains { $0.op == "artwork" && $0.status == .applied }
-        let hasScrapePlanned = groupActions.contains { $0.op == "artwork" && $0.enabled }
+
+        let fileRenameActions = groupActions.filter { $0.op == "rename" && $0.kind == "file" && $0.selected }
+        let folderRenameActions = groupActions.filter { ($0.op == "rename" || $0.op == "mkdir") && $0.kind == "folder" && $0.selected }
+        let organizeActions = groupActions.filter { ($0.op == "rename" || $0.op == "move" || $0.op == "mkdir") && $0.selected }
+        let scrapeActions = groupActions.filter { $0.op == "artwork" && $0.selected }
+
+        let groupJournal = journalRows.filter { groupActionIds.contains($0.actionId) }
+        let organizeAllDone = (!organizeActions.isEmpty && organizeActions.allSatisfy(\.done))
+            || (organizeActions.isEmpty && groupJournal.contains { $0.op != "artwork" && $0.status == .applied })
+        let scrapeAllDone = (!scrapeActions.isEmpty && scrapeActions.allSatisfy(\.done))
+            || (scrapeActions.isEmpty && groupJournal.contains { $0.op == "artwork" && $0.status == .applied })
+        let fileRenameAllDone = !fileRenameActions.isEmpty && fileRenameActions.allSatisfy(\.done)
+        let folderRenameAllDone = !folderRenameActions.isEmpty && folderRenameActions.allSatisfy(\.done)
+        let hasScrapePlanned = !scrapeActions.isEmpty
 
         let posterURL: URL? = g.posterPath.flatMap { AppSettings.shared.imageUrl(path: $0, size: "w185") }
         let badgeText: String = switch g.kind {
@@ -259,23 +286,35 @@ public struct CompletedTaskDetailScreen: View {
                         .lineLimit(1)
                 }
 
-                Text(g.kind == "tv"
-                     ? "整理 \(fileActions.count) 集 | 成功执行 \(groupActions.filter(\.done).count) 项操作"
-                     : "整理 \(fileActions.count) 个文件 | 成功执行 \(groupActions.filter(\.done).count) 项操作")
+                let selectedCount = groupActions.filter(\.selected).count
+                Text(selectedCount == 0
+                     ? "未纳入本次执行"
+                     : (g.kind == "tv"
+                        ? "整理 \(uniqueFileCount) 集 | 已完成 \(groupActions.filter(\.done).count)/\(selectedCount) 项"
+                        : "整理 \(uniqueFileCount) 个文件 | 已完成 \(groupActions.filter(\.done).count)/\(selectedCount) 项"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    stageBadge(title: organizedDone ? "已整理" : "未整理", ok: organizedDone)
-
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.28))
-                        .frame(height: 1)
-                        .frame(maxWidth: 32)
-
-                    if hasScrapePlanned || scrapedDone {
-                        stageBadge(title: scrapedDone ? "已刮削" : "未刮削", ok: scrapedDone)
+                    if selectedCount == 0 {
+                        stageBadge(title: "未执行", ok: false, failed: false)
+                    } else if !isAllSucceeded && !hasScrapePlanned && !fileRenameActions.isEmpty && !folderRenameActions.isEmpty {
+                        stageBadge(title: "文件重命名", ok: fileRenameAllDone, failed: !fileRenameAllDone)
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.28))
+                            .frame(height: 1)
+                            .frame(maxWidth: 24)
+                        stageBadge(title: "文件夹重命名", ok: folderRenameAllDone, failed: !folderRenameAllDone)
+                    } else {
+                        stageBadge(title: organizeAllDone ? "已整理" : "整理未完成", ok: organizeAllDone, failed: !organizeAllDone && !isAllSucceeded)
+                        if hasScrapePlanned || scrapeAllDone {
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.28))
+                                .frame(height: 1)
+                                .frame(maxWidth: 28)
+                            stageBadge(title: scrapeAllDone ? "已刮削" : "刮削未完成", ok: scrapeAllDone, failed: !scrapeAllDone && !isAllSucceeded)
+                        }
                     }
 
                     Spacer(minLength: 4)
@@ -325,17 +364,30 @@ public struct CompletedTaskDetailScreen: View {
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func stageBadge(title: String, ok: Bool) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: ok ? "checkmark.circle.fill" : "circle")
-                .font(.caption)
+    private func stageBadge(title: String, ok: Bool, failed: Bool = false) -> some View {
+        let tint: Color = ok ? MMTheme.greenOk : (failed ? Color(red: 0.96, green: 0.36, blue: 0.28) : .secondary)
+        return HStack(spacing: 4) {
+            if ok {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+            } else if failed {
+                ZStack {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 15, height: 15)
+                    SadFaceEmblem(size: 10, strokeColor: .white)
+                }
+            } else {
+                Image(systemName: "circle")
+                    .font(.caption)
+            }
             Text(title)
                 .font(.caption2.weight(.semibold))
         }
-        .foregroundStyle(ok ? MMTheme.greenOk : .secondary)
+        .foregroundStyle(tint)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background((ok ? MMTheme.greenOk : Color.secondary).opacity(0.14), in: Capsule())
+        .background(tint.opacity(0.14), in: Capsule())
     }
 
     // MARK: - 底部操作区
@@ -360,7 +412,7 @@ public struct CompletedTaskDetailScreen: View {
                 .buttonStyle(.plain)
             }
 
-            if run.failed > 0, matchingPlan != nil {
+            if !isAllSucceeded, matchingPlan != nil {
                 Divider().padding(.leading, 44)
                 Button {
                     retryFailedActions()
@@ -488,7 +540,6 @@ private struct TaskExecutionLogSheet: View {
     let journalRows: [JournalRow]
     let walRows: [ReversibleWalRecord]
 
-    @Environment(\.dismiss) private var dismiss
     @State private var selectedTab: TaskLogTab
 
     init(run: TaskRun, initialTab: TaskLogTab, journalRows: [JournalRow], walRows: [ReversibleWalRecord]) {
@@ -661,7 +712,7 @@ private struct TaskExecutionLogSheet: View {
         case "trash":
             return "清理重复/保留项"
         case "artwork", "upload":
-            if kind == "episode_nfo" || (low.hasSuffix(".nfo") && low.contains("s0")) { return "上传分集 NFO" }
+            if kind == "episode_nfo" || (low.hasSuffix(".nfo") && low.range(of: #"s\d{1,2}e\d{1,3}"#, options: .regularExpression) != nil) { return "上传分集 NFO" }
             if kind == "season_nfo" || low == "season.nfo" { return "上传季 NFO" }
             if kind == "tvshow_nfo" || kind == "movie_nfo" || low.hasSuffix(".nfo") { return "上传作品 NFO" }
             if kind == "clearlogo" || low.contains("logo") { return "上传作品 LOGO" }
@@ -691,4 +742,24 @@ private struct TaskExecutionLogSheet: View {
         f.dateFormat = "MM-dd HH:mm:ss"
         return f
     }()
+}
+
+private struct SadFaceEmblem: View {
+    let size: CGFloat
+    let strokeColor: Color
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let w = sz.width
+            let h = sz.height
+            let eyeR = max(1.0, w * 0.085)
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.30 - eyeR, y: h * 0.36 - eyeR, width: eyeR * 2, height: eyeR * 2)), with: .color(strokeColor))
+            ctx.fill(Path(ellipseIn: CGRect(x: w * 0.70 - eyeR, y: h * 0.36 - eyeR, width: eyeR * 2, height: eyeR * 2)), with: .color(strokeColor))
+            var mouth = Path()
+            mouth.move(to: CGPoint(x: w * 0.30, y: h * 0.72))
+            mouth.addQuadCurve(to: CGPoint(x: w * 0.70, y: h * 0.72), control: CGPoint(x: w * 0.50, y: h * 0.52))
+            ctx.stroke(mouth, with: .color(strokeColor), style: StrokeStyle(lineWidth: max(1.2, w * 0.08), lineCap: .round))
+        }
+        .frame(width: size, height: size)
+    }
 }

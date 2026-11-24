@@ -140,6 +140,13 @@ public enum ScannerReplan {
             throw ScannerReplanError.looseStrategyUnsupported
         }
 
+        if old.id.hasPrefix("unmatched-dir-") {
+            let ids = plan.actions.filter { $0.groupId == groupId && $0.op == "unmatched" && !$0.done }.map(\.id)
+            if !ids.isEmpty {
+                return try await replanFiles(plan: plan, actionIds: ids, info: info, cloud: cloud, hooks: hooks)
+            }
+        }
+
         guard let folderId = old.folderId else {
             var loose = try await replanLoose(
                 plan: plan,
@@ -466,7 +473,7 @@ public enum ScannerReplan {
         hooks: ScannerReplanHooks
     ) async throws -> ScrapePlan {
         guard cloud.accountId == plan.accountId else { throw ScannerReplanError.accountMismatch }
-        guard let source = plan.actions.first(where: { $0.id == actionId && $0.op == "unmatched" && !$0.done }) else {
+        guard let source = plan.actions.first(where: { $0.id == actionId && !$0.done && ($0.op == "unmatched" || $0.kind == "file") }) else {
             throw ScannerReplanError.fileAlreadyProcessed
         }
         guard source.fileId != nil && source.parentId != nil else {
@@ -479,18 +486,39 @@ public enum ScannerReplan {
         }
         let temporaryId = "manual-\(UUID().uuidString.lowercased())"
         let origGroup = plan.groups.first(where: { $0.id == source.groupId })
+        var detachedIds: Set<String> = [actionId]
+        if source.op != "unmatched" {
+            let ls0 = MediaParser.splitNameExt(source.oldName).0.lowercased()
+            for a in plan.actions where a.groupId == source.groupId && !a.done {
+                if let fid = source.fileId, a.fileId == fid {
+                    detachedIds.insert(a.id)
+                } else if a.op == "artwork", source.season != nil, source.episode != nil,
+                          a.season == source.season, a.episode == source.episode {
+                    detachedIds.insert(a.id)
+                } else if (a.kind == "subtitle" || a.kind == "companion"),
+                          a.parentId == source.parentId, !ls0.isEmpty {
+                    let lc = MediaParser.splitNameExt(a.oldName).0.lowercased()
+                    if lc == ls0 || lc.hasPrefix("\(ls0).") || lc.hasPrefix("\(ls0)-") || lc.hasPrefix("\(ls0)_") {
+                        detachedIds.insert(a.id)
+                    }
+                }
+            }
+        }
         var working = plan
-        working.actions = plan.actions.map { a in
-            guard a.id == actionId else { return a }
-            return PlanAction(
-                id: a.id, op: a.op, groupId: temporaryId, fileId: a.fileId, parentId: a.parentId,
-                oldName: a.oldName, newName: a.newName, destParentId: a.destParentId, destRef: a.destRef,
-                destLabel: a.destLabel, kind: a.kind, mediaKind: a.mediaKind, tmdbId: a.tmdbId,
-                season: a.season, episode: a.episode, artworkUrl: a.artworkUrl,
-                selected: a.selected, enabled: a.enabled, blocked: a.blocked, done: a.done, error: a.error, note: a.note,
-                metadataSeason: a.metadataSeason, metadataEpisode: a.metadataEpisode,
-                replaceExisting: a.replaceExisting, folderPath: a.folderPath
-            )
+        working.actions = plan.actions.compactMap { a -> PlanAction? in
+            if a.id == actionId {
+                return PlanAction(
+                    id: a.id, op: a.op, groupId: temporaryId, fileId: a.fileId, parentId: a.parentId,
+                    oldName: a.oldName, newName: a.newName, destParentId: a.destParentId, destRef: a.destRef,
+                    destLabel: a.destLabel, kind: a.kind, mediaKind: a.mediaKind, tmdbId: a.tmdbId,
+                    season: a.season, episode: a.episode, artworkUrl: a.artworkUrl,
+                    selected: a.selected, enabled: a.enabled, blocked: a.blocked, done: a.done, error: a.error, note: a.note,
+                    metadataSeason: a.metadataSeason, metadataEpisode: a.metadataEpisode,
+                    replaceExisting: a.replaceExisting, folderPath: a.folderPath
+                )
+            }
+            if detachedIds.contains(a.id) { return nil }
+            return a
         }
         working.groups.append(PlanGroup(
             id: temporaryId,
@@ -520,10 +548,23 @@ public enum ScannerReplan {
             hooks: hooks
         )
         let sourceGroup = source.groupId
+        if let srcSeason = source.season {
+            let stillHasSeasonVideo = result.actions.contains {
+                $0.groupId == sourceGroup && $0.kind == "file" && $0.season == srcSeason
+            }
+            if !stillHasSeasonVideo {
+                result.actions.removeAll { a in
+                    a.groupId == sourceGroup && !a.done && a.season == srcSeason && (a.op == "mkdir" || a.op == "artwork")
+                }
+            }
+        }
+        if let sgIdx = result.groups.firstIndex(where: { $0.id == sourceGroup }) {
+            result.groups[sgIdx].actionIds = result.actions.filter { $0.groupId == sourceGroup }.map(\.id)
+        }
         result.groups = result.groups.filter { $0.id != sourceGroup || result.actions.contains(where: { a in a.groupId == sourceGroup }) }
         let oldGroupIds = Set(plan.groups.map { $0.id })
         let freshFiles = Set(result.actions.filter { !oldGroupIds.contains($0.groupId) }.compactMap { $0.fileId })
-        if plan.actions.contains(where: { $0.id != actionId && $0.fileId.map { freshFiles.contains($0) } == true && PlanSelection.executable($0) }) {
+        if plan.actions.contains(where: { !detachedIds.contains($0.id) && $0.fileId.map { freshFiles.contains($0) } == true && PlanSelection.executable($0) }) {
             throw ScannerReplanError.duplicateInOtherAction
         }
         return result
@@ -553,7 +594,9 @@ public enum ScannerReplan {
         cur = mergeAddedGroups(cur, existingGroupIds: existingGroupIds, bySourceRoot: true)
         if !failures.isEmpty {
             let appended = failures.map { "批量识别未完成 — \($0)" }
-            cur.flags = Array(Set(cur.flags + appended))
+            for flag in appended where !cur.flags.contains(flag) {
+                cur.flags.append(flag)
+            }
         }
         return cur
     }
@@ -675,7 +718,9 @@ public enum ScannerReplan {
         cur = mergeAddedGroups(cur, existingGroupIds: existingGroupIds, bySourceRoot: false)
         if !failures.isEmpty {
             let appended = failures.map { "批量识别未完成 — \($0)" }
-            cur.flags = Array(Set(cur.flags + appended))
+            for flag in appended where !cur.flags.contains(flag) {
+                cur.flags.append(flag)
+            }
         }
         return cur
     }

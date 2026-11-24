@@ -109,7 +109,15 @@ public struct MediaDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .task(id: "\(g.id)-\(g.tmdbId ?? 0)-\(pageList.count)-\(eff.downloadEpisodeThumb)-\(eff.episodeNfo)") {
+                .onChange(of: g.tmdbId) { _, _ in
+                    seasonMetas.removeAll()
+                    episodeMetas.removeAll()
+                    movieMetas.removeAll()
+                    fetchedClearlogoPath = nil
+                    fetchedBackdropPath = nil
+                    currentPageIndex = 0
+                }
+                .task(id: "\(g.id)-\(g.tmdbId ?? 0)-\(pageList.count)-\(eff.scrapeEnabled)-\(eff.downloadFanart)-\(eff.downloadClearlogo)-\(eff.downloadEpisodeThumb)-\(eff.episodeNfo)") {
                     await loadMetadata(for: g, pageList: pageList, eff: eff)
                 }
             } else {
@@ -121,7 +129,7 @@ public struct MediaDetailView: View {
     // MARK: - 1. 顶部作品头卡
 
     private func headerCard(for g: PlanGroup, actions: [PlanAction]) -> some View {
-        let fileCount = actions.filter { $0.kind == "file" }.count
+        let fileCount = Set(actions.filter { $0.kind == "file" }.map { $0.fileId ?? $0.id }).count
         return HStack(alignment: .top, spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -395,6 +403,20 @@ public struct MediaDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
 
+                            if g.kind == "tv", eff.scrapeEnabled, eff.downloadEpisodeThumb {
+                                let loadedMetas = page.episodes.compactMap { $0.metaLookupKey.flatMap { episodeMetas[$0] } }
+                                let anyThumb = page.episodes.contains { ep in
+                                    if let raw = ep.thumbUrl, !raw.isEmpty { return true }
+                                    if let sp = ep.metaLookupKey.flatMap({ episodeMetas[$0]?.stillPath }), !sp.isEmpty { return true }
+                                    return false
+                                }
+                                if !loadedMetas.isEmpty && !anyThumb {
+                                    Label("当前剧集在 TMDB 暂无单集缩略图", systemImage: "info.circle")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+
                             ForEach(Array(page.episodes.enumerated()), id: \.element.id) { idx, ep in
                                 episodeDetailRow(group: g, page: page, ep: ep, eff: eff)
                                 if idx + 1 < page.episodes.count {
@@ -415,9 +437,9 @@ public struct MediaDetailView: View {
             .clipped()
             .contentShape(Rectangle())
             .simultaneousGesture(
-                DragGesture(minimumDistance: 28, coordinateSpace: .local)
+                DragGesture(minimumDistance: 28, coordinateSpace: .global)
                     .onEnded { value in
-                        guard pageList.count > 1 else { return }
+                        guard pageList.count > 1, value.startLocation.x > 32 else { return }
                         let dx = value.translation.width
                         let dy = value.translation.height
                         guard abs(dx) > abs(dy) * 1.4, abs(dx) > 44 else { return }
@@ -452,9 +474,7 @@ public struct MediaDetailView: View {
         let showSeasonPoster = g.kind == "tv"
             ? (eff.scrapeEnabled && eff.seasonPoster)
             : (eff.scrapeEnabled && eff.downloadPoster)
-        let showSeasonNfo = g.kind == "tv"
-            ? (eff.scrapeEnabled && eff.seasonNfo)
-            : (eff.scrapeEnabled && eff.writeNfo)
+        let showSeasonNfo = g.kind != "tv" && eff.scrapeEnabled && eff.writeNfo
 
         HStack(alignment: .top, spacing: 12) {
             if showSeasonPoster {
@@ -554,10 +574,21 @@ public struct MediaDetailView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(Color.secondary.opacity(0.16))
-                        TmdbImageView(
-                            url: thumbURL,
-                            placeholderSystemName: "photo.tv"
-                        )
+                        if thumbURL != nil {
+                            TmdbImageView(
+                                url: thumbURL,
+                                placeholderSystemName: "photo.tv"
+                            )
+                        } else {
+                            VStack(spacing: 3) {
+                                Image(systemName: "photo.slash")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("暂无缩略图")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                     .frame(width: 96, height: 54)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -573,20 +604,26 @@ public struct MediaDetailView: View {
                         Text("原：\(ep.oldFileName)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-
-                    if showEpNfo, let nfoName = ep.episodeNfoFileName {
-                        Label(nfoName, systemImage: "doc.text")
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
 
-                    if showEpThumb, let thumbName = ep.episodeThumbFileName {
-                        Label(thumbName, systemImage: "photo")
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
+                    if g.kind == "tv" {
+                        Label(showEpNfo ? "集NFO已启用" : "集NFO已关闭", systemImage: "doc.text")
+                            .font(.caption2)
+                            .foregroundStyle(showEpNfo ? MMTheme.greenOk : .secondary)
+                            .lineLimit(1)
+
+                        let thumbStatusText: String = {
+                            guard showEpThumb else { return "集缩略图已关闭" }
+                            return thumbURL == nil ? "集缩略图已开启（TMDB 暂无）" : "集缩略图已开启"
+                        }()
+                        let thumbStatusColor: Color = {
+                            guard showEpThumb else { return .secondary }
+                            return thumbURL == nil ? .orange : MMTheme.greenOk
+                        }()
+                        Label(thumbStatusText, systemImage: "photo")
+                            .font(.caption2)
+                            .foregroundStyle(thumbStatusColor)
                             .lineLimit(1)
                     }
                 }
@@ -711,9 +748,6 @@ public struct MediaDetailView: View {
                     $0.op == "artwork" && $0.kind == "image" && $0.season == s && $0.episode == nil
                     && $0.newName.lowercased().contains("poster")
                 }
-                let seasonNfoAct = actions.first {
-                    $0.op == "artwork" && $0.kind == "season_nfo" && $0.season == s
-                }
                 let seasonFiles = uniqueFiles
                     .filter { ($0.season ?? 1) == s }
                     .sorted { ($0.episode ?? 0) < ($1.episode ?? 0) }
@@ -728,7 +762,7 @@ public struct MediaDetailView: View {
                     folderName: folderName,
                     posterFileName: posterFile,
                     posterUrl: seasonPosterAct?.artworkUrl,
-                    nfoFileName: seasonNfoAct?.newName ?? "season.nfo",
+                    nfoFileName: nil,
                     episodes: eps
                 )
             }

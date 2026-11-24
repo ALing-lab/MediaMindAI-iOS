@@ -116,24 +116,49 @@ public enum SeriesMerger {
         return mergeSplitTvSeasons(out)
     }
 
-    /// 1:1 复刻 Android `SeriesMerger.mergeSplitTvSeasons`：将同父目录下同剧集拆散的多个季文件夹合并归组。
+    /// 跨文件夹合并同剧多季与同系列电影合集为同一张作品卡（即使文件分散在不同目录）。
     public static func mergeSplitTvSeasons(_ plan: ScrapePlan) -> ScrapePlan {
-        let tvGroups = plan.groups.filter { $0.kind == "tv" && $0.tmdbId != nil && $0.folderId != nil }
-        let byShow = Dictionary(grouping: tvGroups) { g -> String in
-            let parent = plan.actions.first(where: { $0.groupId == g.id && $0.fileId == g.folderId })?.parentId ?? g.sourceRootId ?? ""
-            return "\(parent)|\(g.tmdbId ?? 0)"
-        }
         var remap: [String: String] = [:]
+        var upgradedCollectionTitle: [String: String] = [:]
+        var droppedDuplicateFolderRenameIds = Set<String>()
         var extraFlags: [String] = []
+
+        // 1. 同一 TMDB 剧集（即使分散在不同目录）统一合并到主作品卡
+        let tvGroups = plan.groups.filter { $0.kind == "tv" && ($0.tmdbId ?? 0) > 0 }
+        let byShow = Dictionary(grouping: tvGroups) { $0.tmdbId ?? -1 }
         for (_, bucket) in byShow where bucket.count >= 2 {
             let primary = bucket[0]
             for extra in bucket.dropFirst() {
                 remap[extra.id] = primary.id
+                // 避免副目录与主目录重命名为相同剧集目录名，并去重副目录重复的整剧级素材
+                let dupArtNames: Set<String> = ["tvshow.nfo", "poster.jpg", "fanart.jpg", "backdrop.jpg", "clearlogo.png"]
+                for act in plan.actions where act.groupId == extra.id {
+                    if let fid = extra.folderId, act.op == "rename", act.kind == "folder", act.fileId == fid {
+                        droppedDuplicateFolderRenameIds.insert(act.id)
+                    } else if act.op == "artwork", dupArtNames.contains(act.newName.lowercased()) {
+                        droppedDuplicateFolderRenameIds.insert(act.id)
+                    }
+                }
             }
-            extraFlags.append("已合并《\(primary.title)》同目录下 \(bucket.count) 个分散季文件夹")
+            extraFlags.append("已合并《\(primary.title)》跨目录 \(bucket.count) 组剧集为同一作品卡")
         }
+
+        // 2. 同一 TMDB 系列电影合集（即使分散在不同目录）统一合并为一张合集作品卡
+        let movieGroups = plan.groups.filter { $0.kind == "movie" && ($0.collectionId ?? 0) > 0 }
+        let byCollection = Dictionary(grouping: movieGroups) { $0.collectionId ?? -1 }
+        for (_, bucket) in byCollection where bucket.count >= 2 {
+            let primary = bucket[0]
+            let colName = bucket.compactMap(\.collectionName).first(where: { !$0.isEmpty }) ?? primary.title
+            upgradedCollectionTitle[primary.id] = colName
+            for extra in bucket.dropFirst() {
+                remap[extra.id] = primary.id
+            }
+            extraFlags.append("已合并《\(colName)》系列 \(bucket.count) 部电影为同一作品卡")
+        }
+
         guard !remap.isEmpty else { return plan }
-        let newActions = plan.actions.map { a -> PlanAction in
+        let newActions = plan.actions.compactMap { a -> PlanAction? in
+            if droppedDuplicateFolderRenameIds.contains(a.id) { return nil }
             guard let targetGid = remap[a.groupId] else { return a }
             return PlanAction(
                 id: a.id, op: a.op, groupId: targetGid, fileId: a.fileId, parentId: a.parentId,
@@ -148,6 +173,10 @@ public enum SeriesMerger {
         }
         let newGroups = plan.groups.filter { remap[$0.id] == nil }.map { g -> PlanGroup in
             var copy = g
+            if let colTitle = upgradedCollectionTitle[copy.id] {
+                copy.kind = "collection"
+                copy.title = colTitle
+            }
             copy.actionIds = newActions.filter { $0.groupId == copy.id }.map { $0.id }
             return copy
         }

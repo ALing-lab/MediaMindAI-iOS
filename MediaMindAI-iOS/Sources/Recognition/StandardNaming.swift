@@ -524,7 +524,7 @@ public enum StandardNaming {
         let head = [clean, y, tag].filter { !$0.isEmpty }.joined(separator: sep)
         let parsed = parseVersion(fileStem: fileStem, releaseDirName: releaseDirName)
         let baseVersion = (effOpts.map { parsed.filteredBy($0) } ?? parsed).label
-        let editionLabel = EditionParser.parseEditions(fileStem).displayLabel
+        let editionLabel = (effOpts?.keepExtraInfo ?? true) ? EditionParser.parseEditions(fileStem).displayLabel : "" 
 
         let combinedVersion: String
         if !baseVersion.isEmpty && !editionLabel.isEmpty {

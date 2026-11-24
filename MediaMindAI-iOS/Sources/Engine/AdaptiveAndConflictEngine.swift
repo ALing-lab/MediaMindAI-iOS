@@ -192,10 +192,88 @@ public enum AdaptiveDirectoryPlanner {
         var catChildrenCache: [String: Set<String>] = [:]
 
         var newActions = baseActions
+        var prependedCatMkdirs: [PlanAction] = []
         var newFlags = baseFlags
         var createdCatMkdir: [String: String] = [:]
 
         for g in stripped.groups {
+            // 拆开归档：多部电影合集/系列大文件夹不移动外层目录，改为将每部电影独立建子文件夹放到 目标库/电影/ 根目录
+            if g.kind == "collection" || (g.kind == "movie" && g.tmdbId == nil) {
+                let perMovieMkIndices = newActions.indices.filter { idx in
+                    let a = newActions[idx]
+                    return a.groupId == g.id && a.op == "mkdir" && a.kind == "folder" && a.mediaKind == "movie" && !a.done
+                }
+                guard !perMovieMkIndices.isEmpty else { continue }
+                let catName = "电影"
+                let catKey = catName.lowercased()
+                let catPath = "\(rootLabel)/\(catName)"
+                let existingCat = existingCatDirs[catKey]
+                if catChildrenCache[catKey] == nil {
+                    if let existingCat {
+                        let kids = (try? await drive.list(folderId: existingCat.fileId)) ?? []
+                        catChildrenCache[catKey] = Set(kids.map { $0.fileName.lowercased() })
+                    } else {
+                        catChildrenCache[catKey] = []
+                    }
+                }
+                var redirectedCount = 0
+                var catMkdirId: String? = nil
+                for idx in perMovieMkIndices {
+                    let mk = newActions[idx]
+                    let targetName = mk.newName
+                    guard !targetName.isEmpty else { continue }
+                    if catChildrenCache[catKey]?.contains(targetName.lowercased()) == true {
+                        newFlags.append("自适应目录：目标「\(catPath)」已存在同名目录「\(targetName)」，已留在原地")
+                        continue
+                    }
+                    if existingCat == nil && catMkdirId == nil {
+                        if let existingMk = createdCatMkdir[catName] {
+                            catMkdirId = existingMk
+                        } else {
+                            let mid = "adaptive-mkdir-\(catName)"
+                            createdCatMkdir[catName] = mid
+                            catMkdirId = mid
+                            prependedCatMkdirs.append(PlanAction(
+                                id: mid, op: "mkdir", groupId: "", fileId: nil, parentId: targetRootId,
+                                oldName: "", newName: catName, destParentId: targetRootId, destRef: nil,
+                                kind: kindCategoryMkdir, mediaKind: nil, tmdbId: nil, season: nil, episode: nil,
+                                artworkUrl: nil, selected: true, enabled: true, blocked: nil, done: false, error: nil,
+                                note: "自适应目录：创建分类子目录 \(catName)"
+                            ))
+                        }
+                    }
+                    catChildrenCache[catKey]?.insert(targetName.lowercased())
+                    newActions[idx] = PlanAction(
+                        id: mk.id, op: mk.op, groupId: mk.groupId, fileId: mk.fileId,
+                        parentId: existingCat?.fileId ?? targetRootId,
+                        oldName: mk.oldName, newName: mk.newName,
+                        destParentId: existingCat?.fileId,
+                        destRef: catMkdirId,
+                        destLabel: catPath,
+                        kind: mk.kind, mediaKind: mk.mediaKind, tmdbId: mk.tmdbId,
+                        season: mk.season, episode: mk.episode, artworkUrl: mk.artworkUrl,
+                        selected: mk.selected, enabled: mk.enabled, blocked: mk.blocked,
+                        done: mk.done, error: mk.error,
+                        note: "自适应目录：在 \(catPath) 下为每部电影单独建文件夹",
+                        metadataSeason: mk.metadataSeason, metadataEpisode: mk.metadataEpisode,
+                        replaceExisting: mk.replaceExisting, folderPath: mk.folderPath
+                    )
+                    redirectedCount += 1
+                }
+                if redirectedCount > 0 {
+                    if let outerFid = g.folderId {
+                        newActions.removeAll { a in
+                            a.groupId == g.id && a.op == "rename" && a.kind == "folder" && a.fileId == outerFid && !a.done
+                        }
+                    }
+                    if let gIdx = stripped.groups.firstIndex(where: { $0.id == g.id }) {
+                        stripped.groups[gIdx].folderNewName = nil
+                    }
+                    newFlags.append("自适应目录：已将「\(g.title)」内 \(redirectedCount) 部电影拆开独立建文件夹归档至「\(catPath)」")
+                }
+                continue
+            }
+
             guard (g.kind == "movie" || g.kind == "tv"), g.tmdbId != nil, let folderId = g.folderId else { continue }
             let gActions = baseActions.filter { $0.groupId == g.id }
             if gActions.contains(where: { $0.kind == kindManualDestination || $0.done }) { continue }
@@ -243,7 +321,7 @@ public enum AdaptiveDirectoryPlanner {
                     let mid = "adaptive-mkdir-\(catName)"
                     createdCatMkdir[catName] = mid
                     catMkdirId = mid
-                    newActions.append(PlanAction(
+                    prependedCatMkdirs.append(PlanAction(
                         id: mid, op: "mkdir", groupId: "", fileId: nil, parentId: targetRootId,
                         oldName: "", newName: catName, destParentId: targetRootId, destRef: nil,
                         kind: kindCategoryMkdir, mediaKind: nil, tmdbId: nil, season: nil, episode: nil,
@@ -262,7 +340,7 @@ public enum AdaptiveDirectoryPlanner {
             ))
         }
 
-        stripped.actions = newActions
+        stripped.actions = prependedCatMkdirs + newActions
         var seenFlags: Set<String> = []
         stripped.flags = newFlags.filter { seenFlags.insert($0).inserted }
         for i in stripped.groups.indices {

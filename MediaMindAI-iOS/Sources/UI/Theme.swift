@@ -254,10 +254,9 @@ public struct CollapsibleSearchBar: View {
             .padding(.top, 6)
             .padding(.bottom, 6)
             .transition(.move(edge: .top).combined(with: .opacity))
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    focused = true
-                }
+            .task {
+                try? await Task.sleep(for: .milliseconds(50))
+                if isPresented { focused = true }
             }
         }
     }

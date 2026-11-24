@@ -136,16 +136,28 @@ public enum MediaParser {
                 out.append(ch)
             }
         }
-        // 清理常见网盘分享水印与网址前缀
+        // 清理常见网盘分享水印、网址广告前缀与技术参数方括号块
         let patterns = [
+            #"(?i)https?://[^\s\]】)）]+"#,
             #"(?i)www\.[a-z0-9.-]+\.[a-z]{2,}"#,
-            #"(?i)\[(?:电影天堂|阳光电影|飘花电影|人人影视|字幕组|蓝光原盘|国英多音轨|简繁英字幕|高码率|杜比视界|4K|HDR|REMUX)[^\]]*\]"#,
-            #"【[^】]*(?:关注|公众号|资源|夸克|迅雷|123|网盘|字幕组|压制)[^】]*】"#,
+            #"(?i)【[^】]*(?:发布|分享|剧集网|电影网|高清|首发|下载|官方|独家|最新|关注|公众号|资源|夸克|迅雷|123|网盘|光鸭|字幕|压制|频道|\.com|\.cn|\.net|\.tv|\.org)[^】]*】"#,
+            #"【\s*】"#,
+            #"(?i)\[[^\]]*(?:帧率|版本|全\s*\d+\s*[集话期]|更至|更新|国语|粤语|中字|字幕|配音|音轨|双语|多音轨|杜比|视界|高码|无水印|未删减|电影天堂|阳光电影|飘花电影|人人影视|字幕组|蓝光|原盘|WEB-?DL|WEBRip|BluRay|H\.?26[45]|10bit|8bit|\d+fps|2160p|1080p|720p|\b(?:HEVC|AVC|4K|HDR|SDR|DV|DDP|FLAC|AAC|Atmos|TrueHD|DTS|REMUX)\b)[^\]]*\]"#,
+            #"\[\s*\]"#,
         ]
         for p in patterns {
             if let rx = try? NSRegularExpression(pattern: p) {
                 let r = NSRange(out.startIndex..<out.endIndex, in: out)
                 out = rx.stringByReplacingMatches(in: out, range: r, withTemplate: " ")
+            }
+        }
+        // 还原汉字之间用于规避版权的 '=' 穿插分隔符（如 人=鱼 -> 人鱼）
+        if let eqRx = try? NSRegularExpression(pattern: #"([\u4e00-\u9fff])=([\u4e00-\u9fff])"#) {
+            for _ in 0..<4 {
+                let r = NSRange(out.startIndex..<out.endIndex, in: out)
+                let next = eqRx.stringByReplacingMatches(in: out, range: r, withTemplate: "$1$2")
+                if next == out { break }
+                out = next
             }
         }
         return out.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -188,9 +200,9 @@ public enum MediaParser {
             season = rangeParsed.season
             episode = rangeParsed.episodes.first
             if rangeParsed.episodes.count >= 2 { episodeEnd = rangeParsed.episodes.last }
-        } else if let m = matchGroups(#"(?i)\bS(\d{1,2})[._\s-]*E(\d{1,4})\s*[-~]\s*E?(\d{1,4})\b"#, in: text) {
+        } else if let m = matchGroups(#"(?i)(?<![a-z0-9])S(\d{1,2})[._\s-]*E(\d{1,4})\s*[-~]\s*E?(\d{1,4})\b"#, in: text) {
             season = Int(m[1]); episode = Int(m[2]); episodeEnd = Int(m[3])
-        } else if let m = matchGroups(#"(?i)\bS(\d{1,2})[._\s-]*E(\d{1,4})\b"#, in: text) {
+        } else if let m = matchGroups(#"(?i)(?<![a-z0-9])S(\d{1,2})[._\s-]*E(\d{1,4})\b"#, in: text) {
             season = Int(m[1]); episode = Int(m[2])
         } else if let m = matchGroups(#"(?i)第\s*(\d{1,2})\s*季.*?第\s*(\d{1,4})\s*[集话話]"#, in: text) {
             season = Int(m[1]); episode = Int(m[2])
@@ -202,7 +214,7 @@ public enum MediaParser {
         } else if let cnEp = firstMatch(#"第\s*([一二两三四五六七八九十百]+)\s*[集话話期]"#, in: text, group: 1),
                   let parsedEp = parseChineseCardinal(cnEp) {
             episode = parsedEp
-        } else if let m = matchGroups(#"(?i)\bEP?\.?\s*(\d{1,4})\b"#, in: text),
+        } else if let m = matchGroups(#"(?i)(?<![a-z0-9])EP?\.?\s*(\d{1,4})\b"#, in: text),
                   let ep = Int(m[1]), ep > 0, !(1900...2099).contains(ep) {
             episode = ep
         } else if let anime = AnimeEpisodeParser.parse(stemRaw) {
@@ -224,12 +236,13 @@ public enum MediaParser {
         // 5. 标题裁切（在季集、年份、分辨率、编码标签处截断）
         var title = text
         let cutMarkers = [
-            #"(?i)\bS\d{1,2}[._\s-]*E\d{1,4}.*$"#,
+            #"(?i)(?<![a-z0-9])S\d{1,2}[._\s-]*E\d{1,4}.*$"#,
+            #"(?i)(?<=[\s._\-\u4e00-\u9fff])S\d{1,2}(?:[\s._-]|$).*$"#,
             #"第\s*\d{1,2}\s*季.*$"#,
             #"第\s*\d{1,4}\s*[集话話].*$"#,
-            #"(?i)\b(?:2160p|1080p|720p|4K|BluRay|WEB-DL|WEBRip|HDR|DV|HEVC|H\.?265|H\.?264|x265|x264|Remux|AAC|DDP)\b.*$"#,
+            #"(?i)\b(?:2160p|1080p|720p|4K|BluRay|WEB-DL|WEBRip|HDR|SDR|DV|HEVC|H\.?265|H\.?264|x265|x264|10bit|8bit|\d+fps|Remux|AAC|DDP|FLAC)\b.*$"#,
             #"(?:[\s._(\[（【-])(?:19|20)\d{2}(?:[\s._)\]）】-]|$).*$"#,
-            #"(?i)\{?tmdb[-_]\d+\}?.*$"#,
+            #"(?i)\{?(?:(?:tv|movie)[._\s-]+)?tmdb(?:id)?[-_:\s=]?\d+\}?.*$"#,
         ]
         for p in cutMarkers {
             if let rx = try? NSRegularExpression(pattern: p) {

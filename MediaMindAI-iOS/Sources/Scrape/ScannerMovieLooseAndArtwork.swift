@@ -520,13 +520,19 @@ public enum ScannerMovieLooseAndArtwork {
         visited: inout Set<String>,
         actions: inout [PlanAction],
         groups: inout [PlanGroup],
-        flags: inout [String]
+        flags: inout [String],
+        parentFolderName: String? = nil
     ) async -> Int {
         guard visited.insert(folder.fileId).inserted else { return 0 }
         let videos = items.filter { ScannerTreeEngine.isVideo($0) }
         if videos.isEmpty { return 0 }
-        let names = videos.prefix(1).map { MediaParser.splitNameExt($0.fileName).0 }
-        let (show, _) = await tmdb.show(names: names, fixedId: nil)
+        let parentHint = parentFolderName.flatMap { MediaParser.tmdbHint($0) }
+        var names: [String] = []
+        if let parent = parentFolderName, !parent.isEmpty, !ScannerTreeEngine.isCategoryDir(parent) {
+            names.append(parent)
+        }
+        names.append(contentsOf: videos.prefix(2).map { MediaParser.splitNameExt($0.fileName).0 })
+        let (show, _) = await tmdb.show(names: names, fixedId: parentHint?.id)
         guard let show else {
             flags.append("季文件夹「\(folder.fileName)」无法匹配剧集")
             return videos.count
@@ -676,24 +682,40 @@ public enum ScannerMovieLooseAndArtwork {
                 epPair = nil
             }
 
+            let dirHint = MediaParser.tmdbHint(dir.fileName)
+            let dirIsCategory = ScannerTreeEngine.isCategoryDir(dir.fileName)
             let stemHint = MediaParser.tmdbHint(stem)
+            let effectiveHint = stemHint ?? dirHint
+            let stemHasTitle = parsed.cleanTitle.unicodeScalars.contains {
+                (0x4E00...0x9FFF).contains($0.value) || ($0.value >= 65 && $0.value <= 90) || ($0.value >= 97 && $0.value <= 122)
+            } && !parsed.cleanTitle.lowercased().hasPrefix("s0") && !parsed.cleanTitle.lowercased().hasPrefix("s1")
+            let tvCandidateNames: [String] = {
+                if !dirIsCategory && !dir.fileName.isEmpty && (dirHint != nil || !stemHasTitle) {
+                    return [dir.fileName, stem]
+                }
+                if !dirIsCategory && !dir.fileName.isEmpty {
+                    return [stem, dir.fileName]
+                }
+                return [stem]
+            }()
+            let movieFallbacks: [String] = (!dirIsCategory && !dir.fileName.isEmpty) ? [dir.fileName] : []
             let info: MatchInfo?
             if let forced {
                 info = forced.info
-            } else if stemHint?.kind == "tv" {
-                info = await tmdb.show(names: [stem], fixedId: stemHint?.id).0
-            } else if stemHint?.kind == "movie" {
-                info = await tmdb.movie(stem: stem, fallbackNames: [], fallbackId: stemHint?.id)
+            } else if effectiveHint?.kind == "tv" {
+                info = await tmdb.show(names: tvCandidateNames, fixedId: effectiveHint?.id).0
+            } else if effectiveHint?.kind == "movie" {
+                info = await tmdb.movie(stem: stemHasTitle ? stem : dir.fileName, fallbackNames: movieFallbacks, fallbackId: effectiveHint?.id)
             } else if epPair != nil {
-                info = await tmdb.show(names: [stem], fixedId: stemHint?.id).0
-            } else if let sh = stemHint {
-                if let m = await tmdb.movie(stem: stem, fallbackNames: [], fallbackId: sh.id) {
+                info = await tmdb.show(names: tvCandidateNames, fixedId: effectiveHint?.id).0
+            } else if let sh = effectiveHint {
+                if let m = await tmdb.movie(stem: stemHasTitle ? stem : dir.fileName, fallbackNames: movieFallbacks, fallbackId: sh.id) {
                     info = m
                 } else {
-                    info = await tmdb.show(names: [stem], fixedId: sh.id).0
+                    info = await tmdb.show(names: tvCandidateNames, fixedId: sh.id).0
                 }
             } else {
-                info = await tmdb.movie(stem: stem, fallbackNames: [], fallbackId: nil)
+                info = await tmdb.movie(stem: stemHasTitle ? stem : dir.fileName, fallbackNames: movieFallbacks, fallbackId: nil)
             }
             preResolved[item.fileId] = (info, epPair)
             if info == nil && forced == nil {
@@ -733,17 +755,23 @@ public enum ScannerMovieLooseAndArtwork {
 
             let parent = item.parentFileId ?? dir.fileId
             guard let info else {
-                let gid = "unmatched-loose-\(item.fileId)"
+                // 同文件夹下的未识别散文件合并为同一张待确认文件夹卡片，手动识别一次即可整组纠正
+                let gid = "unmatched-dir-\(parent)"
                 let aidVal = aid()
-                groups.append(PlanGroup(
-                    id: gid, kind: "unmatched", tmdbId: nil, title: item.fileName, year: "",
-                    posterPath: nil, folderId: parent, folderName: dir.fileName, folderNewName: nil,
-                    rating: nil, confidence: nil, note: "散文件未匹配", warn: nil, actionIds: [aidVal]
-                ))
+                if let existingIdx = groups.firstIndex(where: { $0.id == gid }) {
+                    groups[existingIdx].actionIds.append(aidVal)
+                } else {
+                    groups.append(PlanGroup(
+                        id: gid, kind: "unmatched", tmdbId: nil,
+                        title: dir.fileName.isEmpty ? item.fileName : dir.fileName, year: "",
+                        posterPath: nil, folderId: parent, folderName: dir.fileName, folderNewName: nil,
+                        rating: nil, confidence: nil, note: "同目录待手动识别", warn: nil, actionIds: [aidVal]
+                    ))
+                }
                 actions.append(PlanAction(
                     id: aidVal, op: "unmatched", groupId: gid, fileId: item.fileId, parentId: parent,
                     oldName: item.fileName, newName: "", destParentId: nil, destRef: nil, destLabel: nil,
-                    kind: "file", mediaKind: nil, tmdbId: nil, season: nil, episode: nil, artworkUrl: nil,
+                    kind: "file", mediaKind: nil, tmdbId: nil, season: epPair?.0, episode: epPair?.1, artworkUrl: nil,
                     selected: false, enabled: true, blocked: nil, done: false, error: nil, note: nil
                 ))
                 continue
@@ -988,15 +1016,6 @@ public enum ScannerMovieLooseAndArtwork {
                     selected: true, enabled: true, blocked: nil, done: false, error: nil, note: "季海报（执行时下载）", replaceExisting: fullScrape
                 ))
             }
-            let hasSeasonNfo = (seasonItems[d.fileId] ?? []).contains(where: { !$0.isDir && $0.fileName.caseInsensitiveCompare("season.nfo") == .orderedSame })
-            if fullScrape || !hasSeasonNfo {
-                actions.append(PlanAction(
-                    id: aid(), op: "artwork", groupId: gid, fileId: nil, parentId: d.fileId,
-                    oldName: "", newName: "season.nfo", destParentId: nil, destRef: nil, destLabel: nil,
-                    kind: "season_nfo", mediaKind: "tv", tmdbId: show.id, season: n, episode: nil, artworkUrl: nil,
-                    selected: true, enabled: true, blocked: nil, done: false, error: nil, note: "若季文件夹尚无 season.nfo", replaceExisting: fullScrape
-                ))
-            }
         }
 
         for (n, ref) in newSeasonDirs {
@@ -1009,12 +1028,6 @@ public enum ScannerMovieLooseAndArtwork {
                     selected: true, enabled: true, blocked: nil, done: false, error: nil, note: "季海报（执行时下载）", replaceExisting: fullScrape
                 ))
             }
-            actions.append(PlanAction(
-                id: aid(), op: "artwork", groupId: gid, fileId: nil, parentId: nil,
-                oldName: "", newName: "season.nfo", destParentId: nil, destRef: ref.0, destLabel: ref.1,
-                kind: "season_nfo", mediaKind: "tv", tmdbId: show.id, season: n, episode: nil, artworkUrl: nil,
-                selected: true, enabled: true, blocked: nil, done: false, error: nil, note: "上传到新建的 \(ref.1)", replaceExisting: fullScrape
-            ))
         }
     }
 

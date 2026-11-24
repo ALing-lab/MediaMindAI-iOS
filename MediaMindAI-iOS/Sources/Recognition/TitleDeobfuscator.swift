@@ -367,6 +367,12 @@ public enum TitleDeobfuscator {
         for v in snapshot {
             for part in splitBilingual(v) {
                 add(part)
+                let noSeries = stripSeriesSuffix(part)
+                if noSeries != part { add(noSeries) }
+                if let m = part.range(of: #"\s+[2-9]$"#, options: .regularExpression) {
+                    let base = String(part[..<m.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if base.count >= 2 && containsCjk(base) { add(base) }
+                }
                 let noLeading = stripLeadingInitial(part)
                 if noLeading != part { add(noLeading) }
             }

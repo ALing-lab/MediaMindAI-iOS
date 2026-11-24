@@ -486,7 +486,6 @@ public final class Pan123Drive: CloudDrive, @unchecked Sendable {
         req.timeoutInterval = 60
         req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         // 存储节点 PUT 不要带 authorization
-        req.setValue("", forHTTPHeaderField: "authorization")
         req.httpBody = data
         let (_, resp) = try await session.data(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0

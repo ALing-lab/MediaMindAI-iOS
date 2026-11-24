@@ -95,7 +95,7 @@ public enum PlanSelection {
             } else {
                 let mkdirIds = Set(target.compactMap { byId[$0] }.filter { $0.op == "mkdir" }.map(\.id))
                 if !mkdirIds.isEmpty {
-                    for m in plan.actions where m.op == "move" {
+                    for m in plan.actions where m.op == "move" || m.op == "mkdir" {
                         if let dep = dependencyOf(m, all: plan.actions), mkdirIds.contains(dep.id) {
                             target.insert(m.id)
                         }
@@ -126,7 +126,7 @@ public enum PlanSelection {
 
         // 共享分类目录 mkdir（groupId 为空）：只要仍有已勾选移动依赖它就保持勾选，全部取消时一并取消
         if updated.contains(where: { $0.kind == AdaptiveDirectoryPlanner.kindCategoryMkdir }) {
-            let activeRefs = Set(updated.filter { $0.selected && $0.op == "move" }.compactMap(\.destRef))
+            let activeRefs = Set(updated.filter { $0.selected && ($0.op == "move" || $0.op == "mkdir") }.compactMap(\.destRef))
             updated = updated.map { a in
                 guard a.kind == AdaptiveDirectoryPlanner.kindCategoryMkdir && executable(a) else { return a }
                 var c = a
@@ -163,14 +163,18 @@ public enum PlanSelection {
     /// 要执行的 ID（按计划顺序，已补齐依赖）。
     public static func selectedIds(plan: ScrapePlan) -> [String] {
         var sel = Set(plan.actions.filter { executable($0) && $0.selected }.map(\.id))
-        for a in plan.actions where sel.contains(a.id) {
-            if let dep = dependencyOf(a, all: plan.actions), executable(dep) {
-                sel.insert(dep.id)
-            }
-            for m in deleteNeeds(a, all: plan.actions) where executable(m) {
-                sel.insert(m.id)
-                if let dep = dependencyOf(m, all: plan.actions), executable(dep) {
+        var prevCount = -1
+        while sel.count != prevCount {
+            prevCount = sel.count
+            for a in plan.actions where sel.contains(a.id) {
+                if let dep = dependencyOf(a, all: plan.actions), executable(dep) {
                     sel.insert(dep.id)
+                }
+                for m in deleteNeeds(a, all: plan.actions) where executable(m) {
+                    sel.insert(m.id)
+                    if let dep = dependencyOf(m, all: plan.actions), executable(dep) {
+                        sel.insert(dep.id)
+                    }
                 }
             }
         }

@@ -196,7 +196,6 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
     public var movie: MediaDefaults = MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
     public var tv: MediaDefaults = MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
     public var seasonPoster: Bool = true
-    public var seasonNfo: Bool = true
     public var episodeNfo: Bool = true
     public var episodeThumb: Bool = false
     public var adaptiveDirectory: Bool = false
@@ -210,7 +209,7 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
         case organizeEnabled, scrapeEnabled, renameFiles, renameFolders, seasonFolders
         case mergeSeries, episodeStrategy, fullScrape, imageQuality
         case movieNaming, tvNaming, movie, tv
-        case seasonPoster, seasonNfo, episodeNfo, episodeThumb
+        case seasonPoster, episodeNfo, episodeThumb
         case adaptiveDirectory, adaptiveTargetDirId, adaptiveTargetDirPath, autoMoveConfirmedDuplicates
     }
 
@@ -230,7 +229,6 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
         self.movie = try c.decodeIfPresent(MediaDefaults.self, forKey: .movie) ?? MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
         self.tv = try c.decodeIfPresent(MediaDefaults.self, forKey: .tv) ?? MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
         self.seasonPoster = try c.decodeIfPresent(Bool.self, forKey: .seasonPoster) ?? true
-        self.seasonNfo = try c.decodeIfPresent(Bool.self, forKey: .seasonNfo) ?? true
         self.episodeNfo = try c.decodeIfPresent(Bool.self, forKey: .episodeNfo) ?? true
         self.episodeThumb = try c.decodeIfPresent(Bool.self, forKey: .episodeThumb) ?? false
         self.adaptiveDirectory = try c.decodeIfPresent(Bool.self, forKey: .adaptiveDirectory) ?? false
@@ -274,7 +272,6 @@ public extension DefaultPolicies {
         if let v = ov.downloadFanart { out.movie.fanart = v; out.tv.fanart = v }
         if let v = ov.downloadClearlogo { out.movie.logo = v; out.tv.logo = v }
         if let v = ov.seasonPoster { out.seasonPoster = v }
-        if let v = ov.seasonNfo { out.seasonNfo = v }
         if let v = ov.episodeNfo { out.episodeNfo = v }
         if let v = ov.downloadEpisodeThumb { out.episodeThumb = v }
         if let v = ov.adaptiveDirectory { out.adaptiveDirectory = v }
@@ -307,7 +304,6 @@ public extension DefaultPolicies {
         if movie.logo != base.movie.logo { ov.downloadClearlogo = movie.logo }
         else if tv.logo != base.tv.logo { ov.downloadClearlogo = tv.logo }
         if seasonPoster != base.seasonPoster { ov.seasonPoster = seasonPoster }
-        if seasonNfo != base.seasonNfo { ov.seasonNfo = seasonNfo }
         if episodeNfo != base.episodeNfo { ov.episodeNfo = episodeNfo }
         if episodeThumb != base.episodeThumb { ov.downloadEpisodeThumb = episodeThumb }
         if adaptiveDirectory != base.adaptiveDirectory { ov.adaptiveDirectory = adaptiveDirectory }
@@ -337,7 +333,6 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
     public var downloadFanart: Bool?
     public var downloadClearlogo: Bool?
     public var seasonPoster: Bool?
-    public var seasonNfo: Bool?
     public var episodeNfo: Bool?
     public var downloadEpisodeThumb: Bool?
     public var adaptiveDirectory: Bool?
@@ -362,7 +357,6 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         downloadFanart: Bool? = nil,
         downloadClearlogo: Bool? = nil,
         seasonPoster: Bool? = nil,
-        seasonNfo: Bool? = nil,
         episodeNfo: Bool? = nil,
         downloadEpisodeThumb: Bool? = nil,
         adaptiveDirectory: Bool? = nil,
@@ -386,7 +380,6 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         self.downloadFanart = downloadFanart
         self.downloadClearlogo = downloadClearlogo
         self.seasonPoster = seasonPoster
-        self.seasonNfo = seasonNfo
         self.episodeNfo = episodeNfo
         self.downloadEpisodeThumb = downloadEpisodeThumb
         self.adaptiveDirectory = adaptiveDirectory
@@ -413,7 +406,6 @@ public struct EffectivePolicy: Hashable, Sendable {
     public let downloadClearlogo: Bool
     public let downloadEpisodeThumb: Bool
     public let seasonPoster: Bool
-    public let seasonNfo: Bool
     public let episodeNfo: Bool
     public let sourceLayer: String // "影片策略" | "任务策略" | "全局策略"
 }
@@ -452,7 +444,6 @@ public enum PolicyResolver {
             downloadClearlogo: film?.downloadClearlogo ?? task?.downloadClearlogo ?? baseMedia.logo,
             downloadEpisodeThumb: film?.downloadEpisodeThumb ?? task?.downloadEpisodeThumb ?? global.episodeThumb,
             seasonPoster: film?.seasonPoster ?? task?.seasonPoster ?? global.seasonPoster,
-            seasonNfo: film?.seasonNfo ?? task?.seasonNfo ?? global.seasonNfo,
             episodeNfo: film?.episodeNfo ?? task?.episodeNfo ?? global.episodeNfo,
             sourceLayer: sourceLayer
         )
@@ -463,7 +454,7 @@ public enum PolicyResolver {
         var out = plan
         for gIdx in out.groups.indices {
             let group = out.groups[gIdx]
-            guard group.kind == "movie" || group.kind == "tv" else { continue }
+            guard group.kind == "movie" || group.kind == "tv" || group.kind == "collection" else { continue }
             let isTv = group.kind == "tv"
             let eff = resolve(isTv: isTv, global: global, task: out.taskPolicy, film: group.policyOverride)
             let fileOpts = eff.naming.fileOptions()
@@ -513,8 +504,6 @@ public enum PolicyResolver {
                     switch act.kind {
                     case "movie_nfo", "tvshow_nfo":
                         enableArt = eff.scrapeEnabled && eff.writeNfo
-                    case "season_nfo":
-                        enableArt = eff.scrapeEnabled && eff.seasonNfo
                     case "episode_nfo":
                         enableArt = eff.scrapeEnabled && eff.episodeNfo
                     case "clearlogo":

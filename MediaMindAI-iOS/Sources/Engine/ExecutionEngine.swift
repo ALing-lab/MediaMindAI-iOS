@@ -189,13 +189,21 @@ public final class ExecutionEngine {
     }
 
     public func rollback(runId: String, drive: any CloudDrive) async -> RollbackSummary {
+        if currentRun?.id == runId {
+            await stopAndWait()
+        }
         isRollingBack = true
         rollbackMessage = "正在按逆序回滚网盘操作…"
         let walRows = ReversibleWalStore.shared.rows(taskId: runId)
         if !walRows.isEmpty {
             let tx = ReversibleTransaction(taskId: runId, drive: drive)
+            let subActions: [String: PlanAction] = {
+                guard let run = PlanAndTaskStore.shared.tasks.first(where: { $0.id == runId }),
+                      let plan = PlanAndTaskStore.shared.plans.first(where: { $0.id == run.planId }) else { return [:] }
+                return Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+            }()
             do {
-                try await tx.undo { done, total in
+                try await tx.undo(substitutionActions: subActions) { done, total in
                     Task { @MainActor in self.rollbackMessage = "正在逆序回滚 \(done)/\(total)…" }
                 }
                 for jRow in OperationJournal.shared.rows(forRunId: runId) where jRow.status == .applied {
@@ -452,9 +460,9 @@ public final class ExecutionEngine {
             var stoppedOnFails = false
             var stoppedEarly = false
 
-            @MainActor func syncPlanAction(_ id: String, done: Bool, error: String?, note: String? = nil) {
+            @MainActor func syncPlanAction(_ id: String, done: Bool, error: String?, note: String? = nil, recordInHistory: Bool = true) {
                 if var a = planActions[id] {
-                    if done && !a.done { newlyOkIds.append(id) }
+                    if done && !a.done && recordInHistory { newlyOkIds.append(id) }
                     a.done = done
                     a.error = error
                     if let note { a.note = note }
@@ -470,19 +478,19 @@ public final class ExecutionEngine {
             @MainActor func recordOutcome(actionId: String, ok: Bool, skipped: Bool = false, noopNote: String? = nil, markDone: Bool = true, err: String?) {
                 run.completed += 1
                 if let noopNote {
-                    // 禁用项 / 非执行 op / TMDB 暂无素材：不标 done、不计入 newlyOkIds、不覆盖为「已存在，未覆盖」
+                    // 禁用项 / 非执行 op / TMDB 暂无素材：不计入 newlyOkIds、不覆盖为「已存在，未覆盖」
                     streak = 0
                     if !noopNote.isEmpty {
-                        syncPlanAction(actionId, done: planActions[actionId]?.done ?? false, error: nil, note: noopNote)
+                        syncPlanAction(actionId, done: markDone ? true : (planActions[actionId]?.done ?? false), error: nil, note: noopNote, recordInHistory: false)
                     }
                 } else if ok || skipped {
                     run.succeeded += 1
                     streak = 0
-                    syncPlanAction(actionId, done: markDone, error: nil, note: skipped ? "已存在，未覆盖" : nil)
+                    syncPlanAction(actionId, done: markDone, error: nil, note: skipped ? "已存在，未覆盖" : nil, recordInHistory: ok && !skipped)
                 } else {
                     run.failed += 1
                     if let err { run.errors.append(err) }
-                    syncPlanAction(actionId, done: false, error: err)
+                    syncPlanAction(actionId, done: false, error: err, recordInHistory: false)
                 }
                 currentRun = run
             }
@@ -529,7 +537,11 @@ public final class ExecutionEngine {
                     return (newId, nil)
 
                 case "mkdir":
-                    let parent = idRemap.resolveOrSelf(act.parentId ?? drive.rootId)
+                    if act.destRef != nil && Self.resolveDest(action: act, refs: mkdirRefs) == nil {
+                        throw DriveError.invalidInput("上级文件夹还没建好")
+                    }
+                    let resolvedParent = Self.resolveDest(action: act, refs: mkdirRefs) ?? act.parentId ?? drive.rootId
+                    let parent = idRemap.resolveOrSelf(resolvedParent)
                     let createdId = try await tx.mkdir(action: act.id, parent: parent, name: act.newName)
                     mkdirRefs["action:\(act.id)"] = createdId
                     mkdirRefs[act.id] = createdId
@@ -540,9 +552,17 @@ public final class ExecutionEngine {
                     guard let rawFid = act.fileId else { throw DriveError.invalidInput("缺少 fileId") }
                     let fid = ((try? idRemap.resolve(rawFid)) ?? rawFid)
                     let parent = act.parentId.map { idRemap.resolveOrSelf($0) }
+                    let resolvedMoveParent: String?
+                    if let safeParent = parent {
+                        resolvedMoveParent = safeParent
+                    } else if drive.kind.idsArePaths {
+                        resolvedMoveParent = DrivePaths.parentOf(fid)
+                    } else {
+                        resolvedMoveParent = try? await drive.parentIdOf(fileId: fid)
+                    }
                     // 重复保留区移入前强复核：必须重新列目录确认 size > 0 且具备强格式内容哈希
                     if act.kind == DuplicateRetentionPlanner.kindRetentionDuplicate {
-                        guard let safeParent = parent else {
+                        guard let safeParent = resolvedMoveParent else {
                             throw DriveError.invalidInput("缺少原父目录，无法移入重复保留区")
                         }
                         let liveItems = try await drive.list(folderId: safeParent)
@@ -576,14 +596,6 @@ public final class ExecutionEngine {
                         throw DriveError.invalidInput("目标文件夹还没建好")
                     }
                     let dest = idRemap.resolveOrSelf(rawDest)
-                    let resolvedMoveParent: String?
-                    if let safeParent = parent {
-                        resolvedMoveParent = safeParent
-                    } else if drive.kind.idsArePaths {
-                        resolvedMoveParent = DrivePaths.parentOf(fid)
-                    } else {
-                        resolvedMoveParent = try? await drive.parentIdOf(fileId: fid)
-                    }
                     guard let safeParent = resolvedMoveParent else {
                         throw DriveError.invalidInput("缺少原父目录，无法记录可撤销移动操作")
                     }
@@ -715,11 +727,11 @@ public final class ExecutionEngine {
                     }
                 }
 
-                // 数据源确实无此素材（如 TMDB 暂无单集剧照）：记为跳过，不重试、不计失败
+                // 数据源确实无此素材（如 TMDB 暂无单集剧照）：记为跳过，标已完成但不计入历史、不重试、不计失败
                 if case .failure(let err) = outcome, err is ArtworkUnavailableError {
                     await gate.onSuccess()
                     journal.markSkipped(rowId: row.id, error: err.localizedDescription)
-                    recordOutcome(actionId: act.id, ok: false, noopNote: err.localizedDescription, err: nil)
+                    recordOutcome(actionId: act.id, ok: false, noopNote: err.localizedDescription, markDone: true, err: nil)
                     return
                 }
 
@@ -1008,15 +1020,16 @@ public final class ExecutionEngine {
                                             if error is ArtworkUnavailableError {
                                                 await gate.onSuccess()
                                                 journal.markSkipped(rowId: row.id, error: error.localizedDescription)
-                                                recordOutcome(actionId: act.id, ok: false, noopNote: error.localizedDescription, err: nil)
+                                                recordOutcome(actionId: act.id, ok: false, noopNote: error.localizedDescription, markDone: true, err: nil)
                                                 continue
                                             }
                                             if RateLimitDetector.isRateLimitError(error) {
                                                 _ = await gate.onRateLimited(backoffMs: skipDelaysForTest ? 0 : 1500)
                                             }
                                             let errStr = "\(Self.labelOf(act))：\(error.localizedDescription)"
+                                            let actWalState = ReversibleWalStore.shared.find(taskId: runId, actionId: act.id)?.state
                                             let isUncertain = (error as NSError).domain == NSURLErrorDomain
-                                                || ReversibleWalStore.shared.hasUncertain(taskId: runId)
+                                                || actWalState == "prepared" || actWalState == "uncertain" || actWalState == "undo_prepared" 
                                             if isUncertain {
                                                 journal.markUncertain(rowId: row.id, error: errStr)
                                                 stopRequested = true

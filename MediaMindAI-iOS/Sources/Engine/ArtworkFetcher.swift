@@ -91,10 +91,6 @@ public actor ArtworkFetcher {
             let xml = try await buildEpisodeNfo(action: action, tmdb: tmdb)
             return Data(filterNfo(xml).utf8)
 
-        case "season_nfo":
-            let xml = await buildSeasonNfo(tid: action.tmdbId, snum: action.season ?? 1, tmdb: tmdb)
-            return Data(xml.utf8)
-
         default:
             throw DriveError.invalidInput("不支持的 artwork kind=\(action.kind)")
         }
@@ -425,29 +421,6 @@ public actor ArtworkFetcher {
         lines.append("  <season>-1</season>")
         lines.append("  <episode>-1</episode>")
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<tvshow>\n" + lines.joined(separator: "\n") + "\n</tvshow>\n"
-    }
-
-    private func buildSeasonNfo(tid: Int?, snum: Int, tmdb: TmdbClient) async -> String {
-        var title = snum == 0 ? "特别篇" : "第 \(snum) 季"
-        var plot = ""
-        var premiered = ""
-        if let tid, let data = await tmdb.get(path: "/tv/\(tid)/season/\(snum)", query: ["language": "zh-CN"]),
-           let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-            if let n = obj["name"] as? String, !n.isEmpty { title = n }
-            if let ov = obj["overview"] as? String { plot = NfoXml.flat(ov) }
-            if let air = obj["air_date"] as? String { premiered = air }
-        }
-        var lines: [String] = []
-        lines.append(NfoXml.cdata(name: "plot", value: plot))
-        lines.append(NfoXml.cdata(name: "outline", value: plot))
-        lines.append(NfoXml.tag(name: "title", value: title))
-        if !premiered.isEmpty {
-            lines.append(NfoXml.tag(name: "premiered", value: premiered))
-            lines.append(NfoXml.tag(name: "releasedate", value: premiered))
-            lines.append(NfoXml.tag(name: "year", value: String(premiered.prefix(4))))
-        }
-        lines.append(NfoXml.tag(name: "seasonnumber", value: snum))
-        return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<season>\n" + lines.joined(separator: "\n") + "\n</season>\n"
     }
 
     private func buildEpisodeNfo(action: PlanAction, tmdb: TmdbClient) async throws -> String {

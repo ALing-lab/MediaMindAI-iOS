@@ -1,5 +1,83 @@
 import SwiftUI
 import UIKit
+import Observation
+
+/// 全局后台非阻塞扫描管理器：扫描期间不锁屏、不阻塞切页或浏览其他目录，顶部轻量浮条实时展示进度与取消入口。
+@Observable
+@MainActor
+public final class BackgroundScanManager {
+    public static let shared = BackgroundScanManager()
+
+    public var isScanning = false
+    public var progressText = ""
+    public var finishedSummary: String? = nil
+    public var errorMessage: String? = nil
+    private var scanTask: Task<Void, Never>? = nil
+    private var scanEpoch: Int = 0
+
+    private init() {}
+
+    public func startScan(account: DriveAccount, roots: [PlanRoot]) {
+        guard !isScanning else { return }
+        scanEpoch += 1
+        let epoch = scanEpoch
+        isScanning = true
+        finishedSummary = nil
+        errorMessage = nil
+        progressText = "正在连接网盘…"
+        scanTask?.cancel()
+        scanTask = Task {
+            do {
+                let drive = try AccountStore.shared.buildDrive(for: account)
+                let plan = try await Scanner.scan(
+                    roots: roots,
+                    drive: drive,
+                    fullDrive: false,
+                    preflightTmdb: true
+                ) { msg, count in
+                    Task { @MainActor in
+                        guard BackgroundScanManager.shared.scanEpoch == epoch else { return }
+                        BackgroundScanManager.shared.progressText = "\(msg)（已发现 \(count) 个视频）"
+                    }
+                }
+                guard !Task.isCancelled, self.scanEpoch == epoch else { return }
+                PlanAndTaskStore.shared.savePlan(plan)
+                isScanning = false
+                scanTask = nil
+                let matchedCount = plan.groups.filter { $0.kind != "unmatched" }.count
+                let unmatchedCount = plan.groups.filter { $0.kind == "unmatched" }.count
+                if unmatchedCount > 0 {
+                    finishedSummary = "扫描完成：已识别 \(matchedCount) 组，待确认 \(unmatchedCount) 组"
+                } else {
+                    finishedSummary = "扫描完成：已识别 \(matchedCount) 组作品"
+                }
+            } catch is CancellationError {
+                guard self.scanEpoch == epoch else { return }
+                isScanning = false
+                scanTask = nil
+                progressText = ""
+            } catch {
+                guard self.scanEpoch == epoch else { return }
+                isScanning = false
+                scanTask = nil
+                errorMessage = "扫描失败：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    public func cancel() {
+        scanEpoch += 1
+        scanTask?.cancel()
+        scanTask = nil
+        isScanning = false
+        progressText = ""
+    }
+
+    public func dismissBanner() {
+        finishedSummary = nil
+        errorMessage = nil
+    }
+}
 
 /// 收藏的云盘目录模型（持久化至 UserDefaults）。
 private struct FavoriteCloudFolder: Identifiable, Codable, Hashable {
@@ -75,27 +153,6 @@ public struct CloudTabView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        // 顶栏：右侧「帮助」胶囊按钮
-                        HStack {
-                            Spacer()
-                            Button("帮助") {
-                                showHelpSheet = true
-                            }
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(MMTheme.accent)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 7)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .overlay(
-                                Capsule().strokeBorder(MMTheme.accent.opacity(0.22), lineWidth: 0.8)
-                            )
-                        }
-
-                        // 大标题「文件来源」
-                        Text("文件来源")
-                            .font(.largeTitle.bold())
-                            .foregroundStyle(.primary)
-
                         // 「我的设备 / 我的收藏」下划线分段标签
                         HStack(spacing: 24) {
                             tabHeaderButton(title: "我的设备", tab: .devices)
@@ -114,7 +171,16 @@ public struct CloudTabView: View {
                     .padding(.bottom, 24)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle("文件来源")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("帮助") {
+                        showHelpSheet = true
+                    }
+                    .foregroundStyle(MMTheme.accent)
+                }
+            }
             .sheet(isPresented: $showAddAccount) {
                 AddAccountSheet()
             }
@@ -389,7 +455,7 @@ public struct CloudTabView: View {
     private func accountSubtitle(_ acct: DriveAccount) -> String {
         if pingingAccountId == acct.id { return "正在检测连接…" }
         if let custom = pingStatusByAccount[acct.id] { return custom }
-        if acct.provider == .webdav, let url = acct.extra["url"], !url.isEmpty {
+        if acct.provider == .webdav, let url = acct.extra["baseUrl"] ?? acct.extra["url"], !url.isEmpty {
             return "已连接 · \(url)"
         }
         return "已连接"
@@ -404,7 +470,7 @@ public struct CloudTabView: View {
 
     private func testConnection(for acct: DriveAccount) async {
         pingingAccountId = acct.id
-        defer { pingingAccountId = nil }
+        defer { if pingingAccountId == acct.id { pingingAccountId = nil } }
         do {
             let drive = try store.buildDrive(for: acct)
             let ok = await drive.ping()
@@ -430,9 +496,6 @@ private struct CloudDirectoryBrowserView: View {
     @State private var loading = false
     @State private var errorMsg: String?
     @State private var loadEpoch = 0
-    @State private var scanning = false
-    @State private var scanProgress = ""
-    @State private var scanTask: Task<Void, Never>?
     @State private var favorites: [FavoriteCloudFolder] = CloudFavoritesStore.load()
 
     private var defaultRootId: String {
@@ -581,37 +644,14 @@ private struct CloudDirectoryBrowserView: View {
                             .background(MMTheme.accent, in: Capsule())
                             .foregroundStyle(.white)
                     }
-                    .disabled(scanning)
+                    .disabled(BackgroundScanManager.shared.isScanning)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(.bar)
             }
 
-            if scanning {
-                Color.black.opacity(0.45).ignoresSafeArea()
-                VStack(spacing: 14) {
-                    ProgressView()
-                        .controlSize(.large)
-                        .tint(MMTheme.accent)
-                    Text("正在扫描并识别影视作品…")
-                        .font(.headline)
-                    if !scanProgress.isEmpty {
-                        Text(scanProgress)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    Button("取消扫描", role: .destructive) {
-                        scanTask?.cancel()
-                        scanning = false
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .padding(24)
-                .frame(maxWidth: 300)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
+
         }
         .navigationTitle(currentFolder.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -641,9 +681,7 @@ private struct CloudDirectoryBrowserView: View {
             }
             await loadCurrent()
         }
-        .onDisappear {
-            scanTask?.cancel()
-        }
+
     }
 
     private func toggleFavoriteCurrent() {
@@ -690,9 +728,7 @@ private struct CloudDirectoryBrowserView: View {
     }
 
     private func startScan() {
-        guard !scanning else { return }
-        scanning = true
-        scanProgress = "正在连接网盘…"
+        guard !BackgroundScanManager.shared.isScanning else { return }
         errorMsg = nil
         let cur = currentFolder
         let picked: [PlanRoot]
@@ -704,33 +740,7 @@ private struct CloudDirectoryBrowserView: View {
                 .map { PlanRoot(folderId: $0.fileId, name: $0.fileName) }
         }
         let targetRoots = picked.isEmpty ? [PlanRoot(folderId: cur.id, name: cur.name)] : picked
-        scanTask = Task {
-            do {
-                let drive = try store.buildDrive(for: account)
-                let plan = try await Scanner.scan(
-                    roots: targetRoots,
-                    drive: drive,
-                    fullDrive: false
-                ) { msg, count in
-                    Task { @MainActor in
-                        scanProgress = "\(msg)（已发现 \(count) 个视频）"
-                    }
-                }
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    PlanAndTaskStore.shared.savePlan(plan)
-                    selectedIds.removeAll()
-                    scanning = false
-                    onScanFinished()
-                }
-            } catch is CancellationError {
-                await MainActor.run { scanning = false }
-            } catch {
-                await MainActor.run {
-                    scanning = false
-                    errorMsg = "扫描失败：\(error.localizedDescription)"
-                }
-            }
-        }
+        selectedIds.removeAll()
+        BackgroundScanManager.shared.startScan(account: account, roots: targetRoots)
     }
 }

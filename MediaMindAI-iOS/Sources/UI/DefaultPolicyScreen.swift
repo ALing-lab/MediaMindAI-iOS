@@ -166,8 +166,14 @@ public struct DefaultPolicyScreen: View {
                 get: { draftPolicies },
                 set: { updated in
                     draftPolicies = updated
-                    hasOverride = true
-                    onOverrideChange?(updated.diffOverride(from: basePoliciesForLayer))
+                    let diff = updated.diffOverride(from: basePoliciesForLayer)
+                    if diff == PolicyOverride() {
+                        hasOverride = false
+                        onOverrideChange?(nil)
+                    } else {
+                        hasOverride = true
+                        onOverrideChange?(diff)
+                    }
                 }
             )
         }
@@ -255,7 +261,13 @@ public struct DefaultPolicyScreen: View {
     @ViewBuilder
     private var organizeSections: some View {
         Section {
-            Toggle("启用文件与目录整理", isOn: policiesBinding.organizeEnabled)
+            if !isScopedOverride {
+                Toggle("启用文件与目录整理", isOn: policiesBinding.organizeEnabled)
+            } else if !settings.policies.organizeEnabled {
+                Label("全局「启用文件与目录整理」总开关已关闭，请在设置 → 整理与命名策略中开启。", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
             Toggle("文件重命名", isOn: policiesBinding.renameFiles)
             Toggle("文件夹重命名", isOn: policiesBinding.renameFolders)
             Toggle("整理季目录", isOn: policiesBinding.seasonFolders)
@@ -266,11 +278,15 @@ public struct DefaultPolicyScreen: View {
         }
 
         Section("实时命名预览") {
-            Picker("预览类型", selection: $organizeIsTv) {
-                Text("电影").tag(false)
-                Text("剧集").tag(true)
+            if case .film = layerMode {
+                EmptyView()
+            } else {
+                Picker("预览类型", selection: $organizeIsTv) {
+                    Text("电影").tag(false)
+                    Text("剧集").tag(true)
+                }
+                .pickerStyle(.segmented)
             }
-            .pickerStyle(.segmented)
 
             let prefs = organizeIsTv ? currentPolicies.tvNaming : currentPolicies.movieNaming
             VStack(spacing: 12) {
@@ -411,7 +427,13 @@ public struct DefaultPolicyScreen: View {
     @ViewBuilder
     private var scrapeSections: some View {
         Section {
-            Toggle("启用海报与 NFO 刮削", isOn: policiesBinding.scrapeEnabled)
+            if !isScopedOverride {
+                Toggle("启用海报与 NFO 刮削", isOn: policiesBinding.scrapeEnabled)
+            } else if !currentPolicies.scrapeEnabled {
+                Label("全局「启用海报与 NFO 刮削」总开关已关闭，请在设置 → 刮削与素材策略中开启。", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
             if currentPolicies.scrapeEnabled {
                 Picker("刮削模式", selection: policiesBinding.fullScrape) {
                     Text("只刮削缺失文件").tag(false)
@@ -423,7 +445,7 @@ public struct DefaultPolicyScreen: View {
             Text("刮削文件策略")
         } footer: {
             Text(!currentPolicies.scrapeEnabled
-                 ? "已关闭海报与 NFO 刮削，扫描与执行时仅做文件整理。"
+                 ? "全局已关闭海报与 NFO 刮削，扫描与执行时仅做文件整理。"
                  : (currentPolicies.fullScrape
                     ? "重新生成所选素材，同名旧文件先备份。"
                     : "默认只补缺失项：复用历史影视匹配，仍实时检查文件是否存在。"))
@@ -443,11 +465,15 @@ public struct DefaultPolicyScreen: View {
             }
 
             Section {
-                Picker("素材类型", selection: $scrapeIsTv) {
-                    Text("剧集").tag(true)
-                    Text("电影").tag(false)
+                if case .film = layerMode {
+                    EmptyView()
+                } else {
+                    Picker("素材类型", selection: $scrapeIsTv) {
+                        Text("剧集").tag(true)
+                        Text("电影").tag(false)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
 
                 Toggle(scrapeIsTv ? "剧 NFO" : "电影 NFO", isOn: activeMediaDefaultsBinding.nfo)
                 if activeMediaDefaultsBinding.wrappedValue.nfo {
@@ -482,7 +508,6 @@ public struct DefaultPolicyScreen: View {
             if scrapeIsTv {
                 Section("季素材设置") {
                     Toggle("季海报", isOn: policiesBinding.seasonPoster)
-                    Toggle("季 NFO", isOn: policiesBinding.seasonNfo)
                 }
                 Section("集素材设置") {
                     Toggle("集 NFO", isOn: policiesBinding.episodeNfo)
@@ -609,7 +634,6 @@ public struct DefaultPolicyScreen: View {
             settings.policies.movie = initial.movie
             settings.policies.tv = initial.tv
             settings.policies.seasonPoster = initial.seasonPoster
-            settings.policies.seasonNfo = initial.seasonNfo
             settings.policies.episodeNfo = initial.episodeNfo
             settings.policies.episodeThumb = initial.episodeThumb
             settings.nfoFields = NfoFieldSelection()
@@ -748,7 +772,15 @@ public struct LibraryDestinationSheet: View {
                 if let err = errorMsg {
                     VStack(spacing: 10) {
                         Text(err).font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center)
-                        Button("重试") { Task { await loadCurrent() } }
+                        Button("重试") {
+                            Task {
+                                if drive == nil {
+                                    await initializeDriveAndLoad()
+                                } else {
+                                    await loadCurrent()
+                                }
+                            }
+                        }
                             .buttonStyle(.bordered)
                     }
                     .padding(24)

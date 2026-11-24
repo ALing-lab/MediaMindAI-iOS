@@ -3,13 +3,13 @@ import AVFoundation
 
 /// 1:1 复刻自 Android `MainActivity.kt` 双 M 深浅色全屏视频开屏动画（AVPlayerLayer center-crop + 12 秒看门狗 + 播放完成/后台/点击自动淡出）。
 public struct SplashView: View {
-    public let onDone: () -> Void
+    public let onDone: @MainActor () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @State private var finished = false
 
-    public init(onDone: @escaping () -> Void) {
+    public init(onDone: @escaping @MainActor () -> Void) {
         self.onDone = onDone
     }
 
@@ -77,7 +77,7 @@ private final class PlayerContainerView: UIView {
 
 private struct SplashVideoPlayerView: UIViewRepresentable {
     let url: URL
-    let onEnded: () -> Void
+    let onEnded: @MainActor () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onEnded: onEnded) }
 
@@ -103,20 +103,23 @@ private struct SplashVideoPlayerView: UIViewRepresentable {
     }
 
     final class Coordinator {
-        private let onEnded: () -> Void
+        private let onEnded: @MainActor () -> Void
         private var player: AVPlayer?
         private var observer: NSObjectProtocol?
 
-        init(onEnded: @escaping () -> Void) { self.onEnded = onEnded }
+        init(onEnded: @escaping @MainActor () -> Void) { self.onEnded = onEnded }
 
         func observe(item: AVPlayerItem, player: AVPlayer) {
             self.player = player
+            let callback = onEnded
             observer = NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: item,
                 queue: .main
-            ) { [weak self] _ in
-                self?.onEnded()
+            ) { _ in
+                Task { @MainActor in
+                    callback()
+                }
             }
         }
 
@@ -135,7 +138,7 @@ private struct SplashVideoPlayerView: UIViewRepresentable {
 #else
 private struct SplashVideoPlayerView: View {
     let url: URL
-    let onEnded: () -> Void
+    let onEnded: @MainActor () -> Void
     var body: some View {
         Color.clear.task { onEnded() }
     }

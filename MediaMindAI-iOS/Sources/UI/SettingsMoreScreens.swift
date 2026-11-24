@@ -100,6 +100,10 @@ public struct TmdbSettingsView: View {
                         .autocorrectionDisabled()
                     TextField("代理端口（如 7890）", value: $settings.tmdbProxyPort, format: .number)
                         .keyboardType(.numberPad)
+                        .onChange(of: settings.tmdbProxyPort) { _, newVal in
+                            if newVal < 0 { settings.tmdbProxyPort = 0 }
+                            else if newVal > 65535 { settings.tmdbProxyPort = 65535 }
+                        }
                 }
             }
 
