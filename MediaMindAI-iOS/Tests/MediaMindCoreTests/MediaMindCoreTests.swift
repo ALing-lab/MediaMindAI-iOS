@@ -407,9 +407,11 @@ final class MediaMindCoreTests: XCTestCase {
         XCTAssertFalse(RateLimitDetector.isRateLimitError(DriveError.api(code: 404, message: "文件 movie_4290.mkv 不存在")))
 
         let gy = AdaptiveReadRate(profile: .guangya)
-        XCTAssertEqual(await gy.interval(), 150)
+        let gyInit = await gy.interval()
+        XCTAssertEqual(gyInit, 150)
         await gy.feedback(durationMs: 100, throttled: true, success: false)
-        XCTAssertEqual(await gy.interval(), 2000)
+        let gyThrottled = await gy.interval()
+        XCTAssertEqual(gyThrottled, 2000)
 
         XCTAssertEqual(GuangyaDrive.normalizePhone("13800138000"), "+86 13800138000")
         XCTAssertEqual(GuangyaDrive.normalizePhone("+14155550100"), "+1 4155550100")

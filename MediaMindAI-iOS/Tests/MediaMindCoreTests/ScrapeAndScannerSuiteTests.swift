@@ -141,9 +141,12 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         let root = Node("root")
         let child = Node("child", parent: root)
         let grand = Node("grand", parent: child)
-        XCTAssertNil(ScannerTreeEngine.holderOf(node: root, root: root, parent: { $0.parent }))
-        XCTAssertTrue(ScannerTreeEngine.holderOf(node: child, root: root, parent: { $0.parent }) === child)
-        XCTAssertTrue(ScannerTreeEngine.holderOf(node: grand, root: root, parent: { $0.parent }) === child)
+        let holderRoot = ScannerTreeEngine.holderOf(node: root, root: root, parent: { (n: Node) in n.parent })
+        let holderChild = ScannerTreeEngine.holderOf(node: child, root: root, parent: { (n: Node) in n.parent })
+        let holderGrand = ScannerTreeEngine.holderOf(node: grand, root: root, parent: { (n: Node) in n.parent })
+        XCTAssertNil(holderRoot)
+        XCTAssertTrue(holderChild === child)
+        XCTAssertTrue(holderGrand === child)
     }
 
     // MARK: - 3. EpisodeStrategyMapper 四种集序策略
