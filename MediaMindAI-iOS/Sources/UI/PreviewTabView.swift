@@ -36,7 +36,10 @@ public struct PreviewTabView: View {
 
     public var body: some View {
         NavigationStack {
-            Group {
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                TopAmbientGlow()
+                Group {
                 if let plan = activePlan {
                     let ready = plan.groups.filter { $0.kind != "unmatched" }
                     let manual = plan.groups.filter { $0.kind == "unmatched" }
@@ -202,7 +205,7 @@ public struct PreviewTabView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                             }
-                            .background(Color(.systemGroupedBackground))
+                            .background(Color.clear)
                         }
 
                         if manualTab && !batchSelectedManualIds.isEmpty {
@@ -252,6 +255,7 @@ public struct PreviewTabView: View {
                     }
                 } else {
                     ContentUnavailableView("暂无识别结果", systemImage: "eye", description: Text("请在「云盘」页面选择文件夹并开始扫描。"))
+                }
                 }
             }
             .searchable(text: $searchQuery, prompt: "搜索片名、文件夹或年份")

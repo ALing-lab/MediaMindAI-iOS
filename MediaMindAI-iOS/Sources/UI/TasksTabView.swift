@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 任务中心页（1:1 对标 Android TasksScreen + CompletedTaskDetailScreen：实时进度、TaskQueue 排队队列、WAL 崩溃核实、操作日志详情与一键撤销回滚）。
 public struct TasksTabView: View {
@@ -15,7 +16,10 @@ public struct TasksTabView: View {
 
     public var body: some View {
         NavigationStack {
-            List {
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                TopAmbientGlow()
+                List {
                 let uncertain = journal.uncertainRows()
                 let walUncertain = ReversibleWalStore.shared.uncertainRecords()
                 if let reconcileHint {
@@ -155,6 +159,8 @@ public struct TasksTabView: View {
                         }
                     }
                 }
+                }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("任务中心")
             .confirmationDialog("停止当前任务", isPresented: $showStopConfirm, titleVisibility: .visible) {

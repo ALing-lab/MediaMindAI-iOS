@@ -84,7 +84,9 @@ public struct FilmLibraryView: View {
         let tvs = filtered.filter { $0.1.kind == "tv" }
         let cols = filtered.filter { $0.1.kind == "collection" }
 
-        List {
+        VStack(spacing: 0) {
+            InlineSearchBar(text: $search, prompt: "搜索片名或年份")
+            List {
             if filtered.isEmpty {
                 ContentUnavailableView("暂无已识别影视库", systemImage: "film.stack", description: Text("完成扫描后，所有识别出的电影、剧集与合集会归类展示于此。"))
             } else {
@@ -104,8 +106,8 @@ public struct FilmLibraryView: View {
                     }
                 }
             }
+            }
         }
-        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索片名或年份")
         .navigationTitle("影视库总览")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: Binding(get: { rematchTarget != nil }, set: { if !$0 { rematchTarget = nil } })) {

@@ -195,7 +195,9 @@ public struct DiagnosticLogView: View {
     }
 
     public var body: some View {
-        List {
+        VStack(spacing: 0) {
+            InlineSearchBar(text: $searchQuery, prompt: "按标签或关键字搜索日志")
+            List {
             Section {
                 Toggle("开启 2 MB 滚动落盘日志（net.log）", isOn: $settings.netLogFileEnabled)
                 if let last = activity.last, !last.isEmpty {
@@ -237,8 +239,8 @@ public struct DiagnosticLogView: View {
                     }
                 }
             }
+            }
         }
-        .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "按标签或关键字搜索日志")
         .navigationTitle("诊断日志")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

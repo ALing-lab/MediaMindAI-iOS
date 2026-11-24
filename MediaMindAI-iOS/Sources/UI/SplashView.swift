@@ -13,7 +13,13 @@ public struct SplashView: View {
         self.onDone = onDone
     }
 
-    private var isDark: Bool { colorScheme == .dark }
+    private var isDark: Bool {
+        switch AppSettings.shared.themeMode {
+        case .dark: return true
+        case .light: return false
+        case .system: return colorScheme == .dark
+        }
+    }
     private var bgColor: Color {
         isDark ? Color(red: 0x20 / 255.0, green: 0x20 / 255.0, blue: 0x20 / 255.0) : .white
     }

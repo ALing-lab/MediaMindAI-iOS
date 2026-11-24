@@ -3,6 +3,15 @@ import SwiftUI
 @main
 struct MediaMindAIApp: App {
     @State private var showSplash = true
+    @State private var settings = AppSettings.shared
+
+    private var preferredScheme: ColorScheme? {
+        switch settings.themeMode {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
 
     init() {
         CrashReporter.install()
@@ -33,6 +42,7 @@ struct MediaMindAIApp: App {
                     .zIndex(10)
                 }
             }
+            .preferredColorScheme(preferredScheme)
         }
     }
 }

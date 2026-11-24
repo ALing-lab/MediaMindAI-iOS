@@ -1,6 +1,20 @@
 import Foundation
 import Observation
 
+public enum AppThemeMode: String, CaseIterable, Codable, Sendable {
+    case system
+    case light
+    case dark
+
+    public var label: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .light: return "浅色"
+        case .dark: return "深色"
+        }
+    }
+}
+
 public enum ImageQualityOption: String, CaseIterable, Codable, Sendable {
     case compact
     case standard
@@ -37,6 +51,11 @@ public final class AppSettings: @unchecked Sendable {
     public static let shared = AppSettings()
 
     private let defaults = UserDefaults.standard
+
+    // 外观主题（浅色 / 深色 / 跟随系统）
+    public var themeMode: AppThemeMode {
+        didSet { defaults.set(themeMode.rawValue, forKey: "app_theme_mode") }
+    }
 
     // 扫描限流
     public var scanAutomatic: Bool {
@@ -210,6 +229,7 @@ public final class AppSettings: @unchecked Sendable {
     }
 
     private init() {
+        self.themeMode = AppThemeMode(rawValue: defaults.string(forKey: "app_theme_mode") ?? "") ?? .system
         self.scanAutomatic = defaults.object(forKey: "scan_auto") as? Bool ?? true
         if let d = defaults.data(forKey: "global_default_policies_v2"),
            let p = try? JSONDecoder().decode(DefaultPolicies.self, from: d) {

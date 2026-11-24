@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 设置总页及全部子页面（1:1 对标 Android SettingsScreens + DefaultPolicyScreen + NfoFields + RetentionZone + AiDiagnostics + AiSettingsScreen + TmdbNetScreen + AccountDetailScreen）。
 public struct SettingsTabView: View {
@@ -9,7 +10,18 @@ public struct SettingsTabView: View {
 
     public var body: some View {
         NavigationStack {
-            List {
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                TopAmbientGlow()
+                List {
+                Section("外观") {
+                    Picker("外观主题", selection: $settings.themeMode) {
+                        ForEach(AppThemeMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                }
+
                 Section("识别与网络") {
                     NavigationLink {
                         TmdbSettingsView()
@@ -92,6 +104,8 @@ public struct SettingsTabView: View {
                         UpdateCheckView()
                     }
                 }
+                }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("设置")
             .confirmationDialog("清除全部本地计划、TMDB 与图片缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {

@@ -443,16 +443,33 @@ public actor GuangyaDrive: CloudDrive {
             guard let vToken = vObj["verification_token"] as? String, !vToken.isEmpty else {
                 throw DriveError.api(code: -1, message: "验证码校验未返回 verification_token")
             }
+            // 为 POST:/v1/auth/signin 单独申请新的无感 captcha_token（绝不复用发码阶段带 meta.phone_number 的旧 token）
+            var signinCaptcha = ""
+            let signinInitBody: [String: Any] = [
+                "client_id": clientId,
+                "action": "POST:/v1/auth/signin",
+                "device_id": challenge.deviceId,
+                "meta": [String: Any](),
+            ]
+            if let (iCode, iObj) = try? await postAccountJson(
+                url: "\(trimmedBase)/v1/shield/captcha/init",
+                body: signinInitBody,
+                deviceId: challenge.deviceId,
+                session: session
+            ), (200...299).contains(iCode), let iObj,
+               let ct = iObj["captcha_token"] as? String, !ct.isEmpty {
+                signinCaptcha = ct
+            }
             var signBody: [String: Any] = [
                 "client_id": clientId,
                 "verification_token": vToken,
             ]
-            if !challenge.captchaToken.isEmpty { signBody["captcha_token"] = challenge.captchaToken }
+            if !signinCaptcha.isEmpty { signBody["captcha_token"] = signinCaptcha }
             let (sCode, sObj) = try await postAccountJson(
                 url: "\(trimmedBase)/v1/auth/signin",
                 body: signBody,
                 deviceId: challenge.deviceId,
-                captchaToken: challenge.captchaToken,
+                captchaToken: signinCaptcha,
                 session: session
             )
             guard (200...299).contains(sCode), let sObj else {
