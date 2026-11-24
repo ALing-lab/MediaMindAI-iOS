@@ -33,6 +33,7 @@ jobs:
           zip -r MediaMindAI-unsigned.ipa Payload
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
           name: unsigned-ipa
           path: MediaMindAI-iOS/MediaMindAI-unsigned.ipa

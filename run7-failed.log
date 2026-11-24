@@ -1,0 +1,1011 @@
+build	Core logic tests (SwiftPM, macOS)	﻿2026-11-24T01:40:23.8734700Z ##[group]Run swift test
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:23.8735660Z ^[[36;1mswift test^[[0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:23.8776980Z shell: /bin/bash -e {0}
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:23.8778950Z ##[endgroup]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:30.7501460Z Building for debugging...
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:30.7586590Z [0/8] /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/arm64-apple-macosx/debug/MediaMindAIPackageTests.derived/runner.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:30.7589440Z [1/8] Write sources
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:30.7592750Z [4/8] Copying naming_fixtures.json
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:31.0215420Z [5/8] Write swift-version--79AA4F9932D1E87A.txt
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:39.9585560Z [7/45] Emitting module MediaMindCore
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:39.9691450Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:39.9791080Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:39.9890830Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:39.9993290Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0096280Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0194200Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0295700Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0399950Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0501830Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0604230Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0704760Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0806200Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.0913760Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1015320Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1116620Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1220020Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1339740Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1341100Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1623040Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1763840Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1864890Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.1967270Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2069260Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2170270Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2273000Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2375620Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2486920Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2588480Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2689630Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2791730Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:40.2894340Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.2985820Z [8/63] Compiling MediaMindCore AiPipelineModules.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3088680Z [9/63] Compiling MediaMindCore AiRecognizer.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3191220Z [10/63] Compiling MediaMindCore AiResponseParser.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3292800Z [11/63] Compiling MediaMindCore AppSettings.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3398060Z [12/63] Compiling MediaMindCore BackgroundAndCrash.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3499470Z [13/63] Compiling MediaMindCore DefaultPolicies.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3599680Z [14/63] Compiling MediaMindCore HistoryStore.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3702000Z [15/63] Compiling MediaMindCore KeychainStore.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3802440Z [16/63] Compiling MediaMindCore NetLog.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.3904290Z [17/63] Compiling MediaMindCore UpdateChecker.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4004740Z [18/63] Compiling MediaMindCore CertPinning.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4105370Z [19/63] Compiling MediaMindCore CloudDrive.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4206280Z [20/63] Compiling MediaMindCore GuangyaDrive.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4306830Z [21/63] Compiling MediaMindCore IdRemap.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4429420Z [22/63] Compiling MediaMindCore Pan123Drive.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4546580Z [23/63] Compiling MediaMindCore ScanFrequency.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4672520Z [24/63] Compiling MediaMindCore WebDavDrive.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4794160Z [25/63] Compiling MediaMindCore AdaptiveAndConflictEngine.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.4924630Z [26/63] Compiling MediaMindCore ArtworkFetcher.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5054420Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5056980Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5176870Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5298880Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5420350Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5522120Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5623020Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5752940Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5854030Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.5955530Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6056420Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6158500Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6260040Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6361150Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6479410Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6581940Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6683210Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6793540Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.6906540Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7007550Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7110170Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7226010Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7327710Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7433940Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7559470Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7661700Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7767610Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7870620Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.7971590Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8073220Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8174230Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8276050Z [27/63] Compiling MediaMindCore DuplicateAndRetentionEngine.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8378130Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8480030Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8600510Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8702640Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8805230Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.8911660Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9012950Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9113950Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9215550Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9333500Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9434780Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9535750Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9657200Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9757310Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9858390Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:57.9959360Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0083000Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0185120Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0286360Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0388010Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0490680Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0593830Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0695700Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0796790Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0897890Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.0998700Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1099780Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1200490Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1301100Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1402020Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1502320Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1604290Z [28/63] Compiling MediaMindCore ExecutionEngine.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1706270Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1811280Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.1913170Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2024160Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2128370Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2250220Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2352920Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2469730Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2580670Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2683410Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2785060Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.2886690Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3015620Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3116440Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3218080Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3319440Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3424130Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3526540Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3628070Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3729570Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3831180Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3932700Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3988550Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3988890Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3989320Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3989880Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3990050Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3990370Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3990730Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3991020Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3991200Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3991550Z [29/63] Compiling MediaMindCore JournalReconciler.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3992500Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3993500Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3993780Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3994190Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3995130Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3995760Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3996160Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3996400Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3996820Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3997470Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3997760Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3998590Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3999010Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3999350Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3999600Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.3999840Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4000600Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4102170Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4203190Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4304200Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4407270Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4509510Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4611030Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4712830Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4835490Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.4936130Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5037580Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5137710Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5238430Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5383940Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5485430Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5587400Z [30/63] Compiling MediaMindCore NfoXml.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5689710Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5789580Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.5890400Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6004520Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6119220Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6222970Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6324500Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6390150Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6392780Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6395110Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6395520Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6396180Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6396570Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6396990Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6397470Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6397750Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6398700Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6414940Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6416070Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6416500Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6417750Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6418680Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6419220Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6419680Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6420270Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6421110Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6421440Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6421920Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6422510Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6422940Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6423240Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6423710Z [31/63] Compiling MediaMindCore OperationJournalAndUndo.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6424800Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6510240Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6613150Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6652140Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6685370Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6718210Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6743380Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6743840Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6744440Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6745170Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6745540Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6746000Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6746440Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6748660Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6749020Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6749350Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6750250Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6751220Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6751710Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6752180Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6752950Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6753800Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6754300Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6758610Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6759210Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6760030Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6760370Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6760880Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6761340Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6762140Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6762700Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6763170Z [32/63] Compiling MediaMindCore PlanModels.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6764250Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6765240Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6765560Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6766070Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6767040Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6767870Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6768250Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6768530Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6769040Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6769690Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6770070Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6770540Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6770980Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6771420Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6771740Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6772060Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6772900Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6773990Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6779370Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6779830Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6780570Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6781440Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6781840Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6782110Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6782620Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6783320Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6783590Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6783950Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6784340Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6784670Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6784950Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6785330Z [33/63] Compiling MediaMindCore RetentionZoneEngine.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6786630Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6787590Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6787810Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6788260Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6789150Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6790690Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6791100Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6791380Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6791900Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6792570Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6792860Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6793260Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6793660Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6794000Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6794390Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6794680Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6795470Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6796500Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6796950Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6797340Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6798030Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6798690Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6799010Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6799230Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6799760Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6800430Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6800810Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6801250Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6801750Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6802110Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6802440Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6802930Z [34/63] Compiling MediaMindCore ReversibleTransactionEngine.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6803970Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6846240Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6847020Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6848310Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6854560Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.6857230Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7028110Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7034020Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7062030Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7070550Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7071720Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7072140Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7072530Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7072860Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7073670Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7074130Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7074930Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7075890Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7076250Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7076630Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7077340Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7078000Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7078290Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7078510Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7079220Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7079890Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7080190Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7080550Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7080930Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7081250Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7081520Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7081880Z [35/63] Compiling MediaMindCore Scanner.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7082830Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7083790Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7084020Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7084470Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7085350Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7086070Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7086440Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7086760Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7087280Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7087970Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7088240Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7088600Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7088980Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7089310Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7089580Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7089930Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7090720Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7091660Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7092010Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7092390Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7093060Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7093980Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7094610Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7094830Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7095340Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7095970Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7096240Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7096590Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7096970Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7097810Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7098090Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7098490Z [36/63] Compiling MediaMindCore SeriesMergerAndRetention.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7099480Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7100400Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7100620Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7101070Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7101960Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7102670Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7103040Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7103320Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7103830Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7104470Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7104750Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7105140Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7106460Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7107470Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7108160Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7108830Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7110890Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7113370Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7114430Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7115350Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7117050Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7118780Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7119480Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7119980Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7121270Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7122920Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7123560Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7124420Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7125340Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7126130Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7126780Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7127710Z [37/63] Compiling MediaMindCore TaskCancellation.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7131070Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7134690Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7135280Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7136390Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7138870Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7140720Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7141600Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7142250Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7143970Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7145970Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7146630Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7147500Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7148460Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7149250Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7149910Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7150580Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7152620Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7155070Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7155900Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7156830Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7158540Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7160220Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7160910Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7161420Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7162690Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7164570Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7165280Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7166160Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7167070Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7167850Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7168510Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7216810Z [38/63] Compiling MediaMindCore AnimeEpisodeParser.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7219560Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7222020Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7222580Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7223750Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7226080Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7242200Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7243350Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7243830Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7244590Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7246400Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7246910Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7247300Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7247720Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7248050Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7248340Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7258000Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7258910Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7260020Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7266030Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7266420Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7267210Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7284780Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7285100Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7285320Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7285820Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7286450Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7286710Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7287380Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7406220Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7530970Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7616880Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7617480Z [39/63] Compiling MediaMindCore EpisodeMapping.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7618550Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7620520Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7726620Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7804030Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7805300Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7806190Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7806590Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7806870Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7807470Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7812070Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7813430Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7813800Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7814180Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7814510Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7814780Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7815050Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7816830Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7820640Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7934870Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.7937140Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8039540Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8041190Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8041490Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8041740Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8043250Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8043920Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8044220Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8044600Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8044960Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8079680Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8080550Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8081490Z [40/63] Compiling MediaMindCore EpisodeRangeParser.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8094880Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8098460Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8199260Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8302960Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8404460Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8504720Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8512740Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8513090Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8513690Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8516250Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8516550Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8516900Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8517260Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8517610Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8517930Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8519980Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8520870Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8617630Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8621050Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8621700Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8622380Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8623110Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8625490Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8625710Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8626240Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8629450Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8629740Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8630090Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8630460Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8630780Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8634390Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8736200Z [41/63] Compiling MediaMindCore ExternalIdExtractor.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8747510Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8748540Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8748760Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8749220Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8750310Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8793230Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8793720Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8793990Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8794500Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8795130Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8795380Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8795710Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8805760Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8929560Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8936200Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8936500Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8937290Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8938280Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8938620Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8943380Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8945330Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8949420Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8950930Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8952550Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8953180Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8953860Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8954130Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8954520Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8955990Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8956310Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8957850Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8958210Z [42/63] Compiling MediaMindCore MediaParser.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.8959160Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9063070Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9155340Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9155900Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9156880Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9282960Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9384830Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9428730Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9429470Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9430230Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9430490Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9430870Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9431240Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9431640Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9431900Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9524120Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9525110Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9526120Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9526470Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9526830Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9527560Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9535270Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9535620Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9535840Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9536810Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9539250Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9539580Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9539940Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9540310Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9540610Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9540870Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9541290Z [43/63] Compiling MediaMindCore ReleaseTokenizer.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9543260Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9664400Z  39 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9712430Z  40 |     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9713000Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9714080Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9817840Z  42 |         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9912910Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9913280Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9913810Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9928130Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9928430Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9928780Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9929150Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9929450Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9929710Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9929970Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9930850Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9940750Z 114 |         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9941880Z 115 |         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:58.9942930Z 116 |         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0007270Z     |                                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0008020Z 117 |     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0008310Z 118 |         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0008520Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0009080Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0009740Z  77 | @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0018980Z  78 | public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0019390Z  79 |     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0019770Z     |                       `- note: static property declared here
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0020080Z  80 | 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0020340Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0020750Z [44/63] Compiling MediaMindCore SequelAndFolderResolver.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0021480Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0027610Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0145300Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0145950Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0146420Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0146800Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0147100Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0147450Z [45/63] Compiling MediaMindCore StandardNaming.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0148830Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0198820Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0199300Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0199730Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0301630Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0402910Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0521130Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0623900Z [46/63] Compiling MediaMindCore TitleDeobfuscator.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0729330Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0833650Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.0945860Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1046070Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1175410Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1255720Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1364470Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1464590Z [47/63] Compiling MediaMindCore TitleScorer.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1576730Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1577580Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1578000Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1578430Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1578860Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1579300Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1579610Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1580010Z [48/63] Compiling MediaMindCore DuplicateRetentionPlanner.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1580730Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1581770Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1582240Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1582670Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1583110Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1583510Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1583820Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1584200Z [49/63] Compiling MediaMindCore EpisodeStrategy.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1584910Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1585590Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1585990Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1586410Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1586840Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1587230Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1587540Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1587940Z [50/63] Compiling MediaMindCore LibraryDestinationAndTargets.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1588900Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1589640Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1590040Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1590460Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1590890Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1591280Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1591580Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1591950Z [51/63] Compiling MediaMindCore ManualConfirmation.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1592640Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1593300Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1593980Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1594810Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1595140Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1595430Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1595630Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1595900Z [52/63] Compiling MediaMindCore PlanSelection.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1596760Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1597360Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1597660Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1597990Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1598320Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1598630Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1598840Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1599080Z [53/63] Compiling MediaMindCore PlanStore.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1599660Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1600230Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1600530Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1601170Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1601500Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1601790Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1602000Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1602260Z [54/63] Compiling MediaMindCore PreviewFilterFull.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1602860Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1603420Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1603720Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1604030Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1604350Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1604640Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1604840Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1605100Z [55/63] Compiling MediaMindCore ScannerHeuristics.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1605700Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1606270Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1606570Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1606880Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1607200Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1607490Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1607690Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1607990Z [56/63] Compiling MediaMindCore ScannerMovieLooseAndArtwork.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1608600Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1609170Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1609460Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1610010Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1610330Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1610620Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1610820Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1611070Z [57/63] Compiling MediaMindCore ScannerReplan.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1611660Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1612230Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1612520Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1612840Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1613160Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1613520Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1613710Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1613970Z [58/63] Compiling MediaMindCore ScannerTvAndBdmv.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1614550Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1615110Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1615400Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1615710Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1616030Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1616320Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1616520Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1616810Z [59/63] Compiling MediaMindCore ScannerTypesAndTree.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1617410Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1617980Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1618270Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1618580Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1618900Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1619190Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1619390Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1619660Z [60/63] Compiling MediaMindCore TmdbClient.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1620300Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1620870Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1621160Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1621470Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1621790Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1622080Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1622280Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1622510Z [61/63] Compiling MediaMindCore TmdbNet.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1623080Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift:454:17: warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1623640Z 452 |                 try Task.checkCancellation()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1623930Z 453 |                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1624670Z 454 |                 await self.store(data: bytes, for: clean)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1624990Z     |                 `- warning: no 'async' operations occur within 'await' expression
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1625280Z 455 |                 return bytes
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:40:59.1625480Z 456 |             } catch is CancellationError {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5079310Z [62/71] Compiling MediaMindCoreTests DrivesTmdbAiCoreSuiteTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5081810Z [63/71] Compiling MediaMindCoreTests ExecReversibleRetentionArtworkTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5083120Z [64/71] Compiling MediaMindCoreTests MediaMindCoreTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5084360Z [65/71] Compiling MediaMindCoreTests Batch1ScrapeTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5123320Z [66/71] Compiling MediaMindCoreTests Batch2ExecTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5139130Z [67/71] Compiling MediaMindCoreTests Batch3NamingAndDriveTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5220990Z [68/71] Compiling MediaMindCoreTests Batch5FixturesAndRegressionTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:10.5257030Z [69/71] Emitting module MediaMindCoreTests
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:11.1739520Z [70/74] Compiling MediaMindCoreTests NamingAndRecognitionSuiteTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:11.1740270Z [71/74] Compiling MediaMindCoreTests ScrapeAndScannerSuiteTests.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:11.1740770Z [72/74] Compiling MediaMindCoreTests resource_bundle_accessor.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:12.8096570Z [73/76] Compiling MediaMindAIPackageTests runner.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:12.8097200Z [74/76] Emitting module MediaMindAIPackageTests
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:12.8150610Z [74/76] Write Objects.LinkFileList
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:13.6259790Z [75/76] Linking MediaMindAIPackageTests
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:13.6289930Z Build complete! (42.99s)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3908020Z Test Suite 'All tests' started at 2026-11-24 01:41:13.987.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3932800Z Test Suite 'MediaMindAIPackageTests.xctest' started at 2026-11-24 01:41:13.988.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3935990Z Test Suite 'Batch1ScrapeTests' started at 2026-11-24 01:41:13.988.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3936830Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testDuplicateRetentionPlannerAndScannerHeuristics]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3938070Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testDuplicateRetentionPlannerAndScannerHeuristics]' passed (0.009 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3940070Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testEpisodeStrategySplitSequentialAbsoluteAndMerge]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3941370Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testEpisodeStrategySplitSequentialAbsoluteAndMerge]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3942410Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testLibraryDestinationTargetsAndEpisodeAssets]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3943400Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testLibraryDestinationTargetsAndEpisodeAssets]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3945220Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testManualConfirmationGateBlocksYearAndTmdbContradictions]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3947680Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testManualConfirmationGateBlocksYearAndTmdbContradictions]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3949350Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testPlanSelectionDependencyPropagationAndSharedMkdir]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3975900Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testPlanSelectionDependencyPropagationAndSharedMkdir]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3976790Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testPreviewTwoRowFilterAndSectionGrouping]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3977580Z Test Case '-[MediaMindCoreTests.Batch1ScrapeTests testPreviewTwoRowFilterAndSectionGrouping]' passed (0.009 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3978200Z Test Suite 'Batch1ScrapeTests' passed at 2026-11-24 01:41:14.009.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3978830Z 	 Executed 6 tests, with 0 failures (0 unexpected) in 0.020 (0.020) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3979620Z Test Suite 'Batch2ExecTests' started at 2026-11-24 01:41:14.009.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3981070Z Test Case '-[MediaMindCoreTests.Batch2ExecTests testJournalReconcilerForwardAndUndoPreparedDeadlockRecovery]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3981980Z Test Case '-[MediaMindCoreTests.Batch2ExecTests testJournalReconcilerForwardAndUndoPreparedDeadlockRecovery]' passed (0.004 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3983030Z Test Case '-[MediaMindCoreTests.Batch2ExecTests testNfoXmlEscapingCdataSplittingAndImageBytes]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3983790Z Test Case '-[MediaMindCoreTests.Batch2ExecTests testNfoXmlEscapingCdataSplittingAndImageBytes]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3984530Z Test Case '-[MediaMindCoreTests.Batch2ExecTests testTaskCancellationKeepAndUndoModes]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3985180Z Test Case '-[MediaMindCoreTests.Batch2ExecTests testTaskCancellationKeepAndUndoModes]' passed (0.005 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3985770Z Test Suite 'Batch2ExecTests' passed at 2026-11-24 01:41:14.018.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3986180Z 	 Executed 3 tests, with 0 failures (0 unexpected) in 0.009 (0.009) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3986720Z Test Suite 'Batch3NamingAndDriveTests' started at 2026-11-24 01:41:14.018.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3987430Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testAiResponseParserAntiHallucinationAndSanitization]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3988410Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testAiResponseParserAntiHallucinationAndSanitization]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3989270Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testAnimeEpisodeParserSpecialsBracketsAndSequelGuard]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3990100Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testAnimeEpisodeParserSpecialsBracketsAndSequelGuard]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3990870Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testEpisodeRangeParser]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3991550Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testEpisodeRangeParser]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3992380Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testExternalIdExtractorFromNameAndNfo]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3993720Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testExternalIdExtractorFromNameAndNfo]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3994530Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testIdRemapNestedPathResolutionAndCycleDetection]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3995440Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testIdRemapNestedPathResolutionAndCycleDetection]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3996290Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testReleaseTokenizerMasksTechnicalSpansWithoutFalsePositives]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3997320Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testReleaseTokenizerMasksTechnicalSpansWithoutFalsePositives]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3998240Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testTitleScorerFourSignalBlendedScoring]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3999050Z Test Case '-[MediaMindCoreTests.Batch3NamingAndDriveTests testTitleScorerFourSignalBlendedScoring]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.3999700Z Test Suite 'Batch3NamingAndDriveTests' passed at 2026-11-24 01:41:14.021.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4000160Z 	 Executed 7 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4000790Z Test Suite 'Batch5FixturesAndRegressionTests' started at 2026-11-24 01:41:14.021.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4001440Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testConflictPolicyAndExistingAssets]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4002320Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testConflictPolicyAndExistingAssets]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4003250Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testDuplicateDetectorAndContentDigest]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4004080Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testDuplicateDetectorAndContentDigest]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4005250Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testEditionParserAndDiscDetection]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4006030Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testEditionParserAndDiscDetection]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4006920Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testLanHostDetectionAndCertPinningNormalization]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4007770Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testLanHostDetectionAndCertPinningNormalization]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4008670Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testLooseSeriesGroupingTemplates]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4009500Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testLooseSeriesGroupingTemplates]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4010290Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testNamingFixturesJsonLoadedAndValidated]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4011220Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testNamingFixturesJsonLoadedAndValidated]' passed (0.003 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4012130Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testTmdbNetConfigNormalizationAndImageMirrors]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4013000Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testTmdbNetConfigNormalizationAndImageMirrors]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4013950Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testUpdateCheckerSemverComparison]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4014800Z Test Case '-[MediaMindCoreTests.Batch5FixturesAndRegressionTests testUpdateCheckerSemverComparison]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4015540Z Test Suite 'Batch5FixturesAndRegressionTests' passed at 2026-11-24 01:41:14.026.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4016090Z 	 Executed 8 tests, with 0 failures (0 unexpected) in 0.005 (0.005) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4016600Z Test Suite 'DrivesTmdbAiCoreSuiteTests' started at 2026-11-24 01:41:14.026.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4017160Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testAiConfigCacheBudgetAndPrompts]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4017910Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testAiConfigCacheBudgetAndPrompts]' passed (0.002 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4018760Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testAiResponseParserSingleBatchRerankAndFranchise]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4019610Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testAiResponseParserSingleBatchRerankAndFranchise]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4020400Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testCertPinningIdRemapAndAccountBinding]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4021190Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testCertPinningIdRemapAndAccountBinding]' passed (0.025 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4021940Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testGuangyaDriveHelpersAndCredsRedaction]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4022840Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testGuangyaDriveHelpersAndCredsRedaction]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4023650Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testHistoryStoreRecordRunAndRemembered]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4024400Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testHistoryStoreRecordRunAndRemembered]' passed (0.009 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4025190Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testNetLogSanitizationDiskAndExport]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4025930Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testNetLogSanitizationDiskAndExport]' passed (0.003 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4026690Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testPan123ExplainAndContentDigest]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4027590Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testPan123ExplainAndContentDigest]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4028430Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testTmdbImageLoaderDiskCacheAndMagicValidation]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4029320Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testTmdbImageLoaderDiskCacheAndMagicValidation]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4030090Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testTmdbNetAndPacerAndConnectHelp]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4030840Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testTmdbNetAndPacerAndConnectHelp]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4031570Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testUpdateCheckerHostMatchAndAppDirs]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4032370Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testUpdateCheckerHostMatchAndAppDirs]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4033110Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testWebDavAddressAndPathHandling]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4033870Z Test Case '-[MediaMindCoreTests.DrivesTmdbAiCoreSuiteTests testWebDavAddressAndPathHandling]' passed (0.006 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4034530Z Test Suite 'DrivesTmdbAiCoreSuiteTests' passed at 2026-11-24 01:41:14.076.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4034960Z 	 Executed 11 tests, with 0 failures (0 unexpected) in 0.049 (0.049) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4035540Z Test Suite 'ExecReversibleRetentionArtworkTests' started at 2026-11-24 01:41:14.076.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4036270Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testAdaptiveConcurrencyGateDemotionOnlyAndPermitRelease]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4037880Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Tests/MediaMindCoreTests/ExecReversibleRetentionArtworkTests.swift:326: error: -[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testAdaptiveConcurrencyGateDemotionOnlyAndPermitRelease] : XCTAssertEqual failed: ("3") is not equal to ("1")
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4040040Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Tests/MediaMindCoreTests/ExecReversibleRetentionArtworkTests.swift:328: error: -[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testAdaptiveConcurrencyGateDemotionOnlyAndPermitRelease] : XCTAssertEqual failed: ("3") is not equal to ("1")
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4041580Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testAdaptiveConcurrencyGateDemotionOnlyAndPermitRelease]' failed (0.245 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4042500Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testArtworkFetcherImageSizeAndPickPath]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4043300Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testArtworkFetcherImageSizeAndPickPath]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4044230Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testConflictPolicyAndExistingAssetsAndLooseGrouping]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4045160Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testConflictPolicyAndExistingAssetsAndLooseGrouping]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4046130Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testCountVideosBoundedCompleteAndLimitGuards]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4047100Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testCountVideosBoundedCompleteAndLimitGuards]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4047920Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testExecPhasesAndExecutionOrder]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4048770Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testExecPhasesAndExecutionOrder]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4049610Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testExecutionEngineConcurrencyAndResolveDest]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4050900Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testExecutionEngineConcurrencyAndResolveDest]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4051860Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testFailedRetryDependencyClosureAndTaskDeletion]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4052750Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testFailedRetryDependencyClosureAndTaskDeletion]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4053620Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testMovieNfoBuildAndNfoFieldsFilter]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4054400Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testMovieNfoBuildAndNfoFieldsFilter]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4055290Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testRetentionZoneMoveRestoreProtectAndCleanup]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4056150Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testRetentionZoneMoveRestoreProtectAndCleanup]' passed (0.012 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4057180Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testReversibleTransactionAuditBackupsThrowsWhenBackupMissing]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4058220Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testReversibleTransactionAuditBackupsThrowsWhenBackupMissing]' passed (0.006 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4059210Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testReversibleTransactionForwardAndSafeUndoWithBackup]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4060180Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testReversibleTransactionForwardAndSafeUndoWithBackup]' passed (0.029 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4061090Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testReversibleTransactionMoveBatchAndUndo]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4061990Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testReversibleTransactionMoveBatchAndUndo]' passed (0.003 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4062990Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testSeriesMergerMergeSplitTvSeasons]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4063790Z Test Case '-[MediaMindCoreTests.ExecReversibleRetentionArtworkTests testSeriesMergerMergeSplitTvSeasons]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4064520Z Test Suite 'ExecReversibleRetentionArtworkTests' failed at 2026-11-24 01:41:14.374.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4065000Z 	 Executed 13 tests, with 2 failures (0 unexpected) in 0.298 (0.298) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4065500Z Test Suite 'MediaMindCoreTests' started at 2026-11-24 01:41:14.374.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4066090Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testAdaptiveDirectoryPlannerAndSelfContainmentGuard]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4066900Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testAdaptiveDirectoryPlannerAndSelfContainmentGuard]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4067760Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testCertPinningNormalizationAndFingerprint]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4068490Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testCertPinningNormalizationAndFingerprint]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4069180Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testCloudRetentionZoneParkRestoreAndDelete]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4069890Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testCloudRetentionZoneParkRestoreAndDelete]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4070570Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testConflictPolicyAndDependentActionSuspension]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4071350Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testConflictPolicyAndDependentActionSuspension]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4072200Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testContentDigestAndDuplicateDetectorClassifications]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4073220Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testContentDigestAndDuplicateDetectorClassifications]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4074070Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testEditionParserKometaWeighting3DAndStacking]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4074870Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testEditionParserKometaWeighting3DAndStacking]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4075600Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testExistingAssetsAndLooseSeriesGrouping]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4076350Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testExistingAssetsAndLooseSeriesGrouping]' passed (0.002 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4077070Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testLanHostDetectionRateLimitAimdAndGuangyaE164]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4077900Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testLanHostDetectionRateLimitAimdAndGuangyaE164]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4078740Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testOperationJournalWebDavRollbackReconcileAndTaskQueue]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4079630Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testOperationJournalWebDavRollbackReconcileAndTaskQueue]' passed (0.007 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4080490Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testScannerProtectsBdmvAndSkipsOrganizedHistory]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.4081720Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testScannerProtectsBdmvAndSkipsOrganizedHistory]' passed (0.005 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5433810Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingHdrMultiTagOrderAndHlgConflict]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5445020Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingHdrMultiTagOrderAndHlgConflict]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5448750Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingInheritsVersionFromReleaseDirAndDetectsResConflict]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5455120Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingInheritsVersionFromReleaseDirAndDetectsResConflict]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5462480Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingMovieFullVersionOrder]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5463470Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingMovieFullVersionOrder]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5464380Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingMultiEpisodeRangeWithTmdb]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5465420Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingMultiEpisodeRangeWithTmdb]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5466300Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingSdrCompletionWhenMissing]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5467030Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingSdrCompletionWhenMissing]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5467840Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingTmdbTagStylesAndBdmvProtection]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5468550Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingTmdbTagStylesAndBdmvProtection]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5469310Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingTvEpisodeIncludesTmdbAfterSe]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5470040Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testStandardNamingTvEpisodeIncludesTmdbAfterSe]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5470890Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testThreeTierPolicyPrecedenceReplanAndPreviewFilter]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5471750Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testThreeTierPolicyPrecedenceReplanAndPreviewFilter]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5472530Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testTitleDeobfuscatorFullDictionaryAndMultiStagePipeline]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5473720Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testTitleDeobfuscatorFullDictionaryAndMultiStagePipeline]' passed (0.004 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5474500Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testTmdbNetHttpSecurityAndMirrorFallback]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5475300Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testTmdbNetHttpSecurityAndMirrorFallback]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5476000Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testUpdateCheckerSemverAndHistoryStore]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5476750Z Test Case '-[MediaMindCoreTests.MediaMindCoreTests testUpdateCheckerSemverAndHistoryStore]' passed (0.003 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5477410Z Test Suite 'MediaMindCoreTests' passed at 2026-11-24 01:41:14.400.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5477830Z 	 Executed 21 tests, with 0 failures (0 unexpected) in 0.025 (0.026) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5478310Z Test Suite 'NamingAndRecognitionSuiteTests' started at 2026-11-24 01:41:14.400.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5478980Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testEditionParserAndStackParts]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5479760Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testEditionParserAndStackParts]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5480660Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testEpisodeMappingAbsoluteAndGroupTable]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5481520Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testEpisodeMappingAbsoluteAndGroupTable]' passed (0.003 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5482290Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testEpisodeRangeAndAnimeParsers]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5483120Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testEpisodeRangeAndAnimeParsers]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5483940Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testExternalIdExtractorFromNameAndNfo]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5484800Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testExternalIdExtractorFromNameAndNfo]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5485750Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testNamingLanguagePreferencesAndPreviews]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5486580Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testNamingLanguagePreferencesAndPreviews]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5487390Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testReleaseTokenizerNoiseMasking]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5488170Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testReleaseTokenizerNoiseMasking]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5488990Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testSequelFolderResolverAndTitleScorer]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5489750Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testSequelFolderResolverAndTitleScorer]' passed (0.004 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5490630Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingBdmvDetection]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5491410Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingBdmvDetection]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5492230Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingDefaultSdrWhenMissing]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5493100Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingDefaultSdrWhenMissing]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5493910Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingFolderAndFileFormatting]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5495330Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Tests/MediaMindCoreTests/NamingAndRecognitionSuiteTests.swift:58: error: -[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingFolderAndFileFormatting] : XCTAssertEqual failed: ("Season 00") is not equal to ("Specials")
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5500760Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Tests/MediaMindCoreTests/NamingAndRecognitionSuiteTests.swift:62: error: -[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingFolderAndFileFormatting] : XCTAssertEqual failed: ("盗梦空间 (2010)  ") is not equal to ("盗梦空间 (2010)")
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5502240Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingFolderAndFileFormatting]' failed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5503210Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingVersionParsingAndFiltering]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5504040Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testStandardNamingVersionParsingAndFiltering]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5504910Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testTitleDeobfuscatorAntiEvasionPipeline]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5505720Z Test Case '-[MediaMindCoreTests.NamingAndRecognitionSuiteTests testTitleDeobfuscatorAntiEvasionPipeline]' passed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5506440Z Test Suite 'NamingAndRecognitionSuiteTests' failed at 2026-11-24 01:41:14.411.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5506960Z 	 Executed 12 tests, with 2 failures (0 unexpected) in 0.011 (0.011) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5507430Z Test Suite 'ScrapeAndScannerSuiteTests' started at 2026-11-24 01:41:14.411.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5508080Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testEpisodeStrategyMapperAllStrategies]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5508840Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testEpisodeStrategyMapperAllStrategies]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5509610Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testPlanSelectionAndPreviewFilters]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5510470Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testPlanSelectionAndPreviewFilters]' passed (0.000 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5511330Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testPlanStoreAtomicSaveLoadAndBindingValidation]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5512730Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Tests/MediaMindCoreTests/ScrapeAndScannerSuiteTests.swift:114: error: -[MediaMindCoreTests.ScrapeAndScannerSuiteTests testPlanStoreAtomicSaveLoadAndBindingValidation] : XCTAssertEqual failed: ("["a1", "a2"]") is not equal to ("["a1"]")
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5514190Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testPlanStoreAtomicSaveLoadAndBindingValidation]' failed (0.004 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5515060Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testScannerEndToEndScanAndReplanWithMockDrive]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5515880Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testScannerEndToEndScanAndReplanWithMockDrive]' passed (0.012 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5516720Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testScannerTreeClassifyAndHolderOfGuard]' started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5518040Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Tests/MediaMindCoreTests/ScrapeAndScannerSuiteTests.swift:124: error: -[MediaMindCoreTests.ScrapeAndScannerSuiteTests testScannerTreeClassifyAndHolderOfGuard] : XCTAssertTrue failed
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5519150Z Test Case '-[MediaMindCoreTests.ScrapeAndScannerSuiteTests testScannerTreeClassifyAndHolderOfGuard]' failed (0.001 seconds).
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5519850Z Test Suite 'ScrapeAndScannerSuiteTests' failed at 2026-11-24 01:41:14.427.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5520230Z 	 Executed 5 tests, with 2 failures (0 unexpected) in 0.016 (0.016) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5520680Z Test Suite 'MediaMindAIPackageTests.xctest' failed at 2026-11-24 01:41:14.427.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5521160Z 	 Executed 86 tests, with 6 failures (0 unexpected) in 0.436 (0.439) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5521490Z Test Suite 'All tests' failed at 2026-11-24 01:41:14.427.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5522000Z 	 Executed 86 tests, with 6 failures (0 unexpected) in 0.436 (0.440) seconds
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5522510Z ◇ Test run started.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5522700Z ↳ Testing Library Version: 124.4
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5522940Z ↳ Target Platform: arm64e-apple-macos14.0
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5523210Z ✔ Test run with 0 tests passed after 0.001 seconds.
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T01:41:14.5541290Z ##[error]Process completed with exit code 1.
