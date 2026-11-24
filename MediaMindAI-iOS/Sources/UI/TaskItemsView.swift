@@ -47,7 +47,6 @@ public struct TaskItemsView: View {
         let activeSelection = selectedFailedIds.intersection(failedSet)
 
         VStack(spacing: 0) {
-            CollapsibleSearchBar(text: $query, isPresented: $showSearch, prompt: "搜索文件名")
             Picker("状态筛选", selection: $filter) {
                 ForEach(Filter.allCases) { f in Text(f.rawValue).tag(f) }
             }
@@ -138,6 +137,7 @@ public struct TaskItemsView: View {
                 }
             }
         }
+        .bottomFloatingSearch(text: $query, prompt: "搜索文件名")
         .navigationTitle("任务操作明细")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -146,13 +146,8 @@ public struct TaskItemsView: View {
             }
         }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-                if !failedActions.isEmpty, let plan = linkedPlan {
+            if !failedActions.isEmpty, let plan = linkedPlan {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("重试选中 (\(activeSelection.count))") {
                         retrySelected(plan: plan, selectedIds: activeSelection)
                     }

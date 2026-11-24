@@ -457,13 +457,16 @@ public enum Scanner {
         let effTv = PolicyResolver.resolve(isTv: true, global: global, task: plan.taskPolicy, film: filmOv).naming
         let provider = tmdbProvider ?? RealScannerTmdbProvider()
         let hooks = ScannerMovieLooseAndArtwork.makeReplanHooks(drive: drive, tmdb: provider, fullScrape: global.fullScrape)
+        let mergeEnabled = plan.taskPolicy?.mergeSeries ?? global.mergeSeries
+        let appendTag = (plan.taskPolicy?.movieNaming ?? global.movieNaming).folderTmdbEnabled
         return try await StandardNaming.$scopedMoviePrefs.withValue(effMovie) {
             try await StandardNaming.$scopedTvPrefs.withValue(effTv) {
-                try await ScannerReplan.replanGroup(
+                let updated = try await ScannerReplan.replanGroup(
                     plan: plan, groupId: groupId, info: info, cloud: drive,
                     strategy: strategy, episodeGroupId: episodeGroupId, episodeGroupName: episodeGroupName,
                     policyOverride: policyOverride, hooks: hooks
                 )
+                return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag)
             }
         }
     }
@@ -480,11 +483,14 @@ public enum Scanner {
         let effTv = PolicyResolver.resolve(isTv: true, global: global, task: plan.taskPolicy).naming
         let provider = tmdbProvider ?? RealScannerTmdbProvider()
         let hooks = ScannerMovieLooseAndArtwork.makeReplanHooks(drive: drive, tmdb: provider, fullScrape: global.fullScrape)
+        let mergeEnabled = plan.taskPolicy?.mergeSeries ?? global.mergeSeries
+        let appendTag = (plan.taskPolicy?.movieNaming ?? global.movieNaming).folderTmdbEnabled
         return try await StandardNaming.$scopedMoviePrefs.withValue(effMovie) {
             try await StandardNaming.$scopedTvPrefs.withValue(effTv) {
-                try await ScannerReplan.replanFiles(
+                let updated = try await ScannerReplan.replanFiles(
                     plan: plan, actionIds: actionIds, info: info, cloud: drive, hooks: hooks
                 )
+                return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag)
             }
         }
     }
@@ -501,11 +507,14 @@ public enum Scanner {
         let effTv = PolicyResolver.resolve(isTv: true, global: global, task: plan.taskPolicy).naming
         let provider = tmdbProvider ?? RealScannerTmdbProvider()
         let hooks = ScannerMovieLooseAndArtwork.makeReplanHooks(drive: drive, tmdb: provider, fullScrape: global.fullScrape)
+        let mergeEnabled = plan.taskPolicy?.mergeSeries ?? global.mergeSeries
+        let appendTag = (plan.taskPolicy?.movieNaming ?? global.movieNaming).folderTmdbEnabled
         return try await StandardNaming.$scopedMoviePrefs.withValue(effMovie) {
             try await StandardNaming.$scopedTvPrefs.withValue(effTv) {
-                try await ScannerReplan.replanTargetGroups(
+                let updated = try await ScannerReplan.replanTargetGroups(
                     plan: plan, targets: targets, info: info, cloud: drive, tmdb: provider, hooks: hooks
                 )
+                return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag)
             }
         }
     }

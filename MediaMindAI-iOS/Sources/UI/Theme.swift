@@ -253,11 +253,142 @@ public struct CollapsibleSearchBar: View {
             .padding(.horizontal, 16)
             .padding(.top, 6)
             .padding(.bottom, 6)
+            .clipped()
             .transition(.move(edge: .top).combined(with: .opacity))
             .task {
-                try? await Task.sleep(for: .milliseconds(50))
-                if isPresented { focused = true }
+                // 等待搜索栏 0.2s 展开动画完成后再拉起键盘，避免主线程冷启动输入法与列表重排动画冲突导致卡顿
+                try? await Task.sleep(for: .milliseconds(230))
+                guard !Task.isCancelled, isPresented else { return }
+                focused = true
+            }
+            .onDisappear {
+                focused = false
             }
         }
+    }
+}
+
+/// 底部悬浮圆形放大镜搜索组件（贴合 iOS 26/27 Liquid Glass 视觉，默认收起为右下角独立圆标，点击后在底部平滑展开搜索胶囊）。
+public struct BottomFloatingSearchModifier: ViewModifier {
+    @Binding var text: String
+    let prompt: String
+    let bottomOffset: CGFloat
+    let visible: Bool
+
+    @State private var isExpanded = false
+    @FocusState private var focused: Bool
+
+    public func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottomTrailing) {
+                if visible {
+                    if isExpanded {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                TextField(prompt, text: $text)
+                                    .focused($focused)
+                                    .font(.subheadline)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .submitLabel(.search)
+                                if !text.isEmpty {
+                                    Button {
+                                        text = ""
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.8))
+                            .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+
+                            Button {
+                                focused = false
+                                text = ""
+                                withAnimation(.snappy(duration: 0.22)) {
+                                    isExpanded = false
+                                }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color(.label))
+                                    .frame(width: 42, height: 42)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.8))
+                                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, bottomOffset)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .task {
+                            try? await Task.sleep(for: .milliseconds(220))
+                            guard !Task.isCancelled, isExpanded else { return }
+                            focused = true
+                        }
+                        .onDisappear {
+                            focused = false
+                        }
+                    } else {
+                        Button {
+                            withAnimation(.snappy(duration: 0.22)) {
+                                isExpanded = true
+                            }
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 19, weight: .semibold))
+                                    .foregroundStyle(text.isEmpty ? Color(.label) : MMTheme.accent)
+                                    .frame(width: 48, height: 48)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay(
+                                        Circle().strokeBorder(
+                                            text.isEmpty ? Color.primary.opacity(0.12) : MMTheme.accent.opacity(0.45),
+                                            lineWidth: 0.8
+                                        )
+                                    )
+                                    .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+                                if !text.isEmpty {
+                                    Circle()
+                                        .fill(MMTheme.accent)
+                                        .frame(width: 9, height: 9)
+                                        .offset(x: -4, y: 4)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("搜索")
+                        .padding(.trailing, 18)
+                        .padding(.bottom, bottomOffset)
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    }
+                }
+            }
+            .onChange(of: visible) { _, nowVisible in
+                if !nowVisible {
+                    focused = false
+                    isExpanded = false
+                }
+            }
+    }
+}
+
+public extension View {
+    func bottomFloatingSearch(
+        text: Binding<String>,
+        prompt: String,
+        bottomOffset: CGFloat = 16,
+        visible: Bool = true
+    ) -> some View {
+        modifier(BottomFloatingSearchModifier(text: text, prompt: prompt, bottomOffset: bottomOffset, visible: visible))
     }
 }

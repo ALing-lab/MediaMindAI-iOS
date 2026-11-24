@@ -51,6 +51,11 @@ public final class BackgroundScanManager {
                 } else {
                     finishedSummary = "扫描完成：已识别 \(matchedCount) 组作品"
                 }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(4))
+                    guard BackgroundScanManager.shared.scanEpoch == epoch else { return }
+                    BackgroundScanManager.shared.finishedSummary = nil
+                }
             } catch is CancellationError {
                 guard self.scanEpoch == epoch else { return }
                 isScanning = false
@@ -61,6 +66,11 @@ public final class BackgroundScanManager {
                 isScanning = false
                 scanTask = nil
                 errorMessage = "扫描失败：\(error.localizedDescription)"
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(6))
+                    guard BackgroundScanManager.shared.scanEpoch == epoch else { return }
+                    BackgroundScanManager.shared.errorMessage = nil
+                }
             }
         }
     }
@@ -130,6 +140,8 @@ public struct CloudTabView: View {
     @State private var showHelpSheet = false
     @State private var reloginTarget: DriveAccount? = nil
     @State private var deleteTarget: DriveAccount? = nil
+    @State private var renameTarget: DriveAccount? = nil
+    @State private var renameDraft: String = "" 
     @State private var pingStatusByAccount: [String: String] = [:]
     @State private var pingingAccountId: String? = nil
 
@@ -210,7 +222,7 @@ public struct CloudTabView: View {
                             Label("点击「添加文件来源」可接入 123 云盘、光鸭云盘或 WebDAV / OpenList。", systemImage: "plus.square")
                             Label("点击已连接的网盘卡片即可浏览目录，勾选影视文件夹后开始识别与整理。", systemImage: "folder")
                             Label("在目录浏览页右上角点击星标，可将常用目录加入「我的收藏」一键直达。", systemImage: "star")
-                            Label("点击网盘卡片右侧「⋮」可检测连接、重新登录或删除账号。", systemImage: "ellipsis.circle")
+                            Label("点击网盘卡片右侧「⋮」可重命名、检测连接、重新登录或删除账号。", systemImage: "ellipsis.circle")
                         }
                     }
                     .navigationTitle("帮助")
@@ -240,6 +252,26 @@ public struct CloudTabView: View {
                 Button("取消", role: .cancel) { deleteTarget = nil }
             } message: {
                 Text("仅移除本机保存的登录凭据，不会删除云盘中的任何文件。")
+            }
+            .alert(
+                "自定义账号名称",
+                isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })
+            ) {
+                TextField("输入账号备注名（如：光鸭主号）", text: $renameDraft)
+                Button("保存") {
+                    if let acct = renameTarget {
+                        let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty {
+                            store.rename(id: acct.id, label: trimmed)
+                        }
+                    }
+                    renameTarget = nil
+                }
+                Button("取消", role: .cancel) {
+                    renameTarget = nil
+                }
+            } message: {
+                Text("用于区分多个云盘账号，仅在本地显示。")
             }
             .onAppear {
                 favorites = CloudFavoritesStore.load()
@@ -305,6 +337,12 @@ public struct CloudTabView: View {
                     .buttonStyle(.plain)
 
                     Menu {
+                        Button {
+                            renameDraft = acct.label
+                            renameTarget = acct
+                        } label: {
+                            Label("重命名", systemImage: "pencil")
+                        }
                         Button {
                             Task { await testConnection(for: acct) }
                         } label: {
@@ -533,12 +571,12 @@ private struct CloudDirectoryBrowserView: View {
                                     selectedIds.removeAll()
                                     Task { await loadCurrent() }
                                 }
-                                .font(.caption)
-                                .foregroundStyle(idx == pathStack.count - 1 ? .primary : MMTheme.accent)
+                                .font(.caption.weight(idx == pathStack.count - 1 ? .semibold : .medium))
+                                .foregroundStyle(idx == pathStack.count - 1 ? Color(.label) : MMTheme.accent)
                                 if idx < pathStack.count - 1 {
                                     Image(systemName: "chevron.right")
                                         .font(.caption2)
-                                        .foregroundStyle(.tertiary)
+                                        .foregroundStyle(Color(.tertiaryLabel))
                                 }
                             }
                         }
@@ -565,9 +603,43 @@ private struct CloudDirectoryBrowserView: View {
                     ProgressView("正在读取目录…")
                     Spacer()
                 } else if entries.isEmpty {
-                    ContentUnavailableView("空目录", systemImage: "folder", description: Text("当前目录下没有文件或子文件夹。"))
+                    VStack(spacing: 12) {
+                        ContentUnavailableView("空目录", systemImage: "folder", description: Text("当前目录下没有文件或子文件夹。"))
+                        if pathStack.count > 1 {
+                            Button {
+                                navigateUp()
+                            } label: {
+                                Label("返回上一级", systemImage: "arrow.turn.up.left")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .buttonStyle(.bordered)
+                            .padding(.bottom, 24)
+                        }
+                    }
                 } else {
                     List {
+                        if pathStack.count > 1 {
+                            Button {
+                                navigateUp()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "arrow.turn.up.left")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(MMTheme.accent)
+                                        .frame(width: 24)
+                                    Text("返回上一级")
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(Color(.label))
+                                    Spacer()
+                                    Text(pathStack[pathStack.count - 2].name)
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                        .lineLimit(1)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .tint(Color(.label))
+                        }
                         ForEach(entries) { entry in
                             HStack(spacing: 12) {
                                 if entry.isDir {
@@ -655,7 +727,23 @@ private struct CloudDirectoryBrowserView: View {
         }
         .navigationTitle(currentFolder.name)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(pathStack.count > 1)
         .toolbar {
+            if pathStack.count > 1 {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        navigateUp()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "chevron.left")
+                                .font(.body.weight(.semibold))
+                            Text("上一级")
+                                .font(.subheadline.weight(.medium))
+                        }
+                        .foregroundStyle(Color(.label))
+                    }
+                }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     toggleFavoriteCurrent()
@@ -682,6 +770,13 @@ private struct CloudDirectoryBrowserView: View {
             await loadCurrent()
         }
 
+    }
+
+    private func navigateUp() {
+        guard pathStack.count > 1 else { return }
+        pathStack.removeLast()
+        selectedIds.removeAll()
+        Task { await loadCurrent() }
     }
 
     private func toggleFavoriteCurrent() {

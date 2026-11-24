@@ -18,14 +18,22 @@ public struct AddAccountSheet: View {
                             HStack(spacing: 12) {
                                 ProviderBadgeIcon(kind: kind)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(kind.label).font(.headline).foregroundStyle(.primary)
-                                    Text(kind.loginHint).font(.caption).foregroundStyle(.secondary)
+                                    Text(kind.label)
+                                        .font(.headline)
+                                        .foregroundStyle(Color(.label))
+                                    Text(kind.loginHint)
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Color(.tertiaryLabel))
                             }
                             .padding(.vertical, 4)
+                            .contentShape(Rectangle())
                         }
+                        .tint(Color(.label))
                     }
                 }
             }

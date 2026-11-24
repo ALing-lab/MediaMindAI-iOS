@@ -535,6 +535,20 @@ public actor TmdbClient {
             }
         }
         var score = best
+        let cjkParts = parts.filter { Self.hasCjk($0) }
+        if !cjkParts.isEmpty {
+            var cjkBest = 0.0
+            for q in cjkParts {
+                for n in rawNames {
+                    cjkBest = max(cjkBest, TitleScorer.titleSimilarityScore(q, n))
+                }
+            }
+            if cjkBest >= 85.0 {
+                score += 35.0
+            } else if !rawNames.contains(where: { Self.hasCjk($0) }) {
+                score -= 35.0
+            }
+        }
         let ry = String(((item["release_date"] as? String) ?? "").prefix(4))
         let releaseYear = ry.count == 4 ? Int(ry) : nil
         let queryYear = year.flatMap { Int($0) }
@@ -560,6 +574,10 @@ public actor TmdbClient {
         return score
     }
 
+    public nonisolated static func hasCjk(_ s: String) -> Bool {
+        cjkRegex.firstMatch(in: s, range: NSRange(location: 0, length: (s as NSString).length)) != nil
+    }
+
     public nonisolated static func scoreTvRaw(_ item: [String: Any], parts: [String], year: String?) -> Double {
         let name = (item["name"] as? String) ?? ""
         let orig = (item["original_name"] as? String) ?? ""
@@ -571,6 +589,20 @@ public actor TmdbClient {
             }
         }
         var score = best
+        let cjkParts = parts.filter { Self.hasCjk($0) }
+        if !cjkParts.isEmpty {
+            var cjkBest = 0.0
+            for q in cjkParts {
+                for n in rawNames {
+                    cjkBest = max(cjkBest, TitleScorer.titleSimilarityScore(q, n))
+                }
+            }
+            if cjkBest >= 85.0 {
+                score += 35.0
+            } else if !rawNames.contains(where: { Self.hasCjk($0) }) {
+                score -= 35.0
+            }
+        }
         let fy = String(((item["first_air_date"] as? String) ?? "").prefix(4))
         let firstYear = fy.count == 4 ? Int(fy) : nil
         let queryYear = year.flatMap { Int($0) }
@@ -729,7 +761,11 @@ public actor TmdbClient {
         }
         let bestScore = rankedFirst.first.map { Self.scoreTvRaw($0, parts: parts, year: yearStr) } ?? -1e9
         let yearOk = yearStr == nil || ((rankedFirst.first?["first_air_date"] as? String) ?? "").hasPrefix(yearStr!)
-        if !(rankedFirst.first != nil && yearOk && bestScore >= 110.0) {
+        let queryHasCjk = parts.contains(where: { Self.hasCjk($0) })
+        let topHasCjk = rankedFirst.first.map {
+            Self.hasCjk(($0["name"] as? String) ?? "") || Self.hasCjk(($0["original_name"] as? String) ?? "")
+        } ?? false
+        if !(rankedFirst.first != nil && yearOk && bestScore >= 110.0 && (!queryHasCjk || topHasCjk)) {
             for y in Self.yearCandidates(yearStr).dropFirst() {
                 for q in parts {
                     merge(await searchTvRaw(query: q, year: y))
@@ -844,6 +880,15 @@ public actor TmdbClient {
             overview: obj["overview"] as? String ?? "",
             rating: obj["vote_average"] as? Double
         )
+    }
+
+    public func tvSeasonEpisodeCounts(id: Int) async -> (seasons: Int, episodes: Int)? {
+        guard let data = await get(path: "/tv/\(id)"),
+              let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        let seasons = (obj["number_of_seasons"] as? Int) ?? 0
+        let episodes = (obj["number_of_episodes"] as? Int) ?? 0
+        guard seasons > 0, episodes > 0 else { return nil }
+        return (seasons, episodes)
     }
 
     public func seasonMeta(tvId: Int, season: Int) async -> SeasonMeta? {

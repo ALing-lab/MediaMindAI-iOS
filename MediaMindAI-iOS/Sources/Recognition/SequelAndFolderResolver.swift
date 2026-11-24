@@ -76,14 +76,36 @@ public enum SequelDisambiguator {
 
     /// 对候选列表应用续集序号与年份加权打分（避免《死神来了2》误匹配到《死神来了》第一部）。
     public static func scoreCandidate(query: String, queryYear: Int?, candidate: MatchInfo) -> Double {
-        let titleSim = MediaParser.titleSimilarityScore(query, candidate.title)
-        let origSim = candidate.originalTitle.map { MediaParser.titleSimilarityScore(query, $0) } ?? 0
-        var score = max(titleSim, origSim)
+        let parts = TmdbClient.splitQuery(query)
+        let queryParts = parts.isEmpty ? [query] : parts
+        let candNames = [candidate.title, candidate.originalTitle ?? ""].filter { !$0.isEmpty }
+        var score = 0.0
+        for q in queryParts {
+            for n in candNames {
+                score = max(score, MediaParser.titleSimilarityScore(q, n))
+            }
+        }
+        let cjkParts = queryParts.filter { TmdbClient.hasCjk($0) }
+        if !cjkParts.isEmpty {
+            var cjkBest = 0.0
+            for q in cjkParts {
+                for n in candNames {
+                    cjkBest = max(cjkBest, MediaParser.titleSimilarityScore(q, n))
+                }
+            }
+            if cjkBest >= 85 {
+                score += 30
+            } else if !candNames.contains(where: { TmdbClient.hasCjk($0) }) {
+                score -= 30
+            }
+        }
         let qSeq = extractSequelNumber(query)
         let cSeq = extractSequelNumber(candidate.title) ?? candidate.originalTitle.flatMap { extractSequelNumber($0) }
         if let qSeq {
             if cSeq == qSeq { score += 18 }
-            else if cSeq == nil && qSeq > 1 { score -= 22 }
+            else if cSeq == nil && qSeq > 1 {
+                if candidate.kind != "tv" { score -= 22 }
+            }
             else if cSeq != nil && cSeq != qSeq { score -= 28 }
         } else if let cSeq, cSeq > 1 {
             score -= 12

@@ -90,23 +90,11 @@ public struct MediaDetailView: View {
                         Button(action: onRematch) {
                             HStack(spacing: 4) {
                                 Image(systemName: "magnifyingglass")
-                                    .font(.caption.weight(.semibold))
                                 Text("手动识别")
-                                    .font(.caption.weight(.semibold))
                             }
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(MMTheme.accent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(MMTheme.accent.opacity(0.16))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .strokeBorder(MMTheme.accent.opacity(0.32), lineWidth: 0.7)
-                            )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .onChange(of: g.tmdbId) { _, _ in
@@ -398,9 +386,14 @@ public struct MediaDetailView: View {
                                 Text(g.kind == "tv" ? "分集明细" : "文件明细")
                                     .font(.subheadline.weight(.semibold))
                                 Spacer()
-                                Text(g.kind == "tv" ? "\(page.episodes.count) 集" : "\(page.episodes.count) 项")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                let uniqEpCount = Set(page.episodes.compactMap(\.episode)).count
+                                Text(
+                                    g.kind == "tv" && uniqEpCount > 0 && uniqEpCount < page.episodes.count
+                                        ? "\(uniqEpCount) 集 · \(page.episodes.count) 文件（多版本）"
+                                        : (g.kind == "tv" ? "\(page.episodes.count) 集" : "\(page.episodes.count) 项")
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             }
 
                             if g.kind == "tv", eff.scrapeEnabled, eff.downloadEpisodeThumb {

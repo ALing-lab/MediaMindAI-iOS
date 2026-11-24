@@ -181,14 +181,16 @@ public struct PreviewTabView: View {
                                                         }
                                                     )
                                                 }
-                                                .padding(14)
-                                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                                .clipped()
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 12)
+                                                .background(Color(.secondarySystemGroupedBackground))
+                                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                                .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
                                             }
                                         }
                                     }
                                 }
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, 20)
                                 .padding(.vertical, 8)
                             }
                             .background(Color.clear)
@@ -246,7 +248,12 @@ public struct PreviewTabView: View {
                 }
                 }
             }
-            .searchable(text: $searchQuery, prompt: "搜索片名、文件夹或年份")
+            .bottomFloatingSearch(
+                text: $searchQuery,
+                prompt: "搜索片名、文件夹或年份",
+                bottomOffset: activePlan != nil ? 80 : 16,
+                visible: activePlan != nil
+            )
             .navigationTitle("识别结果")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -723,6 +730,54 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
     @State private var expanded = false
     @State private var selectedSeason: Int?
     @State private var slideForward = true
+    @State private var tmdbTotalCounts: (seasons: Int, episodes: Int)? = nil
+
+    private var folderPathParts: (srcParent: String, srcName: String, dstParent: String, dstName: String) {
+        let rawPath = (group.folderPath?.isEmpty == false ? group.folderPath : nil)
+            ?? actions.first(where: { ($0.folderPath ?? "").isEmpty == false })?.folderPath
+            ?? ""
+        let cleanPath = rawPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let fallbackName = group.folderName.isEmpty
+            ? (cleanPath.split(separator: "/").last.map(String.init) ?? "")
+            : group.folderName
+
+        let srcParent: String
+        let srcName: String
+        if !cleanPath.isEmpty {
+            let comps = cleanPath.split(separator: "/").map(String.init)
+            if comps.count >= 2 {
+                if comps.last == fallbackName || group.folderName.isEmpty {
+                    srcParent = "/" + comps.dropLast().joined(separator: "/")
+                    srcName = comps.last ?? fallbackName
+                } else {
+                    srcParent = "/" + comps.joined(separator: "/")
+                    srcName = fallbackName
+                }
+            } else if comps.first == fallbackName {
+                srcParent = ""
+                srcName = fallbackName
+            } else {
+                srcParent = "/" + comps.joined(separator: "/")
+                srcName = fallbackName
+            }
+        } else {
+            srcParent = ""
+            srcName = fallbackName
+        }
+
+        let customDestParent: String? = actions.first(where: {
+            ($0.op == "move" || $0.op == "mkdir") && ($0.destLabel ?? "").isEmpty == false
+        })?.destLabel
+        let dstParent: String = {
+            if let dp = customDestParent, !dp.isEmpty {
+                let norm = dp.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                return norm.isEmpty ? srcParent : "/\(norm)"
+            }
+            return srcParent
+        }()
+        let dstName = (group.folderNewName?.isEmpty == false ? group.folderNewName! : srcName)
+        return (srcParent, srcName, dstParent, dstName)
+    }
 
     private var posterUrl: URL? {
         if let pp = group.posterPath, !pp.isEmpty {
@@ -778,11 +833,45 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
         return parsed.season ?? 1
     }
 
+    private func resolvedEpisode(for act: PlanAction) -> Int? {
+        if let e = act.episode { return e }
+        return MediaParser.parse(act.oldName.isEmpty ? act.newName : act.oldName, folderHint: group.folderName).episode
+    }
+
+    private func episodeGroupKey(for act: PlanAction) -> String {
+        if group.kind == "tv", let ep = resolvedEpisode(for: act) {
+            return String(format: "S%02dE%02d", resolvedSeason(for: act), ep)
+        }
+        return act.fileId ?? act.id
+    }
+
+    private var uniqueEpisodeCount: Int {
+        guard group.kind == "tv" else { return episodeFileActions.count }
+        return Set(episodeFileActions.map { episodeGroupKey(for: $0) }).count
+    }
+
+    private var hasMultiVersion: Bool {
+        if group.kind == "tv" {
+            return episodeFileActions.count > uniqueEpisodeCount
+        }
+        if group.kind == "movie" {
+            return episodeFileActions.count > 1
+        }
+        return false
+    }
+
     private struct SeasonBucket: Identifiable {
         let season: Int
         let items: [PlanAction]
+        let uniqueEpisodes: Int
         var id: Int { season }
         var label: String { season == 0 ? "特别篇" : "第 \(season) 季" }
+        var countLabel: String {
+            if items.count > uniqueEpisodes {
+                return "\(uniqueEpisodes) 集 · \(items.count) 文件"
+            }
+            return "\(items.count)"
+        }
     }
 
     private var seasonBuckets: [SeasonBucket] {
@@ -792,7 +881,11 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
             let s = resolvedSeason(for: act)
             map[s, default: []].append(act)
         }
-        return map.keys.sorted().map { SeasonBucket(season: $0, items: map[$0] ?? []) }
+        return map.keys.sorted().map { s in
+            let bucketItems = map[s] ?? []
+            let uniq = Set(bucketItems.map { episodeGroupKey(for: $0) }).count
+            return SeasonBucket(season: s, items: bucketItems, uniqueEpisodes: uniq)
+        }
     }
 
     private var activeSeasonNumber: Int {
@@ -850,7 +943,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                                 .padding(.vertical, 2)
                                 .background(MMTheme.purpleBadge, in: RoundedRectangle(cornerRadius: 4))
                         }
-                        .frame(width: 68, height: 100)
+                        .frame(width: 64, height: 94)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                         VStack(alignment: .leading, spacing: 4) {
@@ -867,9 +960,18 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                             .foregroundStyle(.secondary)
 
                             if group.kind == "tv", !episodeFileActions.isEmpty {
-                                Text("已识别 \(max(1, seasonBuckets.count)) 季 \(episodeFileActions.count) 集")
+                                let recText = "已识别 \(max(1, seasonBuckets.count)) 季 \(uniqueEpisodeCount) 集"
+                                let fullText: String = {
+                                    if let c = tmdbTotalCounts {
+                                        return "\(recText) | 共 \(c.seasons) 季 \(c.episodes) 集"
+                                    }
+                                    return recText
+                                }()
+                                Text(fullText)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.88)
                             } else if group.kind == "unmatched" {
                                 Text("同目录待手动识别")
                                     .font(.caption)
@@ -898,6 +1000,15 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(confColor.opacity(0.14), in: Capsule())
+                                }
+
+                                if hasMultiVersion {
+                                    Text("多版本")
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(MMTheme.purpleBadge)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(MMTheme.purpleBadge.opacity(0.14), in: Capsule())
                                 }
                             }
 
@@ -949,19 +1060,58 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                 }
             }
 
-            if let newName = group.folderNewName {
+            let fp = folderPathParts
+            if !fp.srcName.isEmpty {
+                Divider().opacity(0.45)
                 NavigationLink {
                     detailDestination()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "folder")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text("\(group.folderName) → \(newName)")
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                        Spacer(minLength: 0)
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder")
+                                .font(.caption)
+                                .foregroundStyle(Color(.secondaryLabel))
+                            if !fp.srcParent.isEmpty {
+                                Text(fp.srcParent)
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.secondaryLabel))
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                                Text("/")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.tertiaryLabel))
+                            }
+                            Text(fp.srcName)
+                                .font(.caption)
+                                .foregroundStyle(Color(.secondaryLabel))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Spacer(minLength: 0)
+                        }
+
+                        if group.kind != "unmatched" {
+                            HStack(spacing: 4) {
+                                Image(systemName: "folder")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.label))
+                                if !fp.dstParent.isEmpty {
+                                    Text(fp.dstParent)
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.label))
+                                        .lineLimit(1)
+                                        .truncationMode(.head)
+                                    Text("/")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.tertiaryLabel))
+                                }
+                                Text(fp.dstName)
+                                    .font(.caption)
+                                    .foregroundStyle(fp.dstParent.isEmpty ? Color(.label) : Color(.secondaryLabel))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Spacer(minLength: 0)
+                            }
+                        }
                     }
                     .contentShape(Rectangle())
                 }
@@ -972,7 +1122,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
+                    withAnimation(.snappy(duration: 0.26)) {
                         expanded.toggle()
                     }
                 } label: {
@@ -996,12 +1146,20 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                 if expanded {
                     expandedDetailContent
                         .padding(.top, 10)
-                        .transition(.opacity)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .clipped()
+            .animation(.snappy(duration: 0.26), value: expanded)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
+        .task(id: group.tmdbId) {
+            guard group.kind == "tv", let tid = group.tmdbId else {
+                tmdbTotalCounts = nil
+                return
+            }
+            tmdbTotalCounts = await TmdbClient.shared.tvSeasonEpisodeCounts(id: tid)
+        }
     }
 
     @ViewBuilder
@@ -1050,7 +1208,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                             }
                     )
                 } else if let only = buckets.first {
-                    Text("\(only.label) (\(only.items.count))")
+                    Text("\(only.label)（\(only.countLabel)）")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(MMTheme.accent)
                     episodeRowsList(only.items)
@@ -1085,31 +1243,108 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
         }
     }
 
+    private struct GroupedEpisodeRow: Identifiable {
+        let id: String
+        let headerLabel: String
+        let versions: [PlanAction]
+    }
+
+    private func buildGroupedRows(_ items: [PlanAction]) -> [GroupedEpisodeRow] {
+        guard group.kind == "tv" else {
+            return items.map { GroupedEpisodeRow(id: $0.id, headerLabel: "", versions: [$0]) }
+        }
+        var order: [String] = []
+        var bucket: [String: [PlanAction]] = [:]
+        for act in items {
+            let key = episodeGroupKey(for: act)
+            if bucket[key] == nil { order.append(key) }
+            bucket[key, default: []].append(act)
+        }
+        return order.map { key in
+            GroupedEpisodeRow(id: key, headerLabel: key, versions: bucket[key] ?? [])
+        }
+    }
+
+    private func versionBadgeLabel(for act: PlanAction, fallbackIndex: Int) -> String {
+        let display = act.newName.isEmpty ? act.oldName : act.newName
+        let stem = MediaParser.splitNameExt(display).0
+        let ver = StandardNaming.parseVersion(fileStem: stem).label
+        if !ver.isEmpty { return ver }
+        let oldStem = MediaParser.splitNameExt(act.oldName).0
+        let oldVer = StandardNaming.parseVersion(fileStem: oldStem).label
+        return oldVer.isEmpty ? "版本 \(fallbackIndex + 1)" : oldVer
+    }
+
     @ViewBuilder
     private func episodeRowsList(_ items: [PlanAction]) -> some View {
-        let content = LazyVStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { idx, act in
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(act.newName.isEmpty ? act.oldName : act.newName)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                    if !act.oldName.isEmpty && act.oldName != act.newName {
-                        Text(act.oldName)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+        let rows = buildGroupedRows(items)
+        let content = VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
+                if row.versions.count >= 2 {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Text(row.headerLabel)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text("\(row.versions.count) 个版本")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(MMTheme.purpleBadge)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1.5)
+                                .background(MMTheme.purpleBadge.opacity(0.14), in: Capsule())
+                            Spacer(minLength: 0)
+                        }
+                        ForEach(Array(row.versions.enumerated()), id: \.element.id) { vIdx, act in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(versionBadgeLabel(for: act, fallbackIndex: vIdx))
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(MMTheme.accent)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 1.5)
+                                        .background(MMTheme.accent.opacity(0.12), in: Capsule())
+                                        .lineLimit(1)
+                                    Text(act.newName.isEmpty ? act.oldName : act.newName)
+                                        .font(.caption)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                                if !act.oldName.isEmpty && act.oldName != act.newName {
+                                    Text(act.oldName)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(.leading, 4)
+                        }
                     }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else if let act = row.versions.first {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(act.newName.isEmpty ? act.oldName : act.newName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                        if !act.oldName.isEmpty && act.oldName != act.newName {
+                            Text(act.oldName)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                if idx < items.count - 1 {
+                if idx < rows.count - 1 {
                     Divider().opacity(0.4)
                 }
             }
         }
-        if items.count > 5 {
+        if rows.count > 5 {
             ScrollView {
                 content
             }

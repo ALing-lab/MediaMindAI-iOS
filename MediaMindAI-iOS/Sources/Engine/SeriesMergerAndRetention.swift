@@ -18,6 +18,9 @@ public enum SeriesMerger {
             guard let primaryFolderId = primary.folderId else { continue }
             for dup in list.dropFirst() {
                 guard let dupFolderId = dup.folderId, dupFolderId != primaryFolderId else { continue }
+                if out.actions.contains(where: { $0.op == "move" && $0.kind == "folder" && $0.fileId == dupFolderId && $0.destParentId == primaryFolderId }) {
+                    continue
+                }
                 let origParent = out.actions.first(where: { $0.fileId == dupFolderId })?.parentId
                 let moveAct = PlanAction(
                     id: "merge-\(UUID().uuidString.prefix(8).lowercased())",

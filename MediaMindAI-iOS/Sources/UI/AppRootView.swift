@@ -36,11 +36,16 @@ public struct AppRootView: View {
         mainContent
             .overlay(alignment: .bottom) {
                 floatingScanBanner
-                    .padding(.bottom, sizeClass == .regular ? 20 : 62)
+                    .padding(.bottom, sizeClass == .regular ? 24 : 124)
             }
             .animation(.easeInOut(duration: 0.22), value: scanManager.isScanning)
             .animation(.easeInOut(duration: 0.22), value: scanManager.finishedSummary)
             .animation(.easeInOut(duration: 0.22), value: scanManager.errorMessage)
+            .onChange(of: selectedTab) { _, tab in
+                if tab == .preview && scanManager.finishedSummary != nil {
+                    scanManager.dismissBanner()
+                }
+            }
     }
 
     @ViewBuilder

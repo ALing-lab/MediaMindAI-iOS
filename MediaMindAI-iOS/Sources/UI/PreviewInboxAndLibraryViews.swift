@@ -155,8 +155,6 @@ public struct FilmLibraryView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            CollapsibleSearchBar(text: $search, isPresented: $showSearch, prompt: "搜索片名、年份或 TMDB ID")
-
             if !completedRecords.isEmpty {
                 Picker("分类筛选", selection: $kindFilter) {
                     ForEach(LibraryKindFilter.allCases, id: \.self) { f in
@@ -193,22 +191,13 @@ public struct FilmLibraryView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
+        .bottomFloatingSearch(
+            text: $search,
+            prompt: "搜索片名、年份或 TMDB ID",
+            visible: !completedRecords.isEmpty
+        )
         .navigationTitle("影视库总览")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if !completedRecords.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showSearch.toggle()
-                            if !showSearch { search = "" }
-                        }
-                    } label: {
-                        Image(systemName: showSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
-                    }
-                }
-            }
-        }
     }
 
     private func workRecordCard(_ rec: CompletedWorkRecord) -> some View {

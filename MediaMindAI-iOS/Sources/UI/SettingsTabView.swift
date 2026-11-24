@@ -417,12 +417,6 @@ private struct DistilledRulesLibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            CollapsibleSearchBar(
-                text: $searchQuery,
-                isPresented: $showSearch,
-                prompt: "搜索原始片名、目标片名或 TMDB ID"
-            )
-
             if !rules.isEmpty {
                 Picker("类型筛选", selection: $typeFilter) {
                     ForEach(TypeFilter.allCases, id: \.self) { f in
@@ -487,19 +481,16 @@ private struct DistilledRulesLibraryView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
+        .bottomFloatingSearch(
+            text: $searchQuery,
+            prompt: "搜索原始片名、目标片名或 TMDB ID",
+            visible: !rules.isEmpty
+        )
         .navigationTitle("本地蒸馏规则库")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if !rules.isEmpty {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showSearch.toggle()
-                            if !showSearch { searchQuery = "" }
-                        }
-                    } label: {
-                        Image(systemName: showSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
-                    }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("清空", role: .destructive) {
                         showClearConfirm = true
                     }

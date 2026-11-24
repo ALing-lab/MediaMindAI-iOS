@@ -285,7 +285,9 @@ public final class AccountStore {
     @discardableResult
     public func upsert(provider: ProviderKind, label: String, extra: [String: String] = [:], secret: String, targetId: String? = nil, dedupeSub: String? = nil) -> DriveAccount {
         if let tid = targetId, let idx = accounts.firstIndex(where: { $0.id == tid }) {
-            accounts[idx].label = label
+            if accounts[idx].extra["customLabel"] != "1" {
+                accounts[idx].label = label
+            }
             accounts[idx].extra.merge(extra) { _, new in new }
             KeychainStore.saveAccountSecret(secret, accountId: tid)
             persist()
@@ -294,7 +296,9 @@ public final class AccountStore {
         }
         if let sub = dedupeSub, !sub.isEmpty,
            let idx = accounts.firstIndex(where: { $0.provider == provider && $0.extra["sub"] == sub }) {
-            accounts[idx].label = label
+            if accounts[idx].extra["customLabel"] != "1" {
+                accounts[idx].label = label
+            }
             accounts[idx].extra.merge(extra) { _, new in new }
             KeychainStore.saveAccountSecret(secret, accountId: accounts[idx].id)
             persist()
@@ -317,6 +321,7 @@ public final class AccountStore {
         let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let idx = accounts.firstIndex(where: { $0.id == id }) else { return }
         accounts[idx].label = trimmed
+        accounts[idx].extra["customLabel"] = "1"
         persist()
     }
 

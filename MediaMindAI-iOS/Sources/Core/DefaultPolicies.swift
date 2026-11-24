@@ -456,46 +456,59 @@ public enum PolicyResolver {
             let group = out.groups[gIdx]
             guard group.kind == "movie" || group.kind == "tv" || group.kind == "collection" else { continue }
             let isTv = group.kind == "tv"
+            let isCollection = group.kind == "collection"
             let eff = resolve(isTv: isTv, global: global, task: out.taskPolicy, film: group.policyOverride)
             let fileOpts = eff.naming.fileOptions()
 
-            let targetFolder = StandardNaming.folderName(title: group.title, year: group.year, tmdbId: group.tmdbId, prefs: eff.naming)
+            let targetFolder: String = {
+                if isCollection {
+                    let cid = group.collectionId ?? group.tmdbId ?? 0
+                    return cid > 0
+                        ? MediaParser.buildCollectionName(name: group.title, collectionId: cid, appendTag: eff.naming.folderTmdbEnabled)
+                        : group.title
+                }
+                return StandardNaming.folderName(title: group.title, year: group.year, tmdbId: group.tmdbId, prefs: eff.naming)
+            }()
             out.groups[gIdx].folderNewName = (eff.organizeEnabled && eff.renameFolders && targetFolder != group.folderName) ? targetFolder : nil
 
             for aIdx in out.actions.indices where out.actions[aIdx].groupId == group.id && !out.actions[aIdx].done {
                 let act = out.actions[aIdx]
                 if act.op == "rename" && act.kind == "folder" {
-                    out.actions[aIdx].newName = targetFolder
+                    if !isCollection || act.fileId == group.folderId {
+                        out.actions[aIdx].newName = targetFolder
+                    }
                     let enableFolder = eff.organizeEnabled && eff.renameFolders
                     out.actions[aIdx].enabled = enableFolder
                     out.actions[aIdx].selected = enableFolder
                 } else if act.op == "rename" && act.kind == "file" {
-                    let (oldStem, ext) = MediaParser.splitNameExt(act.oldName)
-                    let recomputed: String
-                    if isTv {
-                        let pm = MediaParser.parse(act.oldName, folderHint: group.folderName)
-                        recomputed = StandardNaming.episodeFileBase(
-                            title: group.title,
-                            season: act.season ?? pm.season ?? 1,
-                            episode: act.episode ?? pm.episode ?? 1,
-                            episodeEnd: pm.episodeEnd,
-                            tmdbId: group.tmdbId,
-                            fileStem: oldStem,
-                            releaseDirName: group.folderName,
-                            options: fileOpts,
-                            year: group.year
-                        ) + ext
-                    } else {
-                        recomputed = StandardNaming.movieFileBase(
-                            title: group.title,
-                            year: group.year,
-                            tmdbId: group.tmdbId,
-                            fileStem: oldStem,
-                            releaseDirName: group.folderName,
-                            options: fileOpts
-                        ) + ext
+                    if !isCollection {
+                        let (oldStem, ext) = MediaParser.splitNameExt(act.oldName)
+                        let recomputed: String
+                        if isTv {
+                            let pm = MediaParser.parse(act.oldName, folderHint: group.folderName)
+                            recomputed = StandardNaming.episodeFileBase(
+                                title: group.title,
+                                season: act.season ?? pm.season ?? 1,
+                                episode: act.episode ?? pm.episode ?? 1,
+                                episodeEnd: pm.episodeEnd,
+                                tmdbId: group.tmdbId,
+                                fileStem: oldStem,
+                                releaseDirName: group.folderName,
+                                options: fileOpts,
+                                year: group.year
+                            ) + ext
+                        } else {
+                            recomputed = StandardNaming.movieFileBase(
+                                title: group.title,
+                                year: group.year,
+                                tmdbId: group.tmdbId,
+                                fileStem: oldStem,
+                                releaseDirName: group.folderName,
+                                options: fileOpts
+                            ) + ext
+                        }
+                        out.actions[aIdx].newName = recomputed
                     }
-                    out.actions[aIdx].newName = recomputed
                     let enableFile = eff.organizeEnabled && eff.renameFiles
                     out.actions[aIdx].enabled = enableFile
                     out.actions[aIdx].selected = enableFile
