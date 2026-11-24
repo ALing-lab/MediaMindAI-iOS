@@ -13,6 +13,7 @@ jobs:
         run: swift test
 
       - name: Build unsigned app
+        if: ${{ !cancelled() }}
         working-directory: MediaMindAI-iOS
         run: |
           xcodebuild build \
@@ -24,6 +25,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Package unsigned IPA
+        if: ${{ !cancelled() }}
         working-directory: MediaMindAI-iOS
         run: |
           mkdir Payload
