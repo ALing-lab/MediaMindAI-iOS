@@ -32,10 +32,16 @@ public struct DefaultPolicyScreen: View {
     @State private var showDestinationPicker: Bool = false
     @State private var nfoSheetTitle: String? = nil
     @State private var nfoSheetIsEpisode: Bool = false
-    @State private var taskPolicies: DefaultPolicies
-    @State private var hasTaskOverride: Bool
-    private let isTaskScope: Bool
-    private let onTaskOverrideChange: ((PolicyOverride?) -> Void)?
+    private enum PolicyLayerMode {
+        case global
+        case task
+        case film(title: String, isTv: Bool, taskOverride: PolicyOverride?)
+    }
+
+    @State private var draftPolicies: DefaultPolicies
+    @State private var hasOverride: Bool
+    private let layerMode: PolicyLayerMode
+    private let onOverrideChange: ((PolicyOverride?) -> Void)?
 
     private let tmdbStyles: [(value: String, label: String)] = [
         ("{tmdb-id}", "{tmdb-842675}"),
@@ -68,24 +74,100 @@ public struct DefaultPolicyScreen: View {
     ) {
         self._category = State(initialValue: initialCategory)
         let base = AppSettings.shared.policies
-        self._taskPolicies = State(initialValue: base.applying(taskOverride))
-        self._hasTaskOverride = State(initialValue: taskOverride != nil)
-        self.isTaskScope = onTaskOverrideChange != nil
-        self.onTaskOverrideChange = onTaskOverrideChange
+        self._draftPolicies = State(initialValue: base.applying(taskOverride))
+        self._hasOverride = State(initialValue: taskOverride != nil)
+        self.layerMode = onTaskOverrideChange != nil ? .task : .global
+        self.onOverrideChange = onTaskOverrideChange
+    }
+
+    /// 第 3 层（影片级 · 最高优先）完整策略页：继承「任务策略 > 全局策略」，所有修改实时生成差量覆盖。
+    public init(
+        initialCategory: PolicyCategory = .organize,
+        filmTitle: String,
+        filmIsTv: Bool,
+        taskOverride: PolicyOverride?,
+        filmOverride: PolicyOverride?,
+        onFilmOverrideChange: @escaping (PolicyOverride?) -> Void
+    ) {
+        let safeCategory: PolicyCategory = (!filmIsTv && initialCategory == .episode) ? .organize : initialCategory
+        self._category = State(initialValue: safeCategory)
+        self._organizeIsTv = State(initialValue: filmIsTv)
+        self._scrapeIsTv = State(initialValue: filmIsTv)
+        let base = AppSettings.shared.policies.applying(taskOverride)
+        self._draftPolicies = State(initialValue: base.applying(filmOverride))
+        self._hasOverride = State(initialValue: filmOverride != nil)
+        self.layerMode = .film(title: filmTitle, isTv: filmIsTv, taskOverride: taskOverride)
+        self.onOverrideChange = onFilmOverrideChange
+    }
+
+    private var basePoliciesForLayer: DefaultPolicies {
+        switch layerMode {
+        case .global:
+            return settings.policies
+        case .task:
+            return settings.policies
+        case .film(_, _, let taskOverride):
+            return settings.policies.applying(taskOverride)
+        }
+    }
+
+    private var isScopedOverride: Bool {
+        if case .global = layerMode { return false }
+        return true
+    }
+
+    private var availableCategories: [PolicyCategory] {
+        if case .film(_, let isTv, _) = layerMode, !isTv {
+            return [.organize, .scrape]
+        }
+        return PolicyCategory.allCases
+    }
+
+    private var layerFooterText: String {
+        switch layerMode {
+        case .global:
+            return "全局策略（第 1 层）会在任务生成时同步为该任务的任务策略；任务策略、影片策略优先于全局策略。所有修改实时生效。"
+        case .task:
+            return "当前为任务策略（第 2 层）：仅覆盖本次识别任务，不影响全局默认设置，所有修改实时生效。"
+        case .film(let title, _, let taskOverride):
+            let display = title.isEmpty ? "当前作品" : "「\(title)」"
+            let parentName = taskOverride != nil ? "任务策略（第 2 层）与全局策略（第 1 层）" : "全局默认策略（第 1 层）"
+            return "当前为影片策略（第 3 层 · 最高优先）：仅覆盖\(display)，优先于\(parentName)，所有修改实时生效。"
+        }
+    }
+
+    private var layerNavigationTitle: String {
+        switch layerMode {
+        case .global:
+            return category.title
+        case .task:
+            return "任务策略"
+        case .film(let title, _, _):
+            return title.isEmpty ? "影片策略" : "影片策略 · \(title)"
+        }
+    }
+
+    private var restoreButtonTitle: String {
+        switch layerMode {
+        case .global: return "恢复本页默认值"
+        case .task: return "恢复继承全局策略"
+        case .film(_, _, let taskOverride):
+            return taskOverride != nil ? "恢复继承任务策略" : "恢复继承上层策略"
+        }
     }
 
     private var currentPolicies: DefaultPolicies {
-        isTaskScope ? taskPolicies : settings.policies
+        isScopedOverride ? draftPolicies : settings.policies
     }
 
     private var policiesBinding: Binding<DefaultPolicies> {
-        if isTaskScope {
+        if isScopedOverride {
             return Binding(
-                get: { taskPolicies },
+                get: { draftPolicies },
                 set: { updated in
-                    taskPolicies = updated
-                    hasTaskOverride = true
-                    onTaskOverrideChange?(updated.diffOverride(from: settings.policies))
+                    draftPolicies = updated
+                    hasOverride = true
+                    onOverrideChange?(updated.diffOverride(from: basePoliciesForLayer))
                 }
             )
         }
@@ -104,7 +186,7 @@ public struct DefaultPolicyScreen: View {
         Form {
             Section {
                 Picker("策略分类", selection: $category) {
-                    ForEach(PolicyCategory.allCases) { cat in
+                    ForEach(availableCategories) { cat in
                         Text(cat.title).tag(cat)
                     }
                 }
@@ -112,9 +194,7 @@ public struct DefaultPolicyScreen: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
             } footer: {
-                Text(isTaskScope
-                     ? "当前为任务策略（第 2 层）：仅覆盖本次识别任务，不影响全局默认设置，所有修改实时生效。"
-                     : "全局策略会在任务生成时同步为该任务的任务策略；任务策略、影片策略优先于全局策略。所有修改实时生效。")
+                Text(layerFooterText)
             }
 
             switch category {
@@ -126,13 +206,13 @@ public struct DefaultPolicyScreen: View {
                 episodeSections
             }
 
-            if isTaskScope {
-                if hasTaskOverride {
+            if isScopedOverride {
+                if hasOverride {
                     Section {
-                        Button("恢复继承全局策略", role: .destructive) {
-                            taskPolicies = settings.policies
-                            hasTaskOverride = false
-                            onTaskOverrideChange?(nil)
+                        Button(restoreButtonTitle, role: .destructive) {
+                            draftPolicies = basePoliciesForLayer
+                            hasOverride = false
+                            onOverrideChange?(nil)
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
@@ -146,7 +226,7 @@ public struct DefaultPolicyScreen: View {
                 }
             }
         }
-        .navigationTitle(isTaskScope ? "任务策略" : category.title)
+        .navigationTitle(layerNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showDestinationPicker) {
             if let acct = AccountStore.shared.activeAccount {

@@ -143,57 +143,40 @@ public struct PreviewTabView: View {
                                                             }
                                                         },
                                                         onToggleGroup: { on in toggleGroup(groupId: group.id, selected: on) },
-                                                        onToggleAction: { aid in toggleAction(actionId: aid) },
                                                         onRematch: {
                                                             rematchTargets = [group]
                                                             showRematchSheet = true
                                                         },
-                                                        onEditFilmPolicy: {
-                                                            editingFilmPolicyGroup = group
-                                                        },
                                                         onParkRetention: {
                                                             parkToRetention(plan: plan, group: group, actions: groupActions)
+                                                        },
+                                                        detailDestination: {
+                                                            MediaDetailView(
+                                                                planId: plan.id,
+                                                                groupId: group.id,
+                                                                onRematch: {
+                                                                    rematchTargets = [group]
+                                                                    showRematchSheet = true
+                                                                },
+                                                                onEditPolicy: {
+                                                                    editingFilmPolicyGroup = group
+                                                                },
+                                                                onEditAssets: {
+                                                                    editingAssetsGroup = group
+                                                                },
+                                                                onEditEpisodeStrategy: group.kind == "tv" ? {
+                                                                    strategyError = nil
+                                                                    strategyEpisodeGroups = []
+                                                                    editingStrategyGroup = group
+                                                                    if let tid = group.tmdbId {
+                                                                        Task {
+                                                                            strategyEpisodeGroups = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
+                                                                        }
+                                                                    }
+                                                                } : nil
+                                                            )
                                                         }
                                                     )
-                                                    Divider()
-                                                    NavigationLink {
-                                                        MediaDetailView(
-                                                            planId: plan.id,
-                                                            groupId: group.id,
-                                                            onRematch: {
-                                                                rematchTargets = [group]
-                                                                showRematchSheet = true
-                                                            },
-                                                            onEditPolicy: {
-                                                                editingFilmPolicyGroup = group
-                                                            },
-                                                            onEditAssets: {
-                                                                editingAssetsGroup = group
-                                                            },
-                                                            onEditEpisodeStrategy: group.kind == "tv" ? {
-                                                                strategyError = nil
-                                                                strategyEpisodeGroups = []
-                                                                editingStrategyGroup = group
-                                                                if let tid = group.tmdbId {
-                                                                    Task {
-                                                                        strategyEpisodeGroups = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
-                                                                    }
-                                                                }
-                                                            } : nil
-                                                        )
-                                                    } label: {
-                                                        HStack {
-                                                            Text("查看完整作品详情与操作明细")
-                                                                .font(.caption)
-                                                                .foregroundStyle(MMTheme.accent)
-                                                            Spacer()
-                                                            Image(systemName: "chevron.right")
-                                                                .font(.caption2)
-                                                                .foregroundStyle(.tertiary)
-                                                        }
-                                                        .contentShape(Rectangle())
-                                                    }
-                                                    .buttonStyle(.plain)
                                                 }
                                                 .padding(14)
                                                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -370,14 +353,21 @@ public struct PreviewTabView: View {
             }
             .sheet(item: $editingFilmPolicyGroup) { grp in
                 if let plan = activePlan {
-                    let isTv = grp.kind == "tv"
-                    PolicyOverrideSheet(
-                        title: "影片策略（第 3 层 · 最高优先）",
-                        isTv: isTv,
-                        current: grp.policyOverride,
-                        fallback: PolicyResolver.resolve(isTv: isTv, global: AppSettings.shared.policies, task: plan.taskPolicy)
-                    ) { updated in
-                        applyFilmPolicy(groupId: grp.id, override: updated)
+                    NavigationStack {
+                        DefaultPolicyScreen(
+                            initialCategory: .organize,
+                            filmTitle: grp.title.isEmpty ? grp.folderName : grp.title,
+                            filmIsTv: grp.kind == "tv",
+                            taskOverride: plan.taskPolicy,
+                            filmOverride: grp.policyOverride
+                        ) { updated in
+                            applyFilmPolicy(groupId: grp.id, override: updated)
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("完成") { editingFilmPolicyGroup = nil }
+                            }
+                        }
                     }
                 }
             }
@@ -458,11 +448,6 @@ public struct PreviewTabView: View {
         guard let plan = activePlan else { return }
         let ids = PlanSelection.groupIds(plan: plan, groupId: groupId)
         PlanAndTaskStore.shared.savePlan(PlanSelection.set(plan: plan, ids: ids, on: selected))
-    }
-
-    private func toggleAction(actionId: String) {
-        guard let plan = activePlan, let a = plan.actions.first(where: { $0.id == actionId }) else { return }
-        PlanAndTaskStore.shared.savePlan(PlanSelection.set(plan: plan, ids: [actionId], on: !a.selected))
     }
 
     private func buildMatchTargetGroups(for groups: [PlanGroup], plan: ScrapePlan?) -> [MatchTargetGroup] {
@@ -674,130 +659,7 @@ public struct PreviewTabView: View {
     }
 }
 
-/// 第 3 层（影片策略）覆盖编辑器（对标 Android FilmPolicySheets）。
-struct PolicyOverrideSheet: View {
-    let title: String
-    let isTv: Bool
-    let current: PolicyOverride?
-    let fallback: EffectivePolicy
-    let onSave: (PolicyOverride?) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var renameFiles: Bool
-    @State private var renameFolders: Bool
-    @State private var fileTmdbEnabled: Bool
-    @State private var keepResolution: Bool
-    @State private var keepFps: Bool
-    @State private var keepQuality: Bool
-    @State private var keepAudio: Bool
-    @State private var defaultSdrWhenMissing: Bool
-    @State private var writeNfo: Bool
-    @State private var downloadPoster: Bool
-    @State private var downloadFanart: Bool
-    @State private var hasOverride: Bool
-
-    init(
-        title: String,
-        isTv: Bool,
-        current: PolicyOverride?,
-        fallback: EffectivePolicy,
-        onSave: @escaping (PolicyOverride?) -> Void
-    ) {
-        self.title = title
-        self.isTv = isTv
-        self.current = current
-        self.fallback = fallback
-        self.onSave = onSave
-        let n = (isTv ? current?.tvNaming : current?.movieNaming) ?? fallback.naming
-        _renameFiles = State(initialValue: current?.renameFiles ?? fallback.renameFiles)
-        _renameFolders = State(initialValue: current?.renameFolders ?? fallback.renameFolders)
-        _fileTmdbEnabled = State(initialValue: n.fileTmdbEnabled)
-        _keepResolution = State(initialValue: n.keepResolution)
-        _keepFps = State(initialValue: n.keepFps)
-        _keepQuality = State(initialValue: n.keepQuality)
-        _keepAudio = State(initialValue: n.keepAudio)
-        _defaultSdrWhenMissing = State(initialValue: n.defaultSdrWhenMissing)
-        _writeNfo = State(initialValue: current?.writeNfo ?? fallback.writeNfo)
-        _downloadPoster = State(initialValue: current?.downloadPoster ?? fallback.downloadPoster)
-        _downloadFanart = State(initialValue: current?.downloadFanart ?? fallback.downloadFanart)
-        _hasOverride = State(initialValue: current != nil)
-    }
-
-    private func liveBinding(_ state: Binding<Bool>) -> Binding<Bool> {
-        Binding(
-            get: { state.wrappedValue },
-            set: { newValue in
-                state.wrappedValue = newValue
-                applyNow()
-            }
-        )
-    }
-
-    private func applyNow() {
-        var naming = (isTv ? current?.tvNaming : current?.movieNaming) ?? fallback.naming
-        naming.fileTmdbEnabled = fileTmdbEnabled
-        naming.keepResolution = keepResolution
-        naming.keepFps = keepFps
-        naming.keepQuality = keepQuality
-        naming.keepAudio = keepAudio
-        naming.defaultSdrWhenMissing = defaultSdrWhenMissing
-        var ov = current ?? PolicyOverride()
-        ov.renameFiles = renameFiles
-        ov.renameFolders = renameFolders
-        if isTv {
-            ov.tvNaming = naming
-        } else {
-            ov.movieNaming = naming
-        }
-        ov.writeNfo = writeNfo
-        ov.downloadPoster = downloadPoster
-        ov.downloadFanart = downloadFanart
-        hasOverride = true
-        onSave(ov)
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(header: Text("文件与版本标签覆盖"), footer: Text("所有开关修改后实时生效，无需点击保存。")) {
-                    Toggle("重命名文件", isOn: liveBinding($renameFiles))
-                    Toggle("重命名目录", isOn: liveBinding($renameFolders))
-                    Toggle("文件名包含 {tmdb-ID}", isOn: liveBinding($fileTmdbEnabled))
-                    Toggle("保留分辨率（2160p / 1080p）", isOn: liveBinding($keepResolution))
-                    Toggle("保留帧率（fps）", isOn: liveBinding($keepFps))
-                    Toggle("保留画质（DV / HDR / UHD / BluRay）", isOn: liveBinding($keepQuality))
-                    Toggle("保留音轨（TrueHD / Atmos / DDP）", isOn: liveBinding($keepAudio))
-                    Toggle("缺失画质时自动补全 SDR", isOn: liveBinding($defaultSdrWhenMissing))
-                }
-
-                Section("刮削素材覆盖") {
-                    Toggle("写入 NFO", isOn: liveBinding($writeNfo))
-                    Toggle("下载海报（poster.jpg）", isOn: liveBinding($downloadPoster))
-                    Toggle("下载背景图（fanart.jpg）", isOn: liveBinding($downloadFanart))
-                }
-
-                if hasOverride {
-                    Section {
-                        Button("恢复继承上层策略", role: .destructive) {
-                            hasOverride = false
-                            onSave(nil)
-                            dismiss()
-                        }
-                    }
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
-                }
-            }
-        }
-    }
-}
-
-private struct MediaGroupCardRow: View {
+private struct MediaGroupCardRow<DetailDestination: View>: View {
     let group: PlanGroup
     let actions: [PlanAction]
     let hasTaskOverride: Bool
@@ -805,11 +667,13 @@ private struct MediaGroupCardRow: View {
     let isBatchSelected: Bool
     let onToggleBatchManual: () -> Void
     let onToggleGroup: (Bool) -> Void
-    let onToggleAction: (String) -> Void
     let onRematch: () -> Void
-    let onEditFilmPolicy: () -> Void
     let onParkRetention: () -> Void
+    @ViewBuilder let detailDestination: () -> DetailDestination
+
     @State private var expanded = false
+    @State private var selectedSeason: Int?
+    @State private var slideForward = true
 
     private var posterUrl: URL? {
         if let pp = group.posterPath, !pp.isEmpty {
@@ -830,53 +694,137 @@ private struct MediaGroupCardRow: View {
         }
     }
 
+    /// 仅保留视频/集文件条目（过滤季文件夹、海报、NFO、剧照等非集条目）。
+    private var episodeFileActions: [PlanAction] {
+        actions
+            .filter { $0.kind == "file" || $0.op == "unmatched" }
+            .sorted { a, b in
+                let sa = resolvedSeason(for: a)
+                let sb = resolvedSeason(for: b)
+                if sa != sb { return sa < sb }
+                let ea = a.episode ?? Int.max
+                let eb = b.episode ?? Int.max
+                if ea != eb { return ea < eb }
+                let na = a.newName.isEmpty ? a.oldName : a.newName
+                let nb = b.newName.isEmpty ? b.oldName : b.newName
+                return na.localizedStandardCompare(nb) == .orderedAscending
+            }
+    }
+
+    private func resolvedSeason(for act: PlanAction) -> Int {
+        if let s = act.season { return s }
+        let parsed = MediaParser.parse(act.oldName.isEmpty ? act.newName : act.oldName, folderHint: group.folderName)
+        return parsed.season ?? 1
+    }
+
+    private struct SeasonBucket: Identifiable {
+        let season: Int
+        let items: [PlanAction]
+        var id: Int { season }
+        var label: String { season == 0 ? "特别篇" : "第 \(season) 季" }
+    }
+
+    private var seasonBuckets: [SeasonBucket] {
+        guard group.kind == "tv" else { return [] }
+        var map: [Int: [PlanAction]] = [:]
+        for act in episodeFileActions {
+            let s = resolvedSeason(for: act)
+            map[s, default: []].append(act)
+        }
+        return map.keys.sorted().map { SeasonBucket(season: $0, items: map[$0] ?? []) }
+    }
+
+    private var activeSeasonNumber: Int {
+        let buckets = seasonBuckets
+        if let s = selectedSeason, buckets.contains(where: { $0.season == s }) {
+            return s
+        }
+        return buckets.first?.season ?? 1
+    }
+
+    private func selectSeason(_ target: Int, in buckets: [SeasonBucket]) {
+        let current = activeSeasonNumber
+        guard target != current,
+              let curIdx = buckets.firstIndex(where: { $0.season == current }),
+              let dstIdx = buckets.firstIndex(where: { $0.season == target }) else {
+            return
+        }
+        slideForward = dstIdx > curIdx
+        withAnimation(.easeInOut(duration: 0.28)) {
+            selectedSeason = target
+        }
+    }
+
+    private func stepSeason(delta: Int, in buckets: [SeasonBucket]) {
+        guard buckets.count > 1,
+              let curIdx = buckets.firstIndex(where: { $0.season == activeSeasonNumber }) else {
+            return
+        }
+        let nextIdx = curIdx + delta
+        guard buckets.indices.contains(nextIdx) else { return }
+        slideForward = delta > 0
+        withAnimation(.easeInOut(duration: 0.28)) {
+            selectedSeason = buckets[nextIdx].season
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.secondary.opacity(0.16))
-                    TmdbImageView(
-                        url: posterUrl,
-                        placeholderSystemName: group.kind == "tv" ? "tv" : "film"
-                    )
-                    Text(kindBadge)
-                        .font(.caption2.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(MMTheme.purpleBadge, in: RoundedRectangle(cornerRadius: 4))
+                NavigationLink {
+                    detailDestination()
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack(alignment: .topLeading) {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.secondary.opacity(0.16))
+                            TmdbImageView(
+                                url: posterUrl,
+                                placeholderSystemName: group.kind == "tv" ? "tv" : "film"
+                            )
+                            Text(kindBadge)
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(MMTheme.purpleBadge, in: RoundedRectangle(cornerRadius: 4))
+                        }
+                        .frame(width: 68, height: 100)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(group.title.isEmpty ? group.folderName : group.title)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                            HStack(spacing: 6) {
+                                if !group.year.isEmpty { Text(group.year) }
+                                if let r = group.rating, r > 0 { Text(String(format: "★ %.1f", r)) }
+                                if let tid = group.tmdbId { Text("TMDB \(tid)") }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            Text("\(episodeFileActions.count) 个文件 · \(actions.count) 项整理操作" + (group.note.map { " · \($0)" } ?? ""))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            if group.policyOverride != nil {
+                                Text("已启用影片级策略覆盖").font(.caption2).foregroundStyle(MMTheme.accent)
+                            } else if hasTaskOverride {
+                                Text("继承任务级策略").font(.caption2).foregroundStyle(.secondary)
+                            }
+
+                            if let warn = group.warn {
+                                Text(warn).font(.caption2).foregroundStyle(.orange)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .frame(width: 68, height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(group.title.isEmpty ? group.folderName : group.title)
-                        .font(.headline)
-                        .lineLimit(2)
-                    HStack(spacing: 6) {
-                        if !group.year.isEmpty { Text(group.year) }
-                        if let r = group.rating, r > 0 { Text(String(format: "★ %.1f", r)) }
-                        if let tid = group.tmdbId { Text("TMDB \(tid)") }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                    Text("\(actions.count) 项整理操作" + (group.note.map { " · \($0)" } ?? ""))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if group.policyOverride != nil {
-                        Text("已启用影片级策略覆盖").font(.caption2).foregroundStyle(MMTheme.accent)
-                    } else if hasTaskOverride {
-                        Text("继承任务级策略").font(.caption2).foregroundStyle(.secondary)
-                    }
-
-                    if let warn = group.warn {
-                        Text(warn).font(.caption2).foregroundStyle(.orange)
-                    }
-                }
-                Spacer()
                 VStack(alignment: .trailing, spacing: 6) {
                     if isManualMode {
                         Button {
@@ -887,6 +835,11 @@ private struct MediaGroupCardRow: View {
                                 .font(.title3)
                         }
                         .buttonStyle(.plain)
+
+                        Button("保留区") { onParkRetention() }
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .buttonStyle(.borderless)
                     } else {
                         let execs = actions.filter { !$0.done && $0.op != "unmatched" }
                         if !execs.isEmpty {
@@ -901,83 +854,161 @@ private struct MediaGroupCardRow: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Button("匹配") { onRematch() }
-                        .font(.caption)
-                        .buttonStyle(.bordered)
-                    if !isManualMode {
-                        Button("策略") { onEditFilmPolicy() }
-                            .font(.caption2)
-                            .foregroundStyle(MMTheme.accent)
-                            .buttonStyle(.borderless)
-                    } else {
-                        Button("保留区") { onParkRetention() }
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .buttonStyle(.borderless)
-                    }
                 }
             }
 
             if let newName = group.folderNewName {
-                Text("目录：\(group.folderName) → \(newName)")
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                NavigationLink {
+                    detailDestination()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(group.folderName) → \(newName)")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
 
-            if !actions.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            expanded.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Text("查看 \(actions.count) 项整理操作")
-                                .font(.caption)
-                                .foregroundStyle(MMTheme.accent)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(MMTheme.accent)
-                                .rotationEffect(.degrees(expanded ? 90 : 0))
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+            Divider().opacity(0.45)
 
-                    if expanded {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(actions) { act in
-                                HStack(spacing: 8) {
-                                    if act.op != "unmatched" && !act.done {
-                                        Button {
-                                            onToggleAction(act.id)
-                                        } label: {
-                                            Image(systemName: act.selected ? "checkmark.square.fill" : "square")
-                                                .foregroundStyle(act.selected ? MMTheme.accent : .secondary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text("[\(MMTheme.opLabel(act.op))] \(act.newName.isEmpty ? act.oldName : act.newName)")
-                                            .font(.caption.monospaced())
-                                            .foregroundStyle(.primary)
-                                            .lineLimit(2)
-                                        if !act.oldName.isEmpty && act.oldName != act.newName {
-                                            Text("原：\(act.oldName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                        }
-                                    }
-                                    Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        expanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Text(group.kind == "tv"
+                             ? (expanded ? "收起剧集详情" : "查看剧集详情")
+                             : (expanded ? "收起整理详情" : "查看整理详情"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(MMTheme.accent)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(MMTheme.accent)
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                    }
+                    .padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if expanded {
+                    expandedDetailContent
+                        .padding(.top, 10)
+                        .transition(.opacity)
+                }
+            }
+            .clipped()
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var expandedDetailContent: some View {
+        let buckets = seasonBuckets
+        VStack(alignment: .leading, spacing: 10) {
+            if group.kind == "tv" && !buckets.isEmpty {
+                if buckets.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(buckets) { b in
+                                let isOn = b.season == activeSeasonNumber
+                                Button {
+                                    selectSeason(b.season, in: buckets)
+                                } label: {
+                                    Text("\(b.label) (\(b.items.count))")
+                                        .font(.caption.weight(isOn ? .semibold : .regular))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(isOn ? MMTheme.accent : Color.secondary.opacity(0.14), in: Capsule())
+                                        .foregroundStyle(isOn ? .white : .primary)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .padding(.top, 4)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
+
+                    let activeItems = buckets.first(where: { $0.season == activeSeasonNumber })?.items ?? []
+                    ZStack(alignment: .topLeading) {
+                        episodeRowsList(activeItems)
+                            .id(activeSeasonNumber)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: slideForward ? .trailing : .leading).combined(with: .opacity),
+                                removal: .move(edge: slideForward ? .leading : .trailing).combined(with: .opacity)
+                            ))
+                    }
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 24)
+                            .onEnded { value in
+                                let dx = value.translation.width
+                                let dy = value.translation.height
+                                guard abs(dx) > abs(dy) * 1.4, abs(dx) > 40 else { return }
+                                stepSeason(delta: dx < 0 ? 1 : -1, in: buckets)
+                            }
+                    )
+                } else if let only = buckets.first {
+                    Text("\(only.label) (\(only.items.count))")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(MMTheme.accent)
+                    episodeRowsList(only.items)
+                }
+            } else if !episodeFileActions.isEmpty {
+                episodeRowsList(episodeFileActions)
+            } else {
+                Text("暂无视频文件条目")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                onRematch()
+            } label: {
+                Label("手动识别", systemImage: "magnifyingglass")
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(MMTheme.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .foregroundStyle(MMTheme.accent)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func episodeRowsList(_ items: [PlanAction]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, act in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(act.newName.isEmpty ? act.oldName : act.newName)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    if !act.oldName.isEmpty && act.oldName != act.newName {
+                        Text(act.oldName)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if idx < items.count - 1 {
+                    Divider().opacity(0.4)
                 }
             }
         }
-        .padding(.vertical, 4)
     }
 }

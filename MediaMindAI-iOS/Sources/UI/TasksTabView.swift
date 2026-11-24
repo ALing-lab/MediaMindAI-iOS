@@ -1,9 +1,19 @@
 import SwiftUI
 import UIKit
 
-/// 任务中心页（1:1 对标 Android TasksScreen + CompletedTaskDetailScreen：实时进度、TaskQueue 排队队列、WAL 崩溃核实、操作日志详情与一键撤销回滚）。
+/// 任务中心页（参考任务中心双标签卡片流：进行中 / 已完成 + 4 步流水线状态 + 队列与实时进度 + WAL 崩溃核实）。
 public struct TasksTabView: View {
-    public init() {}
+    public let onOpenPreview: () -> Void
+    public init(onOpenPreview: @escaping () -> Void = {}) {
+        self.onOpenPreview = onOpenPreview
+    }
+
+    private enum TaskFilterTab: Int, CaseIterable {
+        case active = 0
+        case completed = 1
+    }
+
+    @State private var selectedTab: TaskFilterTab = .active
     @State private var engine = ExecutionEngine.shared
     @State private var store = PlanAndTaskStore.shared
     @State private var queue = TaskQueue.shared
@@ -13,156 +23,119 @@ public struct TasksTabView: View {
     @State private var showStopConfirm = false
     @State private var stoppingRun: TaskRun? = nil
     @State private var pendingDeleteRun: TaskRun? = nil
+    @State private var pendingCancelPlan: ScrapePlan? = nil
+    @State private var copiedToast: String? = nil
+
+    private var activeRun: TaskRun? {
+        guard engine.isRunning, let r = engine.currentRun else { return nil }
+        return r
+    }
+
+    /// 尚未执行完、且当前未在运行或排队中的识别计划（显示在「进行中」的待确认卡片）。
+    private var pendingPlans: [ScrapePlan] {
+        let runningPlanId = activeRun?.planId
+        let queuedPlanIds = Set(queue.items.map(\.planId))
+        return store.plans.filter { plan in
+            if plan.id == runningPlanId || queuedPlanIds.contains(plan.id) { return false }
+            return plan.actions.contains { !$0.done && $0.enabled && $0.op != "unmatched" }
+        }
+    }
+
+    private var activeCount: Int {
+        (activeRun != nil ? 1 : 0) + queue.items.count + pendingPlans.count
+    }
+
+    private var completedRuns: [TaskRun] {
+        let activeId = activeRun?.id
+        return store.tasks.filter { $0.id != activeId }
+    }
 
     public var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
                 Color(.systemGroupedBackground).ignoresSafeArea()
                 TopAmbientGlow()
-                List {
-                let uncertain = journal.uncertainRows()
-                let walUncertain = ReversibleWalStore.shared.uncertainRecords()
-                if let reconcileHint {
-                    Section {
-                        HStack(spacing: 8) {
-                            Image(systemName: "info.circle.fill").foregroundStyle(MMTheme.accent)
-                            Text(reconcileHint).font(.footnote)
-                            Spacer()
-                            Button("关闭") { self.reconcileHint = nil }.font(.caption)
-                        }
-                    }
-                }
 
-                if !uncertain.isEmpty || !walUncertain.isEmpty {
-                    Section("异常中断核实") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("检测到 \(uncertain.count + walUncertain.count) 条未收口操作日志（可能因断网或中断导致）", systemImage: "exclamationmark.triangle.fill")
-                                .font(.subheadline)
-                                .foregroundStyle(.orange)
-                            Button {
-                                Task { await runReconcile() }
-                            } label: {
-                                if reconciling {
-                                    ProgressView()
-                                } else {
-                                    Text("核实云端真实状态")
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(reconciling)
-                        }
-                        .padding(.vertical, 4)
+                VStack(spacing: 0) {
+                    // 顶部双标签：进行中 (N) | 已完成
+                    Picker("任务状态", selection: $selectedTab) {
+                        Text(activeCount > 0 ? "进行中 (\(activeCount))" : "进行中").tag(TaskFilterTab.active)
+                        Text("已完成").tag(TaskFilterTab.completed)
                     }
-                }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
 
-                if let run = engine.currentRun, engine.isRunning {
-                    Section("正在执行") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text(run.sourceLabel).font(.headline)
-                                Spacer()
-                                Text("\(run.completed)/\(run.total)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                            }
-                            ProgressView(value: Double(run.completed), total: Double(max(1, run.total)))
-                            Text(run.message).font(.caption).foregroundStyle(.secondary)
-                            HStack(spacing: 12) {
-                                Button(engine.isPaused ? "继续" : "暂停") {
-                                    engine.isPaused.toggle()
-                                }
-                                .buttonStyle(.bordered)
-                                Button("停止", role: .destructive) {
-                                    stoppingRun = run
-                                    showStopConfirm = true
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-
-                if !queue.items.isEmpty {
-                    Section("排队等待中（\(queue.items.count)）") {
-                        ForEach(queue.items) { item in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.sourceLabel.isEmpty ? "计划 \(item.planId)" : item.sourceLabel).font(.subheadline.bold())
-                                    Text("\(item.provider) · \(item.actionCount) 项操作").font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "clock").foregroundStyle(.secondary)
-                            }
-                        }
-                        .onDelete { idxs in
-                            let ids = idxs.compactMap { queue.items.indices.contains($0) ? queue.items[$0].id : nil }
-                            for id in ids { queue.remove(id: id) }
-                        }
-                    }
-                }
-
-                Section("任务记录（\(store.tasks.count)）") {
-                    if store.tasks.isEmpty {
-                        ContentUnavailableView("暂无任务记录", systemImage: "bolt", description: Text("在「预览」中点击执行后，任务进度、WAL 操作明细与一键回滚会显示在这里。"))
-                    } else {
-                        ForEach(store.tasks) { t in
-                            NavigationLink {
-                                CompletedTaskDetailScreen(run: t)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(t.sourceLabel.isEmpty ? "任务 \(t.id)" : t.sourceLabel).font(.headline)
-                                        Spacer()
-                                        statusPill(t.status)
-                                    }
-                                    Text("\(t.provider) · 成功 \(t.succeeded) / 失败 \(t.failed) / 共 \(t.total)")
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            if let copiedToast {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(MMTheme.greenOk)
+                                    Text(copiedToast)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    if journal.hasRollbackableRows(runId: t.id) || ReversibleWalStore.shared.rows(taskId: t.id).contains(where: { $0.state == "applied" }) {
-                                        Text("支持一键撤销回滚").font(.caption2).foregroundStyle(MMTheme.accent)
-                                    }
-                                    if let firstErr = t.errors.first {
-                                        Text(firstErr).font(.caption2).foregroundStyle(MMTheme.redErr).lineLimit(2)
-                                    }
+                                    Spacer()
                                 }
-                                .padding(.vertical, 2)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                let hasUncertain = journal.rows(forRunId: t.id).contains(where: { $0.status == .prepared || $0.status == .uncertain || $0.status == .undoPrepared })
-                                    || ReversibleWalStore.shared.rows(taskId: t.id).contains(where: { $0.state == "uncertain" || $0.state == "prepared" || $0.state == "undo_prepared" })
-                                let canResumePaused = t.status == "paused" && !hasUncertain
-                                    && store.plans.contains(where: { $0.id == t.planId })
-                                    && AccountStore.shared.get(id: t.accountId) != nil
-                                let isActiveEngineRun = engine.currentRun?.id == t.id && (engine.isRunning || engine.isPaused)
-                                if canResumePaused {
+
+                            if let reconcileHint {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "info.circle.fill").foregroundStyle(MMTheme.accent)
+                                    Text(reconcileHint).font(.footnote)
+                                    Spacer()
+                                    Button("关闭") { self.reconcileHint = nil }
+                                        .font(.caption)
+                                        .foregroundStyle(MMTheme.accent)
+                                }
+                                .padding(12)
+                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+
+                            let uncertain = journal.uncertainRows()
+                            let walUncertain = ReversibleWalStore.shared.uncertainRecords()
+                            if !uncertain.isEmpty || !walUncertain.isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Label("检测到 \(uncertain.count + walUncertain.count) 条未收口操作日志（可能因断网或中断导致）", systemImage: "exclamationmark.triangle.fill")
+                                        .font(.footnote.weight(.medium))
+                                        .foregroundStyle(.orange)
                                     Button {
-                                        guard let pausedPlan = store.plans.first(where: { $0.id == t.planId }),
-                                              let acct = AccountStore.shared.get(id: t.accountId),
-                                              let drive = try? AccountStore.shared.buildDrive(for: acct) else { return }
-                                        var superseded = t
-                                        superseded.status = "stopped"
-                                        superseded.message = "已发起续跑任务"
-                                        store.saveTask(superseded)
-                                        ExecutionEngine.shared.enqueueOrStart(plan: pausedPlan, drive: drive)
+                                        Task { await runReconcile() }
                                     } label: {
-                                        Label("继续任务", systemImage: "play.fill")
+                                        HStack(spacing: 6) {
+                                            if reconciling { ProgressView().controlSize(.small) }
+                                            Text(reconciling ? "核实中…" : "核实云端真实状态")
+                                                .font(.caption.weight(.semibold))
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(MMTheme.accent, in: Capsule())
+                                        .foregroundStyle(.white)
                                     }
-                                    .tint(MMTheme.accent)
+                                    .buttonStyle(.plain)
+                                    .disabled(reconciling)
                                 }
-                                if t.status != "running" && !isActiveEngineRun && !hasUncertain {
-                                    Button(role: .destructive) {
-                                        pendingDeleteRun = t
-                                    } label: {
-                                        Label("删除记录", systemImage: "trash")
-                                    }
-                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(14)
+                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+
+                            if selectedTab == .active {
+                                activeTabContent
+                            } else {
+                                completedTabContent
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 24)
                     }
                 }
-                }
-                .scrollContentBackground(.hidden)
             }
             .navigationTitle("任务中心")
+            .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog("停止当前任务", isPresented: $showStopConfirm, titleVisibility: .visible) {
                 Button("停止并保留已完成项") {
                     let run = stoppingRun
@@ -218,6 +191,21 @@ public struct TasksTabView: View {
                 Text("选择停止方式：保留已完成项，或尝试把本轮已执行的云端操作逐条回滚。")
             }
             .confirmationDialog(
+                "确认取消该待执行任务？",
+                isPresented: Binding(get: { pendingCancelPlan != nil }, set: { if !$0 { pendingCancelPlan = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("取消任务", role: .destructive) {
+                    if let plan = pendingCancelPlan {
+                        store.deletePlan(id: plan.id)
+                    }
+                    pendingCancelPlan = nil
+                }
+                Button("返回", role: .cancel) { pendingCancelPlan = nil }
+            } message: {
+                Text("将移除本地待确认计划，不会改动云盘上的任何文件。")
+            }
+            .confirmationDialog(
                 "确认删除任务记录？",
                 isPresented: Binding(get: { pendingDeleteRun != nil }, set: { if !$0 { pendingDeleteRun = nil } }),
                 titleVisibility: .visible
@@ -235,6 +223,508 @@ public struct TasksTabView: View {
             }
         }
     }
+
+    // MARK: - 进行中标签页
+
+    @ViewBuilder
+    private var activeTabContent: some View {
+        if activeCount == 0 {
+            ContentUnavailableView(
+                "暂无进行中的任务",
+                systemImage: "bolt.circle",
+                description: Text("在「云盘」扫描目录或在「预览」发起整理后，任务进度会显示在这里。")
+            )
+            .padding(.top, 48)
+        } else {
+            if let run = activeRun {
+                runningTaskCard(run)
+            }
+
+            ForEach(queue.items) { item in
+                queuedTaskCard(item)
+            }
+
+            ForEach(pendingPlans) { plan in
+                pendingPlanCard(plan)
+            }
+        }
+    }
+
+    // MARK: - 已完成标签页
+
+    @ViewBuilder
+    private var completedTabContent: some View {
+        if completedRuns.isEmpty {
+            ContentUnavailableView(
+                "暂无已完成任务",
+                systemImage: "checkmark.circle",
+                description: Text("执行完成或已取消的任务记录会归档在这里，可随时查看日志与一键回滚。")
+            )
+            .padding(.top, 48)
+        } else {
+            ForEach(completedRuns) { run in
+                completedTaskCard(run)
+            }
+        }
+    }
+
+    // MARK: - 1. 正在执行卡片
+
+    private func runningTaskCard(_ run: TaskRun) -> some View {
+        let linkedPlan = store.plans.first(where: { $0.id == run.planId })
+        let fileCount = linkedPlan?.actions.filter { $0.kind == "file" }.count ?? run.total
+        let folderCount = linkedPlan?.groups.count ?? 0
+        let hasScrape = linkedPlan?.actions.contains(where: { $0.op == "artwork" && $0.selected }) ?? false
+
+        return VStack(alignment: .leading, spacing: 10) {
+            cardHeaderRow(
+                taskId: run.id,
+                subtitle: "\(providerDisplay(run.provider)) · \(run.sourceLabel.isEmpty ? run.planId : run.sourceLabel)",
+                badgeText: "本机执行",
+                badgeColor: .blue
+            )
+
+            pipelineStepRow(steps: [
+                ("识别", .done),
+                ("待确认", .done),
+                ("整理", .active),
+                ("刮削", hasScrape ? .pending : .none)
+            ])
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(run.message.isEmpty ? (engine.isPaused ? "已暂停执行" : "正在执行云端操作…") : run.message)
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(run.completed)/\(run.total)")
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(MMTheme.accent)
+                }
+                ProgressView(value: Double(run.completed), total: Double(max(1, run.total)))
+                    .tint(MMTheme.accent)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(MMTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            HStack {
+                Button {
+                    stoppingRun = run
+                    showStopConfirm = true
+                } label: {
+                    Text("停止任务")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(MMTheme.accent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.secondary.opacity(0.14), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    engine.isPaused.toggle()
+                } label: {
+                    Text(engine.isPaused ? "继续执行" : "暂停执行")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background(MMTheme.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            cardFooterRow(fileCount: fileCount, folderCount: folderCount, extraCount: nil, date: run.startedAt)
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - 2. 排队等待卡片
+
+    private func queuedTaskCard(_ item: QueuedTaskItem) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            cardHeaderRow(
+                taskId: item.planId,
+                subtitle: "\(providerDisplay(item.provider)) · \(item.sourceLabel.isEmpty ? item.planId : item.sourceLabel)",
+                badgeText: "排队中",
+                badgeColor: .orange
+            )
+
+            pipelineStepRow(steps: [
+                ("识别", .done),
+                ("待确认", .done),
+                ("整理", .pending),
+                ("刮削", .pending)
+            ])
+
+            HStack {
+                Label("排队等待当前任务完成后自动开始（\(item.actionCount) 项操作）", systemImage: "clock.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                Button("移出队列") {
+                    queue.remove(id: item.id)
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(MMTheme.redErr)
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - 3. 待确认计划卡片（对应参考图 1）
+
+    private func pendingPlanCard(_ plan: ScrapePlan) -> some View {
+        let rootPath = plan.roots.map(\.name).joined(separator: "、")
+        let fileCount = plan.actions.filter { $0.kind == "file" }.count
+        let folderCount = plan.groups.count
+        let selectedCount = plan.actions.filter { $0.selected && !$0.done && $0.op != "unmatched" }.count
+        let hasScrape = plan.actions.contains { $0.op == "artwork" && $0.enabled }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            cardHeaderRow(
+                taskId: plan.id,
+                subtitle: "\(providerDisplay(plan.provider)) · \(rootPath.isEmpty ? "待确认计划" : rootPath)",
+                badgeText: "本机执行",
+                badgeColor: .blue
+            )
+
+            pipelineStepRow(steps: [
+                ("识别", .done),
+                ("待确认", .active),
+                ("整理", .pending),
+                ("刮削", hasScrape ? .pending : .none)
+            ])
+
+            Button {
+                onOpenPreview()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(MMTheme.accent)
+                    Text("识别完成，请确认结果后继续执行")
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    HStack(spacing: 2) {
+                        Text("去确认")
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MMTheme.accent)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(MMTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            HStack {
+                Button {
+                    pendingCancelPlan = plan
+                } label: {
+                    Text("取消任务")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(MMTheme.accent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.secondary.opacity(0.14), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    startPlan(plan)
+                } label: {
+                    Text(selectedCount > 0 ? "立即执行" : "去预览确认")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(MMTheme.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            cardFooterRow(fileCount: fileCount, folderCount: folderCount, extraCount: nil, date: plan.createdAt)
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: - 4. 已完成 / 已取消历史卡片（对应参考图 2）
+
+    private func completedTaskCard(_ run: TaskRun) -> some View {
+        let linkedPlan = store.plans.first(where: { $0.id == run.planId })
+        let rows = journal.rows(forRunId: run.id)
+        let walRows = ReversibleWalStore.shared.rows(taskId: run.id)
+        let fileCount = linkedPlan?.actions.filter { $0.kind == "file" }.count ?? max(run.total, rows.filter { $0.kind == "file" }.count)
+        let folderCount = linkedPlan?.groups.count ?? rows.filter { $0.kind == "folder" }.count
+        let artworkCount = rows.filter { $0.op == "artwork" }.count
+        let isStopped = run.status == "stopped"
+        let isDone = run.status == "done"
+        let hasScrape = artworkCount > 0 || (linkedPlan?.actions.contains { $0.op == "artwork" && $0.done } ?? false)
+        let hasRollback = journal.hasRollbackableRows(runId: run.id) || walRows.contains(where: { $0.state == "applied" })
+
+        let steps: [(String, StepState)] = isStopped
+            ? [("识别", .cancelled), ("待确认", .cancelled), ("整理", .cancelled), ("刮削", .cancelled)]
+            : [
+                ("识别", .done),
+                ("待确认", .done),
+                ("整理", run.failed > 0 && run.succeeded == 0 ? .failed : .done),
+                ("刮削", hasScrape ? .done : .none)
+            ]
+
+        return NavigationLink {
+            CompletedTaskDetailScreen(run: run)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                cardHeaderRow(
+                    taskId: run.id,
+                    subtitle: "\(providerDisplay(run.provider)) · \(run.sourceLabel.isEmpty ? run.planId : run.sourceLabel)",
+                    badgeText: "本机执行",
+                    badgeColor: .blue
+                )
+
+                pipelineStepRow(steps: steps)
+
+                HStack(spacing: 6) {
+                    if isDone && run.failed == 0 {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(MMTheme.greenOk)
+                            .font(.subheadline)
+                        Text("任务执行完成")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(MMTheme.greenOk)
+                    } else if isStopped {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                        Text("已取消")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    } else if run.status == "paused" {
+                        Image(systemName: "pause.circle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.subheadline)
+                        Text("已暂停 · 成功 \(run.succeeded)/\(run.total)")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.orange)
+                    } else {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(MMTheme.redErr)
+                            .font(.subheadline)
+                        Text("部分失败 · 成功 \(run.succeeded) / 失败 \(run.failed)")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(MMTheme.redErr)
+                    }
+
+                    Spacer()
+
+                    if hasRollback {
+                        Text("可回滚")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(MMTheme.accent)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(MMTheme.accent.opacity(0.12), in: Capsule())
+                    }
+                }
+
+                cardFooterRow(
+                    fileCount: fileCount,
+                    folderCount: folderCount,
+                    extraCount: artworkCount > 0 ? artworkCount : nil,
+                    date: run.finishedAt ?? run.startedAt
+                )
+            }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            let hasUncertain = rows.contains(where: { $0.status == .prepared || $0.status == .uncertain || $0.status == .undoPrepared })
+                || walRows.contains(where: { $0.state == "uncertain" || $0.state == "prepared" || $0.state == "undo_prepared" })
+            if run.status == "paused", !hasUncertain,
+               let pausedPlan = linkedPlan,
+               let acct = AccountStore.shared.get(id: run.accountId),
+               let drive = try? AccountStore.shared.buildDrive(for: acct) {
+                Button {
+                    var superseded = run
+                    superseded.status = "stopped"
+                    superseded.message = "已发起续跑任务"
+                    store.saveTask(superseded)
+                    ExecutionEngine.shared.enqueueOrStart(plan: pausedPlan, drive: drive)
+                } label: {
+                    Label("继续任务", systemImage: "play.fill")
+                }
+            }
+            Button {
+                copyTaskId(run.id)
+            } label: {
+                Label("复制任务 ID", systemImage: "doc.on.doc")
+            }
+            if !hasUncertain {
+                Button(role: .destructive) {
+                    pendingDeleteRun = run
+                } label: {
+                    Label("删除记录", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    // MARK: - 共享卡片子组件
+
+    private enum StepState {
+        case done, active, pending, cancelled, failed, none
+    }
+
+    private func cardHeaderRow(taskId: String, subtitle: String, badgeText: String, badgeColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(taskId)
+                    .font(.subheadline.monospaced().bold())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Button {
+                    copyTaskId(taskId)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(badgeText)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(badgeColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(badgeColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private func pipelineStepRow(steps: [(String, StepState)]) -> some View {
+        HStack(spacing: 6) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { _, pair in
+                if pair.1 != .none {
+                    stepChip(title: pair.0, state: pair.1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func stepChip(title: String, state: StepState) -> some View {
+        let (icon, fg, bg): (String, Color, Color) = switch state {
+        case .done:
+            ("checkmark", MMTheme.greenOk, MMTheme.greenOk.opacity(0.14))
+        case .active:
+            ("arrow.triangle.2.circlepath", MMTheme.accent, MMTheme.accent.opacity(0.14))
+        case .pending:
+            ("circle", .secondary, Color.secondary.opacity(0.12))
+        case .cancelled:
+            ("minus.circle", .secondary, Color.secondary.opacity(0.12))
+        case .failed:
+            ("xmark.circle", MMTheme.redErr, MMTheme.redErr.opacity(0.14))
+        case .none:
+            ("circle", .secondary, Color.clear)
+        }
+        return HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(title)
+                .font(.caption2.weight(.medium))
+        }
+        .foregroundStyle(fg)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(bg, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private func cardFooterRow(fileCount: Int, folderCount: Int, extraCount: Int?, date: Date) -> some View {
+        HStack(spacing: 12) {
+            Label("\(fileCount)", systemImage: "film")
+            if folderCount > 0 {
+                Label("\(folderCount)", systemImage: "folder")
+            }
+            if let extraCount, extraCount > 0 {
+                Label("\(extraCount)", systemImage: "photo")
+            }
+            Spacer()
+            Text(Self.shortDateFormatter.string(from: date))
+                .monospacedDigit()
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+    }
+
+    private func providerDisplay(_ raw: String) -> String {
+        switch raw.lowercased() {
+        case "guangya": return "光鸭"
+        case "p123", "123": return "123"
+        case "webdav": return "WebDAV"
+        default: return raw
+        }
+    }
+
+    private func copyTaskId(_ id: String) {
+        UIPasteboard.general.string = id
+        copiedToast = "已复制任务 ID：\(id)"
+        Task {
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            await MainActor.run {
+                if copiedToast == "已复制任务 ID：\(id)" {
+                    copiedToast = nil
+                }
+            }
+        }
+    }
+
+    private func startPlan(_ plan: ScrapePlan) {
+        let selectedCount = plan.actions.filter { $0.selected && !$0.done && $0.op != "unmatched" }.count
+        guard selectedCount > 0 else {
+            onOpenPreview()
+            return
+        }
+        guard let acct = AccountStore.shared.accounts.first(where: { $0.id == plan.accountId }),
+              let drive = try? AccountStore.shared.buildDrive(for: acct) else {
+            reconcileHint = "找不到该计划对应的云盘账号，无法启动执行"
+            return
+        }
+        ExecutionEngine.shared.enqueueOrStart(plan: plan, drive: drive)
+    }
+
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm"
+        return f
+    }()
 
     private func runReconcile() async {
         reconciling = true
@@ -287,22 +777,4 @@ public struct TasksTabView: View {
         let missingNote = missingAcct > 0 ? "（其中 \(missingAcct) 条所属账号不可用）" : ""
         reconcileHint = "核实完成：已生效 \(applied) / 未生效 \(notApplied) / 已回滚 \(reverted) / 待定 \(still)\(missingNote)"
     }
-
-    private func statusPill(_ status: String) -> some View {
-        let (label, color): (String, Color) = switch status {
-        case "done": ("已完成", MMTheme.greenOk)
-        case "running": ("执行中", MMTheme.accent)
-        case "paused": ("已暂停", .orange)
-        case "stopped": ("已停止", .secondary)
-        default: ("部分失败", MMTheme.redErr)
-        }
-        return Text(label)
-            .font(.caption2.bold())
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.14), in: Capsule())
-    }
 }
-
-/// 已完成任务详情与一键撤销回滚页（1:1 对标 Android CompletedTaskDetailScreen）。

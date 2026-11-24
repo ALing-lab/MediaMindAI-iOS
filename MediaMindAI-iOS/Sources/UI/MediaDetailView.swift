@@ -16,6 +16,7 @@ public struct MediaDetailView: View {
     @State private var planStore = PlanAndTaskStore.shared
     @State private var settings = AppSettings.shared
     @State private var currentPageIndex: Int = 0
+    @State private var pageSlideForward: Bool = true
     @State private var seasonMetas: [Int: SeasonMeta] = [:]
     @State private var episodeMetas: [String: EpisodeMeta] = [:]
     @State private var movieMetas: [Int: MatchInfo] = [:]
@@ -84,6 +85,30 @@ public struct MediaDetailView: View {
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle(g.title.isEmpty ? "作品详情" : g.title)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: onRematch) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.caption.weight(.semibold))
+                                Text("手动识别")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .foregroundStyle(MMTheme.accent)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(MMTheme.accent.opacity(0.16))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(MMTheme.accent.opacity(0.32), lineWidth: 0.7)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 .task(id: "\(g.id)-\(g.tmdbId ?? 0)-\(pageList.count)-\(eff.downloadEpisodeThumb)-\(eff.episodeNfo)") {
                     await loadMetadata(for: g, pageList: pageList, eff: eff)
                 }
@@ -163,10 +188,6 @@ public struct MediaDetailView: View {
                 .padding(.bottom, 6)
 
             VStack(spacing: 0) {
-                quickActionRow(icon: "magnifyingglass", title: "重新搜索匹配 TMDB", action: onRematch)
-
-                Divider().padding(.leading, 44)
-
                 HStack(spacing: 12) {
                     Image(systemName: "switch.2")
                         .foregroundStyle(MMTheme.accent)
@@ -186,11 +207,11 @@ public struct MediaDetailView: View {
 
                     Divider().padding(.leading, 44)
                     quickActionRow(icon: "photo.on.rectangle.angled", title: "自定义 NFO 与海报素材", action: onEditAssets)
-                }
 
-                if g.kind == "tv", let onEditEpisodeStrategy {
-                    Divider().padding(.leading, 44)
-                    quickActionRow(icon: "list.number", title: "切换剧集策略 / TMDB 剧集组", action: onEditEpisodeStrategy)
+                    if g.kind == "tv", let onEditEpisodeStrategy {
+                        Divider().padding(.leading, 44)
+                        quickActionRow(icon: "list.number", title: "切换剧集策略 / TMDB 剧集组", action: onEditEpisodeStrategy)
+                    }
                 }
             }
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -330,7 +351,9 @@ public struct MediaDetailView: View {
                     HStack(spacing: 8) {
                         ForEach(Array(pageList.enumerated()), id: \.element.id) { idx, item in
                             Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                guard idx != safeIndex else { return }
+                                pageSlideForward = idx > safeIndex
+                                withAnimation(.easeInOut(duration: 0.28)) {
                                     currentPageIndex = idx
                                 }
                             } label: {
@@ -355,33 +378,41 @@ public struct MediaDetailView: View {
                 }
             }
 
-            // 当前季 / 当前部电影完整卡片（支持左右滑动切换）
-            VStack(alignment: .leading, spacing: 14) {
-                pageHeaderBlock(group: g, page: page, eff: eff)
+            // 当前季 / 当前部电影完整卡片（支持左右滑动切换，带定向滑动过渡动画）
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 14) {
+                    pageHeaderBlock(group: g, page: page, eff: eff)
 
-                if !page.episodes.isEmpty {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text(g.kind == "tv" ? "分集明细" : "文件明细")
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text(g.kind == "tv" ? "\(page.episodes.count) 集" : "\(page.episodes.count) 项")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                    if !page.episodes.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text(g.kind == "tv" ? "分集明细" : "文件明细")
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text(g.kind == "tv" ? "\(page.episodes.count) 集" : "\(page.episodes.count) 项")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
 
-                        ForEach(Array(page.episodes.enumerated()), id: \.element.id) { idx, ep in
-                            episodeDetailRow(group: g, page: page, ep: ep, eff: eff)
-                            if idx + 1 < page.episodes.count {
-                                Divider()
+                            ForEach(Array(page.episodes.enumerated()), id: \.element.id) { idx, ep in
+                                episodeDetailRow(group: g, page: page, ep: ep, eff: eff)
+                                if idx + 1 < page.episodes.count {
+                                    Divider()
+                                }
                             }
                         }
                     }
                 }
+                .padding(14)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .id(page.id)
+                .transition(.asymmetric(
+                    insertion: .move(edge: pageSlideForward ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: pageSlideForward ? .leading : .trailing).combined(with: .opacity)
+                ))
             }
-            .padding(14)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipped()
             .contentShape(Rectangle())
             .simultaneousGesture(
                 DragGesture(minimumDistance: 28, coordinateSpace: .local)
@@ -390,10 +421,14 @@ public struct MediaDetailView: View {
                         let dx = value.translation.width
                         let dy = value.translation.height
                         guard abs(dx) > abs(dy) * 1.4, abs(dx) > 44 else { return }
-                        withAnimation(.easeInOut(duration: 0.22)) {
-                            if dx < 0, safeIndex + 1 < pageList.count {
+                        if dx < 0, safeIndex + 1 < pageList.count {
+                            pageSlideForward = true
+                            withAnimation(.easeInOut(duration: 0.28)) {
                                 currentPageIndex = safeIndex + 1
-                            } else if dx > 0, safeIndex > 0 {
+                            }
+                        } else if dx > 0, safeIndex > 0 {
+                            pageSlideForward = false
+                            withAnimation(.easeInOut(duration: 0.28)) {
                                 currentPageIndex = safeIndex - 1
                             }
                         }
@@ -415,7 +450,7 @@ public struct MediaDetailView: View {
     private func pageHeaderBlock(group g: PlanGroup, page: DetailPage, eff: EffectivePolicy) -> some View {
         let posterURL = resolvedPagePosterURL(group: g, page: page)
         let showSeasonPoster = g.kind == "tv"
-            ? (eff.scrapeEnabled && settings.policies.seasonPoster)
+            ? (eff.scrapeEnabled && eff.seasonPoster)
             : (eff.scrapeEnabled && eff.downloadPoster)
         let showSeasonNfo = g.kind == "tv"
             ? (eff.scrapeEnabled && eff.seasonNfo)
@@ -779,11 +814,11 @@ public struct MediaDetailView: View {
     }
 
     private func resolvedPagePosterURL(group g: PlanGroup, page: DetailPage) -> URL? {
-        if let raw = page.posterUrl, let u = URL(string: raw) { return u }
-        if let s = page.seasonNumber, let sp = seasonMetas[s]?.posterPath {
+        if let s = page.seasonNumber, let sp = seasonMetas[s]?.posterPath, !sp.isEmpty {
             return settings.imageUrl(path: sp, size: "w342")
         }
-        if let mid = page.movieTmdbId, let mp = movieMetas[mid]?.posterPath {
+        if let raw = page.posterUrl, !raw.isEmpty, let u = URL(string: raw) { return u }
+        if let mid = page.movieTmdbId, let mp = movieMetas[mid]?.posterPath, !mp.isEmpty {
             return settings.imageUrl(path: mp, size: "w342")
         }
         return g.posterPath.flatMap { settings.imageUrl(path: $0, size: "w342") }
@@ -806,6 +841,7 @@ public struct MediaDetailView: View {
         }
 
         if g.kind == "tv" {
+            // 先批量拉取所有季的专属元数据与季海报，避免第 2/3 季海报被第 1 季分集请求阻塞
             for page in pageList {
                 guard let s = page.seasonNumber else { continue }
                 if seasonMetas[s] == nil {
@@ -813,6 +849,8 @@ public struct MediaDetailView: View {
                         seasonMetas[s] = sm
                     }
                 }
+            }
+            for page in pageList {
                 for ep in page.episodes {
                     guard let ms = ep.metadataSeason, let me = ep.metadataEpisode, let key = ep.metaLookupKey else { continue }
                     if episodeMetas[key] == nil {

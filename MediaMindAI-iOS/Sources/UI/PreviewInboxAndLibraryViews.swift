@@ -62,213 +62,249 @@ public struct PreviewInboxView: View {
     }
 }
 
-/// 1:1 复刻自 Android `FilmLibraryScreen.kt`：按「电影 / 剧集 / 合集」分类浏览全部已识别作品。
+/// 影视库总览：只读展示已整理/刮削成功的作品记录卡片（不可点击跳转）。
 public struct FilmLibraryView: View {
+    private enum LibraryKindFilter: String, CaseIterable {
+        case all = "全部"
+        case movie = "电影"
+        case tv = "剧集"
+        case collection = "合集"
+    }
+
+    private struct CompletedWorkRecord: Identifiable {
+        let id: String
+        let group: PlanGroup
+        let provider: String
+        let posterUrl: URL?
+        let fileCount: Int
+        let seasonCount: Int
+        let organized: Bool
+        let scraped: Bool
+        let completedAt: Date
+    }
+
     @State private var store = PlanAndTaskStore.shared
     @State private var search = ""
     @State private var showSearch = false
-    @State private var rematchTarget: (plan: ScrapePlan, group: PlanGroup)? = nil
-    @State private var policyTarget: (plan: ScrapePlan, group: PlanGroup)? = nil
-    @State private var assetsTarget: (plan: ScrapePlan, group: PlanGroup)? = nil
+    @State private var kindFilter: LibraryKindFilter = .all
 
     public init() {}
 
-    public var body: some View {
-        let allPairs: [(ScrapePlan, PlanGroup)] = store.plans.flatMap { p in
-            p.groups.filter { $0.kind != "unmatched" }.map { (p, $0) }
-        }
-        let filtered = allPairs.filter { _, g in
-            let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return q.isEmpty || g.title.lowercased().contains(q) || g.year.contains(q)
-        }
-        let movies = filtered.filter { $0.1.kind == "movie" }
-        let tvs = filtered.filter { $0.1.kind == "tv" }
-        let cols = filtered.filter { $0.1.kind == "collection" }
+    private var completedRecords: [CompletedWorkRecord] {
+        let runsByPlan = Dictionary(grouping: store.tasks, by: \.planId)
+        var records: [CompletedWorkRecord] = []
+        var seenKeys = Set<String>()
 
-        VStack(spacing: 0) {
-            CollapsibleSearchBar(text: $search, isPresented: $showSearch, prompt: "搜索片名或年份")
-            List {
-            if filtered.isEmpty {
-                ContentUnavailableView("暂无已识别影视库", systemImage: "film.stack", description: Text("完成扫描后，所有识别出的电影、剧集与合集会归类展示于此。"))
-            } else {
-                if !movies.isEmpty {
-                    Section("电影（\(movies.count)）") {
-                        ForEach(movies, id: \.1.id) { pair in row(plan: pair.0, grp: pair.1) }
+        for plan in store.plans {
+            let planRuns = runsByPlan[plan.id] ?? []
+            let latestSuccessRun = planRuns.first(where: { $0.status == "done" || $0.succeeded > 0 })
+            let completedDate = latestSuccessRun?.finishedAt ?? latestSuccessRun?.startedAt ?? plan.createdAt
+
+            for grp in plan.groups where grp.kind != "unmatched" {
+                let grpActions = plan.actions.filter { $0.groupId == grp.id }
+                let doneOrganize = grpActions.contains { ($0.op == "rename" || $0.op == "move" || $0.op == "mkdir") && $0.done }
+                let doneScrape = grpActions.contains { $0.op == "artwork" && $0.done }
+                guard doneOrganize || doneScrape else { continue }
+
+                let dedupKey = grp.tmdbId.map { "\(grp.kind)-\($0)" } ?? grp.id
+                guard seenKeys.insert(dedupKey).inserted else { continue }
+
+                let fileActions = grpActions.filter { $0.kind == "file" }
+                let seasons = Set(fileActions.compactMap(\.season))
+                let posterUrl: URL? = {
+                    if let pp = grp.posterPath, !pp.isEmpty {
+                        return AppSettings.shared.imageUrl(path: pp, size: "w342")
                     }
-                }
-                if !tvs.isEmpty {
-                    Section("剧集（\(tvs.count)）") {
-                        ForEach(tvs, id: \.1.id) { pair in row(plan: pair.0, grp: pair.1) }
+                    if let fallback = grpActions.first(where: { $0.kind == "image" && $0.newName.lowercased() == "poster.jpg" })?.artworkUrl {
+                        return URL(string: fallback.replacingOccurrences(of: "/t/p/w780/", with: "/t/p/w342/"))
                     }
-                }
-                if !cols.isEmpty {
-                    Section("系列合集（\(cols.count)）") {
-                        ForEach(cols, id: \.1.id) { pair in row(plan: pair.0, grp: pair.1) }
-                    }
-                }
-            }
+                    return nil
+                }()
+                records.append(CompletedWorkRecord(
+                    id: "\(plan.id)-\(grp.id)",
+                    group: grp,
+                    provider: plan.provider,
+                    posterUrl: posterUrl,
+                    fileCount: fileActions.count,
+                    seasonCount: seasons.count,
+                    organized: doneOrganize,
+                    scraped: doneScrape,
+                    completedAt: completedDate
+                ))
             }
         }
+        return records.sorted { $0.completedAt > $1.completedAt }
+    }
+
+    private var filteredRecords: [CompletedWorkRecord] {
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return completedRecords.filter { rec in
+            switch kindFilter {
+            case .all: break
+            case .movie: if rec.group.kind != "movie" { return false }
+            case .tv: if rec.group.kind != "tv" { return false }
+            case .collection: if rec.group.kind != "collection" { return false }
+            }
+            guard !q.isEmpty else { return true }
+            return rec.group.title.lowercased().contains(q)
+                || rec.group.folderName.lowercased().contains(q)
+                || rec.group.year.contains(q)
+                || (rec.group.tmdbId.map { String($0).contains(q) } ?? false)
+        }
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            CollapsibleSearchBar(text: $search, isPresented: $showSearch, prompt: "搜索片名、年份或 TMDB ID")
+
+            if !completedRecords.isEmpty {
+                Picker("分类筛选", selection: $kindFilter) {
+                    ForEach(LibraryKindFilter.allCases, id: \.self) { f in
+                        Text(f.rawValue).tag(f)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+
+            if completedRecords.isEmpty {
+                ContentUnavailableView(
+                    "暂无已整理作品",
+                    systemImage: "film.stack",
+                    description: Text("完成整理与刮削任务后，成功的电影、剧集与合集作品记录会展示在这里。")
+                )
+            } else if filteredRecords.isEmpty {
+                ContentUnavailableView(
+                    "未找到匹配作品",
+                    systemImage: "magnifyingglass",
+                    description: Text("试试更换关键字或切换分类筛选。")
+                )
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(filteredRecords) { rec in
+                            workRecordCard(rec)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("影视库总览")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showSearch.toggle() }
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-            }
-        }
-        .sheet(isPresented: Binding(get: { rematchTarget != nil }, set: { if !$0 { rematchTarget = nil } })) {
-            if let t = rematchTarget {
-                let livePlan = store.plans.first(where: { $0.id == t.plan.id }) ?? t.plan
-                let liveGrp = livePlan.groups.first(where: { $0.id == t.group.id }) ?? t.group
-                ManualMatchSheet(
-                    initialQuery: liveGrp.title.isEmpty ? liveGrp.folderName : liveGrp.title,
-                    initialKind: liveGrp.kind == "tv" ? "tv" : "movie",
-                    onApply: { match in
-                        rematchTarget = nil
-                        Task {
-                            let latestPlan = store.plans.first(where: { $0.id == t.plan.id }) ?? livePlan
-                            if let acct = AccountStore.shared.get(id: latestPlan.accountId),
-                               let drive = try? AccountStore.shared.buildDrive(for: acct),
-                               let replanned = try? await Scanner.replanGroup(plan: latestPlan, groupId: t.group.id, info: match, drive: drive) {
-                                await MainActor.run {
-                                    store.savePlan(replanned)
-                                }
-                                return
-                            }
-                            await MainActor.run {
-                                var updated = store.plans.first(where: { $0.id == t.plan.id }) ?? latestPlan
-                                guard !updated.actions.contains(where: { $0.groupId == t.group.id && $0.done }) else { return }
-                                if let idx = updated.groups.firstIndex(where: { $0.id == t.group.id }) {
-                                    updated.groups[idx].tmdbId = match.id
-                                    updated.groups[idx].title = match.title
-                                    updated.groups[idx].year = match.year
-                                    updated.groups[idx].posterPath = match.posterPath
-                                    updated.groups[idx].kind = match.kind
-                                }
-                                for aIdx in updated.actions.indices where updated.actions[aIdx].groupId == t.group.id && !updated.actions[aIdx].done {
-                                    let a = updated.actions[aIdx]
-                                    var nextKind = a.kind
-                                    var nextNewName = a.newName
-                                    var nextArtUrl = a.artworkUrl
-                                    if a.op == "artwork" {
-                                        if a.kind == "movie_nfo" && match.kind == "tv" {
-                                            nextKind = "tvshow_nfo"
-                                            nextNewName = "tvshow.nfo"
-                                        } else if a.kind == "tvshow_nfo" && match.kind == "movie" {
-                                            nextKind = "movie_nfo"
-                                            nextNewName = "movie.nfo"
-                                        } else if a.kind == "image" {
-                                            let low = a.newName.lowercased()
-                                            if low.contains("poster") && !low.contains("season") {
-                                                nextArtUrl = match.posterPath.flatMap { AppSettings.shared.imageUrl(path: $0)?.absoluteString }
-                                            } else if low.contains("fanart") || low.contains("backdrop") {
-                                                nextArtUrl = match.backdropPath.flatMap { AppSettings.shared.imageUrl(path: $0, size: AppSettings.shared.imageQuality.backdropSize)?.absoluteString }
-                                            } else {
-                                                nextArtUrl = nil
-                                            }
-                                        }
-                                    }
-                                    updated.actions[aIdx] = PlanAction(
-                                        id: a.id,
-                                        op: a.op,
-                                        groupId: a.groupId,
-                                        fileId: a.fileId,
-                                        parentId: a.parentId,
-                                        oldName: a.oldName,
-                                        newName: nextNewName,
-                                        destParentId: a.destParentId,
-                                        destRef: a.destRef,
-                                        destLabel: a.destLabel,
-                                        kind: nextKind,
-                                        mediaKind: match.kind,
-                                        tmdbId: match.id,
-                                        season: a.season,
-                                        episode: a.episode,
-                                        artworkUrl: nextArtUrl,
-                                        selected: a.selected,
-                                        enabled: a.enabled,
-                                        blocked: a.blocked,
-                                        done: a.done,
-                                        error: a.error,
-                                        note: a.note,
-                                        metadataSeason: a.metadataSeason,
-                                        metadataEpisode: a.metadataEpisode,
-                                        replaceExisting: a.replaceExisting,
-                                        folderPath: a.folderPath
-                                    )
-                                }
-                                updated = PolicyResolver.applyOverrides(to: updated, global: AppSettings.shared.policies)
-                                store.savePlan(updated)
-                            }
+            if !completedRecords.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSearch.toggle()
+                            if !showSearch { search = "" }
                         }
+                    } label: {
+                        Image(systemName: showSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
                     }
-                )
-            }
-        }
-        .sheet(isPresented: Binding(get: { policyTarget != nil }, set: { if !$0 { policyTarget = nil } })) {
-            if let t = policyTarget {
-                let livePlan = store.plans.first(where: { $0.id == t.plan.id }) ?? t.plan
-                let liveGrp = livePlan.groups.first(where: { $0.id == t.group.id }) ?? t.group
-                let eff = PolicyResolver.resolve(isTv: liveGrp.kind == "tv", global: AppSettings.shared.policies, task: livePlan.taskPolicy)
-                PolicyOverrideSheet(
-                    title: "单作品策略：\(liveGrp.title.isEmpty ? liveGrp.folderName : liveGrp.title)",
-                    isTv: liveGrp.kind == "tv",
-                    current: liveGrp.policyOverride,
-                    fallback: eff
-                ) { ov in
-                    var updated = store.plans.first(where: { $0.id == t.plan.id }) ?? livePlan
-                    if let idx = updated.groups.firstIndex(where: { $0.id == t.group.id }) {
-                        updated.groups[idx].policyOverride = ov
-                    }
-                    updated = PolicyResolver.applyOverrides(to: updated, global: AppSettings.shared.policies)
-                    store.savePlan(updated)
-                }
-            }
-        }
-        .sheet(isPresented: Binding(get: { assetsTarget != nil }, set: { if !$0 { assetsTarget = nil } })) {
-            if let t = assetsTarget {
-                let livePlan = store.plans.first(where: { $0.id == t.plan.id }) ?? t.plan
-                let liveGrp = livePlan.groups.first(where: { $0.id == t.group.id }) ?? t.group
-                let eff = PolicyResolver.resolve(isTv: liveGrp.kind == "tv", global: AppSettings.shared.policies, task: livePlan.taskPolicy, film: liveGrp.policyOverride)
-                LibraryScrapeAssetsSheet(
-                    title: liveGrp.title.isEmpty ? liveGrp.folderName : liveGrp.title,
-                    isTv: liveGrp.kind == "tv",
-                    initial: liveGrp.policyOverride,
-                    fallback: eff
-                ) { ov in
-                    var updated = store.plans.first(where: { $0.id == t.plan.id }) ?? livePlan
-                    if let idx = updated.groups.firstIndex(where: { $0.id == t.group.id }) {
-                        updated.groups[idx].policyOverride = ov
-                    }
-                    updated = PolicyResolver.applyOverrides(to: updated, global: AppSettings.shared.policies)
-                    store.savePlan(updated)
                 }
             }
         }
     }
 
-    private func row(plan: ScrapePlan, grp: PlanGroup) -> some View {
-        NavigationLink {
-            MediaDetailView(
-                planId: plan.id,
-                groupId: grp.id,
-                onRematch: { rematchTarget = (plan, grp) },
-                onEditPolicy: { policyTarget = (plan, grp) },
-                onEditAssets: { assetsTarget = (plan, grp) }
-            )
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(grp.title.isEmpty ? grp.folderName : grp.title).font(.headline)
-                Text("\(grp.year) · \(plan.provider)" + (grp.tmdbId.map { " · TMDB \($0)" } ?? ""))
+    private func workRecordCard(_ rec: CompletedWorkRecord) -> some View {
+        let g = rec.group
+        let posterURL = rec.posterUrl
+        let badgeText: String = switch g.kind {
+        case "tv": "剧集"
+        case "movie": "电影"
+        case "collection": "合集"
+        default: "影视"
+        }
+
+        return HStack(alignment: .top, spacing: 12) {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.secondary.opacity(0.16))
+                TmdbImageView(url: posterURL, placeholderSystemName: g.kind == "tv" ? "tv" : "film")
+                Text(badgeText)
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(MMTheme.purpleBadge, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+            .frame(width: 64, height: 94)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(g.title.isEmpty ? g.folderName : g.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                HStack(spacing: 6) {
+                    if !g.year.isEmpty { Text(g.year) }
+                    if let r = g.rating, r > 0 { Text(String(format: "★ %.1f", r)) }
+                    if let tid = g.tmdbId { Text("TMDB \(tid)") }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Text(summaryLine(rec))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    if rec.organized {
+                        recordStatusBadge("已整理")
+                    }
+                    if rec.scraped {
+                        recordStatusBadge("已刮削")
+                    }
+                    Spacer(minLength: 4)
+                    Text(Self.dateFormatter.string(from: rec.completedAt))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
             }
+            Spacer(minLength: 0)
         }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
+
+    private func recordStatusBadge(_ text: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption2)
+            Text(text)
+                .font(.caption2.weight(.semibold))
+        }
+        .foregroundStyle(MMTheme.greenOk)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(MMTheme.greenOk.opacity(0.14), in: Capsule())
+    }
+
+    private func summaryLine(_ rec: CompletedWorkRecord) -> String {
+        let providerLabel: String = switch rec.provider.lowercased() {
+        case "guangya": "光鸭"
+        case "p123", "123": "123"
+        case "webdav": "WebDAV"
+        default: rec.provider
+        }
+        if rec.group.kind == "tv", rec.seasonCount > 0 {
+            return "\(providerLabel) · \(rec.seasonCount) 季 · \(rec.fileCount) 集"
+        }
+        return "\(providerLabel) · \(rec.fileCount) 个文件"
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm"
+        return f
+    }()
 }
 
 /// 崩溃日志查看页（对标 Android CrashReporter 查看入口）。

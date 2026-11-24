@@ -254,7 +254,7 @@ public extension DefaultPolicies {
         }
     }
 
-    /// 将第 2 层任务策略覆写合并到当前全局策略副本，供完整任务策略页展示与实时编辑。
+    /// 将第 2 层（任务策略）或第 3 层（影片策略）覆写合并到当前基准策略副本，供完整策略页展示与实时编辑。
     func applying(_ override: PolicyOverride?) -> DefaultPolicies {
         guard let ov = override else { return self }
         var out = self
@@ -262,7 +262,10 @@ public extension DefaultPolicies {
         if let v = ov.scrapeEnabled { out.scrapeEnabled = v }
         if let v = ov.renameFiles { out.renameFiles = v }
         if let v = ov.renameFolders { out.renameFolders = v }
+        if let v = ov.seasonFolders { out.seasonFolders = v }
         if let v = ov.mergeSeries { out.mergeSeries = v }
+        if let v = ov.episodeStrategy { out.episodeStrategy = v }
+        if let v = ov.fullScrape { out.fullScrape = v }
         if let v = ov.imageQuality { out.imageQuality = v }
         if let v = ov.movieNaming { out.movieNaming = v }
         if let v = ov.tvNaming { out.tvNaming = v }
@@ -270,18 +273,28 @@ public extension DefaultPolicies {
         if let v = ov.downloadPoster { out.movie.poster = v; out.tv.poster = v }
         if let v = ov.downloadFanart { out.movie.fanart = v; out.tv.fanart = v }
         if let v = ov.downloadClearlogo { out.movie.logo = v; out.tv.logo = v }
+        if let v = ov.seasonPoster { out.seasonPoster = v }
+        if let v = ov.seasonNfo { out.seasonNfo = v }
+        if let v = ov.episodeNfo { out.episodeNfo = v }
         if let v = ov.downloadEpisodeThumb { out.episodeThumb = v }
+        if let v = ov.adaptiveDirectory { out.adaptiveDirectory = v }
+        if let v = ov.adaptiveTargetDirId { out.adaptiveTargetDirId = v }
+        if let v = ov.adaptiveTargetDirPath { out.adaptiveTargetDirPath = v }
+        if let v = ov.autoMoveConfirmedDuplicates { out.autoMoveConfirmedDuplicates = v }
         return out
     }
 
-    /// 计算相对全局默认策略的差量覆写，仅记录第 2 层任务级差异。
+    /// 计算相对上层基准策略的差量覆写，仅记录本层级修改过的差异项。
     func diffOverride(from base: DefaultPolicies) -> PolicyOverride {
         var ov = PolicyOverride()
         if organizeEnabled != base.organizeEnabled { ov.organizeEnabled = organizeEnabled }
         if scrapeEnabled != base.scrapeEnabled { ov.scrapeEnabled = scrapeEnabled }
         if renameFiles != base.renameFiles { ov.renameFiles = renameFiles }
         if renameFolders != base.renameFolders { ov.renameFolders = renameFolders }
+        if seasonFolders != base.seasonFolders { ov.seasonFolders = seasonFolders }
         if mergeSeries != base.mergeSeries { ov.mergeSeries = mergeSeries }
+        if episodeStrategy != base.episodeStrategy { ov.episodeStrategy = episodeStrategy }
+        if fullScrape != base.fullScrape { ov.fullScrape = fullScrape }
         if imageQuality != base.imageQuality { ov.imageQuality = imageQuality }
         if movieNaming != base.movieNaming { ov.movieNaming = movieNaming }
         if tvNaming != base.tvNaming { ov.tvNaming = tvNaming }
@@ -293,7 +306,14 @@ public extension DefaultPolicies {
         else if tv.fanart != base.tv.fanart { ov.downloadFanart = tv.fanart }
         if movie.logo != base.movie.logo { ov.downloadClearlogo = movie.logo }
         else if tv.logo != base.tv.logo { ov.downloadClearlogo = tv.logo }
+        if seasonPoster != base.seasonPoster { ov.seasonPoster = seasonPoster }
+        if seasonNfo != base.seasonNfo { ov.seasonNfo = seasonNfo }
+        if episodeNfo != base.episodeNfo { ov.episodeNfo = episodeNfo }
         if episodeThumb != base.episodeThumb { ov.downloadEpisodeThumb = episodeThumb }
+        if adaptiveDirectory != base.adaptiveDirectory { ov.adaptiveDirectory = adaptiveDirectory }
+        if adaptiveTargetDirId != base.adaptiveTargetDirId { ov.adaptiveTargetDirId = adaptiveTargetDirId }
+        if adaptiveTargetDirPath != base.adaptiveTargetDirPath { ov.adaptiveTargetDirPath = adaptiveTargetDirPath }
+        if autoMoveConfirmedDuplicates != base.autoMoveConfirmedDuplicates { ov.autoMoveConfirmedDuplicates = autoMoveConfirmedDuplicates }
         return ov
     }
 }
@@ -305,7 +325,10 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
     public var scrapeEnabled: Bool?
     public var renameFiles: Bool?
     public var renameFolders: Bool?
+    public var seasonFolders: Bool?
     public var mergeSeries: Bool?
+    public var episodeStrategy: String?
+    public var fullScrape: Bool?
     public var imageQuality: ImageQualityOption?
     public var movieNaming: MediaNamingPrefs?
     public var tvNaming: MediaNamingPrefs?
@@ -313,14 +336,24 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
     public var downloadPoster: Bool?
     public var downloadFanart: Bool?
     public var downloadClearlogo: Bool?
+    public var seasonPoster: Bool?
+    public var seasonNfo: Bool?
+    public var episodeNfo: Bool?
     public var downloadEpisodeThumb: Bool?
+    public var adaptiveDirectory: Bool?
+    public var adaptiveTargetDirId: String?
+    public var adaptiveTargetDirPath: String?
+    public var autoMoveConfirmedDuplicates: Bool?
 
     public init(
         organizeEnabled: Bool? = nil,
         scrapeEnabled: Bool? = nil,
         renameFiles: Bool? = nil,
         renameFolders: Bool? = nil,
+        seasonFolders: Bool? = nil,
         mergeSeries: Bool? = nil,
+        episodeStrategy: String? = nil,
+        fullScrape: Bool? = nil,
         imageQuality: ImageQualityOption? = nil,
         movieNaming: MediaNamingPrefs? = nil,
         tvNaming: MediaNamingPrefs? = nil,
@@ -328,13 +361,23 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         downloadPoster: Bool? = nil,
         downloadFanart: Bool? = nil,
         downloadClearlogo: Bool? = nil,
-        downloadEpisodeThumb: Bool? = nil
+        seasonPoster: Bool? = nil,
+        seasonNfo: Bool? = nil,
+        episodeNfo: Bool? = nil,
+        downloadEpisodeThumb: Bool? = nil,
+        adaptiveDirectory: Bool? = nil,
+        adaptiveTargetDirId: String? = nil,
+        adaptiveTargetDirPath: String? = nil,
+        autoMoveConfirmedDuplicates: Bool? = nil
     ) {
         self.organizeEnabled = organizeEnabled
         self.scrapeEnabled = scrapeEnabled
         self.renameFiles = renameFiles
         self.renameFolders = renameFolders
+        self.seasonFolders = seasonFolders
         self.mergeSeries = mergeSeries
+        self.episodeStrategy = episodeStrategy
+        self.fullScrape = fullScrape
         self.imageQuality = imageQuality
         self.movieNaming = movieNaming
         self.tvNaming = tvNaming
@@ -342,7 +385,14 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         self.downloadPoster = downloadPoster
         self.downloadFanart = downloadFanart
         self.downloadClearlogo = downloadClearlogo
+        self.seasonPoster = seasonPoster
+        self.seasonNfo = seasonNfo
+        self.episodeNfo = episodeNfo
         self.downloadEpisodeThumb = downloadEpisodeThumb
+        self.adaptiveDirectory = adaptiveDirectory
+        self.adaptiveTargetDirId = adaptiveTargetDirId
+        self.adaptiveTargetDirPath = adaptiveTargetDirPath
+        self.autoMoveConfirmedDuplicates = autoMoveConfirmedDuplicates
     }
 }
 
@@ -352,7 +402,9 @@ public struct EffectivePolicy: Hashable, Sendable {
     public let scrapeEnabled: Bool
     public let renameFiles: Bool
     public let renameFolders: Bool
+    public let seasonFolders: Bool
     public let mergeSeries: Bool
+    public let fullScrape: Bool
     public let imageQuality: ImageQualityOption
     public let naming: MediaNamingPrefs
     public let writeNfo: Bool
@@ -360,6 +412,7 @@ public struct EffectivePolicy: Hashable, Sendable {
     public let downloadFanart: Bool
     public let downloadClearlogo: Bool
     public let downloadEpisodeThumb: Bool
+    public let seasonPoster: Bool
     public let seasonNfo: Bool
     public let episodeNfo: Bool
     public let sourceLayer: String // "影片策略" | "任务策略" | "全局策略"
@@ -388,7 +441,9 @@ public enum PolicyResolver {
             scrapeEnabled: film?.scrapeEnabled ?? task?.scrapeEnabled ?? global.scrapeEnabled,
             renameFiles: film?.renameFiles ?? task?.renameFiles ?? global.renameFiles,
             renameFolders: film?.renameFolders ?? task?.renameFolders ?? global.renameFolders,
+            seasonFolders: film?.seasonFolders ?? task?.seasonFolders ?? global.seasonFolders,
             mergeSeries: film?.mergeSeries ?? task?.mergeSeries ?? global.mergeSeries,
+            fullScrape: film?.fullScrape ?? task?.fullScrape ?? global.fullScrape,
             imageQuality: film?.imageQuality ?? task?.imageQuality ?? global.imageQuality,
             naming: filmNaming ?? taskNaming ?? baseNaming,
             writeNfo: film?.writeNfo ?? task?.writeNfo ?? baseMedia.nfo,
@@ -396,8 +451,9 @@ public enum PolicyResolver {
             downloadFanart: film?.downloadFanart ?? task?.downloadFanart ?? baseMedia.fanart,
             downloadClearlogo: film?.downloadClearlogo ?? task?.downloadClearlogo ?? baseMedia.logo,
             downloadEpisodeThumb: film?.downloadEpisodeThumb ?? task?.downloadEpisodeThumb ?? global.episodeThumb,
-            seasonNfo: global.seasonNfo,
-            episodeNfo: global.episodeNfo,
+            seasonPoster: film?.seasonPoster ?? task?.seasonPoster ?? global.seasonPoster,
+            seasonNfo: film?.seasonNfo ?? task?.seasonNfo ?? global.seasonNfo,
+            episodeNfo: film?.episodeNfo ?? task?.episodeNfo ?? global.episodeNfo,
             sourceLayer: sourceLayer
         )
     }
@@ -470,7 +526,7 @@ public enum PolicyResolver {
                         } else if act.episode != nil {
                             enableArt = eff.scrapeEnabled && eff.downloadEpisodeThumb
                         } else if low.contains("season") && low.contains("poster") {
-                            enableArt = eff.scrapeEnabled && global.seasonPoster
+                            enableArt = eff.scrapeEnabled && eff.seasonPoster
                         } else {
                             enableArt = eff.scrapeEnabled && eff.downloadPoster
                         }

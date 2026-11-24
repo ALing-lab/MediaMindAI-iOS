@@ -66,7 +66,7 @@ public struct AppRootView: View {
         case .preview:
             PreviewTabView(onStartExecution: { selectedTab = .tasks })
         case .tasks:
-            TasksTabView()
+            TasksTabView(onOpenPreview: { selectedTab = .preview })
         case .settings:
             SettingsTabView()
         }
