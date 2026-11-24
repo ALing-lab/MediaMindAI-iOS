@@ -81,9 +81,7 @@ public struct CompletedTaskDetailScreen: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            InlineSearchBar(text: $searchQuery, prompt: "按文件名、操作类型或错误信息搜索")
-            List {
+        List {
             Section("任务摘要") {
                 LabeledContent("来源", value: run.sourceLabel.isEmpty ? run.id : run.sourceLabel)
                 LabeledContent("网盘", value: run.provider)
@@ -198,10 +196,10 @@ public struct CompletedTaskDetailScreen: View {
                     ContentUnavailableView("当前筛选下无明细记录", systemImage: "list.bullet.rectangle")
                 }
             }
-            }
         }
+        .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "按文件名、操作类型或错误信息搜索")
         .navigationTitle("任务详情")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .confirmationDialog("确认撤销本次任务的全部已执行操作？", isPresented: $showRollbackConfirm, titleVisibility: .visible) {
             Button("确认逆序撤销", role: .destructive) {
                 Task { await runRollback() }

@@ -46,7 +46,6 @@ public struct TaskItemsView: View {
         let activeSelection = selectedFailedIds.intersection(failedSet)
 
         VStack(spacing: 0) {
-            InlineSearchBar(text: $query, prompt: "搜索文件名")
             Picker("状态筛选", selection: $filter) {
                 ForEach(Filter.allCases) { f in Text(f.rawValue).tag(f) }
             }
@@ -137,8 +136,9 @@ public struct TaskItemsView: View {
                 }
             }
         }
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "搜索文件名")
         .navigationTitle("任务操作明细")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .onAppear {
             if selectedFailedIds.isEmpty {
                 selectedFailedIds = failedSet

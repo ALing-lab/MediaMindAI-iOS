@@ -182,43 +182,6 @@ extension MMTheme {
     }
 }
 
-/// 独立内联搜索栏：用于从大标题页推入的二级页面，彻底规避 iOS 17/18 `.searchable` 在推入动画中与首行重影淡出的系统 Bug。
-public struct InlineSearchBar: View {
-    @Binding public var text: String
-    public let prompt: String
-
-    public init(text: Binding<String>, prompt: String) {
-        self._text = text
-        self.prompt = prompt
-    }
-
-    public var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField(prompt, text: $text)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
-    }
-}
-
 /// 统一顶部柔和品牌光晕（用于云盘 / 预览 / 任务 / 设置四大主页面）。
 public struct TopAmbientGlow: View {
     public init() {}

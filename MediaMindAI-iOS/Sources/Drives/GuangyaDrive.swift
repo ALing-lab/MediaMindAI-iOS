@@ -29,11 +29,13 @@ public struct GySmsChallenge: Sendable, Equatable {
     public let verificationId: String
     public let deviceId: String
     public let captchaToken: String
+    public let phone: String
 
-    public init(verificationId: String, deviceId: String, captchaToken: String = "") {
+    public init(verificationId: String, deviceId: String, captchaToken: String = "", phone: String = "") {
         self.verificationId = verificationId
         self.deviceId = deviceId
         self.captchaToken = captchaToken
+        self.phone = phone
     }
 }
 
@@ -407,7 +409,7 @@ public actor GuangyaDrive: CloudDrive {
         guard let vid = obj["verification_id"] as? String, !vid.isEmpty else {
             throw DriveError.api(code: -1, message: "光鸭未返回 verification_id：\(accountErrorDesc(obj, fallback: "请重试"))")
         }
-        return GySmsChallenge(verificationId: vid, deviceId: deviceId, captchaToken: token)
+        return GySmsChallenge(verificationId: vid, deviceId: deviceId, captchaToken: token, phone: phone)
     }
 
     /// 原生短信登录第二步：校验短信验证码并换取 `access_token` / `refresh_token`。
@@ -443,35 +445,62 @@ public actor GuangyaDrive: CloudDrive {
             guard let vToken = vObj["verification_token"] as? String, !vToken.isEmpty else {
                 throw DriveError.api(code: -1, message: "验证码校验未返回 verification_token")
             }
-            // 为 POST:/v1/auth/signin 单独申请新的无感 captcha_token（绝不复用发码阶段带 meta.phone_number 的旧 token）
-            var signinCaptcha = ""
-            let signinInitBody: [String: Any] = [
-                "client_id": clientId,
-                "action": "POST:/v1/auth/signin",
-                "device_id": challenge.deviceId,
-                "meta": [String: Any](),
-            ]
-            if let (iCode, iObj) = try? await postAccountJson(
-                url: "\(trimmedBase)/v1/shield/captcha/init",
-                body: signinInitBody,
-                deviceId: challenge.deviceId,
-                session: session
-            ), (200...299).contains(iCode), let iObj,
-               let ct = iObj["captcha_token"] as? String, !ct.isEmpty {
-                signinCaptcha = ct
-            }
-            var signBody: [String: Any] = [
+            // 步骤 1：优先不带发码旧 captcha_token 直接用 verification_token 换取登录凭据
+            let plainSignBody: [String: Any] = [
                 "client_id": clientId,
                 "verification_token": vToken,
             ]
-            if !signinCaptcha.isEmpty { signBody["captcha_token"] = signinCaptcha }
-            let (sCode, sObj) = try await postAccountJson(
+            var (sCode, sObj) = try await postAccountJson(
                 url: "\(trimmedBase)/v1/auth/signin",
-                body: signBody,
+                body: plainSignBody,
                 deviceId: challenge.deviceId,
-                captchaToken: signinCaptcha,
+                captchaToken: "",
                 session: session
             )
+
+            // 步骤 2：若服务端要求 /v1/auth/signin 必须携带 captcha_token，按 meta.username 精确对齐重试
+            if !(200...299).contains(sCode) {
+                let firstErr = accountErrorDesc(sObj, fallback: "").lowercased()
+                if firstErr.contains("captcha") || firstErr.contains("username") || sCode == 400 {
+                    let metaCandidates: [([String: Any], String?)] = challenge.phone.isEmpty
+                        ? [(["username": ""], nil)]
+                        : [(["username": challenge.phone], challenge.phone), (["username": ""], nil)]
+
+                    for (metaDict, bodyUsername) in metaCandidates {
+                        let initBody: [String: Any] = [
+                            "client_id": clientId,
+                            "action": "POST:/v1/auth/signin",
+                            "device_id": challenge.deviceId,
+                            "meta": metaDict,
+                        ]
+                        guard let (iCode, iObj) = try? await postAccountJson(
+                            url: "\(trimmedBase)/v1/shield/captcha/init",
+                            body: initBody,
+                            deviceId: challenge.deviceId,
+                            session: session
+                        ), (200...299).contains(iCode), let iObj,
+                           let ct = iObj["captcha_token"] as? String, !ct.isEmpty else {
+                            continue
+                        }
+                        var retryBody: [String: Any] = [
+                            "client_id": clientId,
+                            "verification_token": vToken,
+                            "captcha_token": ct,
+                        ]
+                        if let u = bodyUsername { retryBody["username"] = u }
+                        let (rCode, rObj) = try await postAccountJson(
+                            url: "\(trimmedBase)/v1/auth/signin",
+                            body: retryBody,
+                            deviceId: challenge.deviceId,
+                            captchaToken: ct,
+                            session: session
+                        )
+                        sCode = rCode
+                        sObj = rObj
+                        if (200...299).contains(sCode) { break }
+                    }
+                }
+            }
             guard (200...299).contains(sCode), let sObj else {
                 throw DriveError.api(code: sCode, message: "光鸭登录失败：\(accountErrorDesc(sObj, fallback: "HTTP \(sCode)"))")
             }
