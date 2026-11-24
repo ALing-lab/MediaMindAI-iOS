@@ -200,7 +200,7 @@ public enum AccountBinding {
 
     public static func stamp(account: DriveAccount, secret: String) -> String {
         var parts: [String] = [account.id, account.provider.rawValue]
-        for key in account.extra.keys.sorted() {
+        for key in account.extra.keys.sorted() where key != "customLabel" {
             parts.append(key)
             parts.append(account.extra[key] ?? "")
         }

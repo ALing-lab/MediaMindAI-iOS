@@ -628,7 +628,7 @@ private final class WebDavMultistatusParser: NSObject, XMLParserDelegate {
                 case "propstat":
                     inPropstat = false
                     let st = psStatus.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if st.isEmpty || st.contains(" 2") {
+                    if st.isEmpty || is2xxStatus(st) {
                         respHasGoodProps = true
                         if psIsDir { respIsDir = true }
                         if let s = psSize { respSize = s }

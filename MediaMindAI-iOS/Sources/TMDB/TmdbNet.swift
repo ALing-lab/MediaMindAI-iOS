@@ -342,7 +342,7 @@ public actor TmdbNet {
                 }
                 let rawType = httpResp?.value(forHTTPHeaderField: "Content-Type") ?? ""
                 let mime = rawType.split(separator: ";", maxSplits: 1).first.map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? ""
-                let isImg = mime.hasPrefix("image/") || Self.looksLikeImage(data)
+                let isImg = Self.looksLikeImage(data)
                 if (200...299).contains(code) && !data.isEmpty && isImg {
                     if let matchedBase = baseOf(config: c, url: url) {
                         preferredImageBase = matchedBase
@@ -449,7 +449,7 @@ public actor TmdbImageLoader {
         let task = Task<Data?, Never> {
             do {
                 try Task.checkCancellation()
-                let bytes = try await TmdbNet.shared.downloadImageWithFallback(urlStr: clean, config: cfg)
+                let bytes = try await TmdbNet.shared.downloadImageWithFallback(urlStr: clean, config: cfg, bypassCache: bypassCache)
                 try Task.checkCancellation()
                 guard TmdbNet.looksLikeImage(bytes) else { return nil }
                 await self.store(data: bytes, for: clean)

@@ -190,8 +190,16 @@ public enum ScannerReplan {
 
         // 规划用条目：去掉过期产物；改成电影时把 Season 目录内的视频/字幕纳入改名
         var planItems = items.filter { !staleNames.contains($0.fileName.lowercased()) && !(toMovie && seasonDirIds.contains($0.fileId)) }
-        for (_, kids) in seasonKids {
-            planItems.append(contentsOf: kids.filter { !$0.isDir && (ScannerTreeEngine.isVideo($0) || ScannerTreeEngine.isSub($0)) })
+        for (sd, kids) in seasonKids {
+            let fixedKids = kids
+                .filter { !$0.isDir && (ScannerTreeEngine.isVideo($0) || ScannerTreeEngine.isSub($0)) }
+                .map { k in
+                    k.parentFileId != nil ? k : CloudEntry(
+                        fileId: k.fileId, fileName: k.fileName, isDir: k.isDir, size: k.size,
+                        parentFileId: sd.fileId, etag: k.etag, contentHash: k.contentHash, hashAlgorithm: k.hashAlgorithm
+                    )
+                }
+            planItems.append(contentsOf: fixedKids)
         }
 
         var actions: [PlanAction] = []

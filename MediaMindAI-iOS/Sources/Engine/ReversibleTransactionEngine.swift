@@ -715,6 +715,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
                 throw DriveError.invalidInput("原位置已被其他对象占用")
             }
             wal.change(row, state: "undo_prepared")
+            if let err = wal.lastStorageError { throw DriveError.invalidInput(err) }
             let restored = try await drive.move(fileId: after.id, destParentId: before.parent)
             RetentionZoneEngine.shared.markRestored(taskId: taskId, actionId: row.actionId)
             wal.reverted(row, undoResult: after.with(id: restored, parent: before.parent, name: before.name))
@@ -907,6 +908,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
                 }
 
                 wal.change(row, state: "undo_prepared")
+            if let err = wal.lastStorageError { throw DriveError.invalidInput(err) }
                 let restored: String
                 switch row.operation {
                 case "rename":

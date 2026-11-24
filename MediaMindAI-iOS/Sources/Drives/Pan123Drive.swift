@@ -341,6 +341,8 @@ public final class Pan123Drive: CloudDrive, @unchecked Sendable {
             }
         }
         if !res.ok && fid == nil {
+            if res.code == 401 { throw DriveError.unauthorized("123 登录凭据已失效：\(res.errText)") }
+            if res.code == 429 { throw DriveError.rateLimited(code: 429, message: "123 新建文件夹限流：\(res.errText)") }
             throw DriveError.api(code: res.code, message: "123 新建文件夹失败：\(res.errText)")
         }
         guard let createdId = fid else {

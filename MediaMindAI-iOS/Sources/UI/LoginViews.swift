@@ -153,6 +153,7 @@ public struct GuangyaLoginView: View {
         .task(id: countdown) {
             guard countdown > 0 else { return }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
             if countdown > 0 { countdown -= 1 }
         }
     }

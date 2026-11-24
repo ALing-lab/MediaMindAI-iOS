@@ -174,7 +174,10 @@ public final class AppSettings: @unchecked Sendable {
 
     private func syncTmdbNet() {
         let cfg = tmdbNetConfig
-        Task { await TmdbNet.shared.apply(cfg) }
+        Task {
+            await TmdbNet.shared.apply(cfg)
+            await TmdbClient.shared.resetFailures()
+        }
     }
 
     // AI 智能识别（1:1 对标 Android AiRecognizerConfig）

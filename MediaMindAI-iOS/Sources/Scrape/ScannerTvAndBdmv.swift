@@ -500,7 +500,8 @@ public enum ScannerTvAndBdmv {
         } else if strategy != .original {
             let counts = await tmdb.seasonCounts(showId: show.id)
             let original = vids.map { EpisodeMapping.EpisodeKey(season: $0.season, episode: $0.episode) }
-            if let mapped = try? EpisodeStrategyMapper.map(strategy: strategy, episodes: original, seasonCounts: counts) {
+            do {
+                let mapped = try EpisodeStrategyMapper.map(strategy: strategy, episodes: original, seasonCounts: counts)
                 let metadata: [EpisodeMapping.EpisodeKey]
                 switch strategy {
                 case .merge:
@@ -516,8 +517,8 @@ public enum ScannerTvAndBdmv {
                     vids[i].metadataSeason = metadata[i].season
                     vids[i].metadataEpisode = metadata[i].episode
                 }
-            } else {
-                flags.append("剧集「\(folder.fileName)」TMDB 季集信息不完整，已保持原集序策略")
+            } catch {
+                flags.append("剧集「\(folder.fileName)」\(error.localizedDescription)，已保持原集序策略")
             }
         }
 

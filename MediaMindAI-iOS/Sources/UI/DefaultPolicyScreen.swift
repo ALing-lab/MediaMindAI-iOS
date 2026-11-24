@@ -240,8 +240,10 @@ public struct DefaultPolicyScreen: View {
                     accountId: acct.id,
                     sourceId: nil
                 ) { folderId, displayPath in
-                    policiesBinding.wrappedValue.adaptiveTargetDirId = folderId
-                    policiesBinding.wrappedValue.adaptiveTargetDirPath = displayPath
+                    var next = policiesBinding.wrappedValue
+                    next.adaptiveTargetDirId = folderId
+                    next.adaptiveTargetDirPath = displayPath
+                    policiesBinding.wrappedValue = next
                 }
             }
         }
@@ -407,8 +409,10 @@ public struct DefaultPolicyScreen: View {
 
                 if !currentPolicies.adaptiveTargetDirId.isEmpty {
                     Button("清除已选目标目录", role: .destructive) {
-                        policiesBinding.wrappedValue.adaptiveTargetDirId = ""
-                        policiesBinding.wrappedValue.adaptiveTargetDirPath = ""
+                        var next = policiesBinding.wrappedValue
+                        next.adaptiveTargetDirId = ""
+                        next.adaptiveTargetDirPath = ""
+                        policiesBinding.wrappedValue = next
                     }
                 }
             }
@@ -859,8 +863,10 @@ public struct LibraryDestinationSheet: View {
             folders = list.filter { $0.isDir && $0.fileId != sourceId }
             loading = false
         } catch is CancellationError {
+            if epoch == loadEpoch { loading = false }
             return
         } catch let urlErr as URLError where urlErr.code == .cancelled {
+            if epoch == loadEpoch { loading = false }
             return
         } catch {
             guard epoch == loadEpoch else { return }

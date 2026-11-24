@@ -108,10 +108,10 @@ public enum JournalReconciler {
 
             // 1. 撤销中断核实（M-6：undo_prepared 逆向判定）
             if row.status == .undoPrepared {
-                if hasBefore && exactBefore != nil && exactAfter == nil {
+                if (hasBefore && exactBefore != nil && exactAfter == nil) || (!hasBefore && exactAfter == nil) {
                     await MainActor.run { store.markStatus(rowId: row.id, status: .undone, error: nil) }
                     reverted += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.op, outcome: "reverted", detail: "已确认撤销生效：对象已回到原位置"))
+                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.op, outcome: "reverted", detail: hasBefore ? "已确认撤销生效：对象已回到原位置" : "已确认新建对象已撤销移除"))
                 } else if exactAfter != nil && exactBefore == nil {
                     await MainActor.run { store.markApplied(rowId: row.id, createdId: exactAfter?.fileId) }
                     applied += 1
@@ -210,6 +210,10 @@ public enum JournalReconciler {
                     }
                     reverted += 1
                     entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认撤销已生效"))
+                } else if row.before == nil, afterMatches.isEmpty {
+                    wal.reverted(row, undoResult: nil)
+                    reverted += 1
+                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认新建对象已撤销移除"))
                 } else if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
                     wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
                     applied += 1

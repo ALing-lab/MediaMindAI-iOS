@@ -546,7 +546,7 @@ public actor TmdbClient {
             if cjkBest >= 85.0 {
                 score += 35.0
             } else if !rawNames.contains(where: { Self.hasCjk($0) }) {
-                score -= 35.0
+                score -= 20.0
             }
         }
         let ry = String(((item["release_date"] as? String) ?? "").prefix(4))
@@ -600,7 +600,7 @@ public actor TmdbClient {
             if cjkBest >= 85.0 {
                 score += 35.0
             } else if !rawNames.contains(where: { Self.hasCjk($0) }) {
-                score -= 35.0
+                score -= 20.0
             }
         }
         let fy = String(((item["first_air_date"] as? String) ?? "").prefix(4))
@@ -816,6 +816,8 @@ public actor TmdbClient {
     public func zhTitle(kind: String, id: Int, title: String) async -> String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return title }
+        let lang = AppSettings.shared.tmdbLanguage.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard lang.isEmpty || lang.hasPrefix("zh") else { return trimmed }
         if Self.cjkRegex.firstMatch(in: trimmed, range: NSRange(location: 0, length: (trimmed as NSString).length)) != nil {
             return trimmed
         }
@@ -962,7 +964,7 @@ public actor TmdbClient {
     }
 
     public func collectionParts(collectionId: Int) async -> [MatchInfo] {
-        guard let data = await get(path: "/collection/\(collectionId)", query: ["language": "zh-CN"]),
+        guard let data = await get(path: "/collection/\(collectionId)", query: [:]),
               let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let parts = obj["parts"] as? [[String: Any]] else {
             return []
@@ -1016,7 +1018,7 @@ public actor TmdbClient {
     }
 
     public func tvSeasonCounts(id: Int) async -> [Int: Int] {
-        guard let data = await get(path: "/tv/\(id)", query: ["language": "zh-CN"]),
+        guard let data = await get(path: "/tv/\(id)", query: [:]),
               let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let seasons = obj["seasons"] as? [[String: Any]] else {
             return [:]
@@ -1031,7 +1033,7 @@ public actor TmdbClient {
     }
 
     public func tvEpisodeGroups(tvId: Int) async -> [TmdbEpisodeGroupSummary] {
-        guard let data = await get(path: "/tv/\(tvId)/episode_groups", query: ["language": "zh-CN"]),
+        guard let data = await get(path: "/tv/\(tvId)/episode_groups", query: [:]),
               let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let results = obj["results"] as? [[String: Any]] else {
             return []
@@ -1049,7 +1051,7 @@ public actor TmdbClient {
     }
 
     public func tvEpisodeGroupDetails(groupId: String) async -> [[EpisodeMapping.EpisodeKey]] {
-        guard let data = await get(path: "/tv/episode_group/\(groupId)", query: ["language": "zh-CN"]),
+        guard let data = await get(path: "/tv/episode_group/\(groupId)", query: [:]),
               let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let groups = obj["groups"] as? [[String: Any]] else {
             return []

@@ -74,7 +74,7 @@ public actor AdaptiveConcurrencyGate {
         active = max(0, active - 1)
     }
 
-    nonisolated public func withPermit<T>(skipBackoff: Bool = false, _ op: () async throws -> T) async throws -> T {
+    nonisolated public func withPermit<T>(isolation: isolated (any Actor)? = #isolation, skipBackoff: Bool = false, _ op: () async throws -> T) async throws -> T {
         try await acquire(skipBackoff: skipBackoff)
         do {
             let result = try await op()
@@ -526,7 +526,7 @@ public final class ExecutionEngine {
                     } else if drive.kind.idsArePaths {
                         resolvedParent = DrivePaths.parentOf(fid)
                     } else {
-                        resolvedParent = try? await drive.parentIdOf(fileId: fid)
+                        resolvedParent = try await drive.parentIdOf(fileId: fid)
                     }
                     guard let safeParent = resolvedParent else {
                         throw DriveError.invalidInput("缺少原父目录，无法记录可撤销重命名操作")
@@ -558,7 +558,7 @@ public final class ExecutionEngine {
                     } else if drive.kind.idsArePaths {
                         resolvedMoveParent = DrivePaths.parentOf(fid)
                     } else {
-                        resolvedMoveParent = try? await drive.parentIdOf(fileId: fid)
+                        resolvedMoveParent = try await drive.parentIdOf(fileId: fid)
                     }
                     // 重复保留区移入前强复核：必须重新列目录确认 size > 0 且具备强格式内容哈希
                     if act.kind == DuplicateRetentionPlanner.kindRetentionDuplicate {
@@ -620,10 +620,11 @@ public final class ExecutionEngine {
                     let title = grp?.kind == "collection" ? (act.destLabel ?? "电影") : ((grp?.title.isEmpty == false ? grp?.title : nil) ?? "影视作品")
                     let root = grp?.kind == "collection" ? dest : (grp?.folderId.map { idRemap.resolveOrSelf($0) } ?? dest)
                     let yrPart = (grp?.year.isEmpty == false) ? " (\(grp!.year))" : ""
+                    let tid = act.tmdbId ?? grp?.tmdbId
                     let scope = AssetBackupScope(
                         rootId: root,
-                        workKey: "\(kind):\(act.tmdbId ?? grp?.tmdbId ?? 0)",
-                        workLabel: "\(String(title.prefix(48)))\(yrPart) [\(kind)-tmdb-\(act.tmdbId ?? grp?.tmdbId ?? 0)]",
+                        workKey: tid.map { "\(kind):\($0)" } ?? "\(kind):\(act.groupId)",
+                        workLabel: "\(String(title.prefix(48)))\(yrPart) [\(kind)-tmdb-\(tid ?? 0)]",
                         locationLabel: dest == root ? "根目录" : (act.destLabel ?? (act.season.map { String(format: "Season %02d", $0) } ?? "子目录-\(String(dest.suffix(8)))"))
                     )
                     let created = try await tx.upload(
@@ -658,7 +659,7 @@ public final class ExecutionEngine {
                     } else if drive.kind.idsArePaths {
                         resolvedDelParent = DrivePaths.parentOf(fid)
                     } else {
-                        resolvedDelParent = try? await drive.parentIdOf(fileId: fid)
+                        resolvedDelParent = try await drive.parentIdOf(fileId: fid)
                     }
                     guard let safeParent = resolvedDelParent else {
                         throw DriveError.invalidInput("缺少原父目录，无法移入可恢复暂存目录")
@@ -873,7 +874,7 @@ public final class ExecutionEngine {
                                     resolvedParent = idRemap.resolveOrSelf(rawParent)
                                 } else if drive.kind.idsArePaths {
                                     resolvedParent = DrivePaths.parentOf(resolvedFid)
-                                } else if let p = try? await drive.parentIdOf(fileId: resolvedFid) {
+                                } else if let p = try await drive.parentIdOf(fileId: resolvedFid) {
                                     resolvedParent = p
                                 } else {
                                     throw DriveError.invalidInput("缺少原父目录，无法记录批量移动操作")
@@ -1170,7 +1171,7 @@ public final class ExecutionEngine {
             } else if drive.kind.idsArePaths {
                 resolvedParent = DrivePaths.parentOf(fid)
             } else {
-                resolvedParent = try? await drive.parentIdOf(fileId: fid)
+                resolvedParent = try await drive.parentIdOf(fileId: fid)
             }
             guard let safeParent = resolvedParent else {
                 throw DriveError.invalidInput("缺少原父目录，无法记录可撤销重命名操作")
@@ -1192,7 +1193,7 @@ public final class ExecutionEngine {
             } else if drive.kind.idsArePaths {
                 resolvedMoveParent = DrivePaths.parentOf(fid)
             } else {
-                resolvedMoveParent = try? await drive.parentIdOf(fileId: fid)
+                resolvedMoveParent = try await drive.parentIdOf(fileId: fid)
             }
             guard let safeParent = resolvedMoveParent else {
                 throw DriveError.invalidInput("缺少原父目录，无法记录可撤销移动操作")
@@ -1217,10 +1218,11 @@ public final class ExecutionEngine {
             let title = grp?.kind == "collection" ? (act.destLabel ?? "电影") : ((grp?.title.isEmpty == false ? grp?.title : nil) ?? "影视作品")
             let root = grp?.kind == "collection" ? dest : (grp?.folderId.map { idRemap.resolveOrSelf($0) } ?? dest)
             let yrPart = (grp?.year.isEmpty == false) ? " (\(grp!.year))" : ""
+            let tid = act.tmdbId ?? grp?.tmdbId
             let scope = AssetBackupScope(
                 rootId: root,
-                workKey: "\(kind):\(act.tmdbId ?? grp?.tmdbId ?? 0)",
-                workLabel: "\(String(title.prefix(48)))\(yrPart) [\(kind)-tmdb-\(act.tmdbId ?? grp?.tmdbId ?? 0)]",
+                workKey: tid.map { "\(kind):\($0)" } ?? "\(kind):\(act.groupId)",
+                workLabel: "\(String(title.prefix(48)))\(yrPart) [\(kind)-tmdb-\(tid ?? 0)]",
                 locationLabel: dest == root ? "根目录" : (act.destLabel ?? (act.season.map { String(format: "Season %02d", $0) } ?? "子目录-\(String(dest.suffix(8)))"))
             )
             let created = try await tx.upload(

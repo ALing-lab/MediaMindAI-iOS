@@ -471,10 +471,20 @@ public enum PolicyResolver {
             }()
             out.groups[gIdx].folderNewName = (eff.organizeEnabled && eff.renameFolders && targetFolder != group.folderName) ? targetFolder : nil
 
+            let hasCollectionMkdir = isCollection && out.actions.contains(where: {
+                $0.groupId == group.id && $0.op == "mkdir" && $0.mediaKind == "collection"
+            })
+            var disabledMkdirIds: [String] = []
             for aIdx in out.actions.indices where out.actions[aIdx].groupId == group.id && !out.actions[aIdx].done {
                 let act = out.actions[aIdx]
-                if act.op == "rename" && act.kind == "folder" {
-                    if !isCollection || act.fileId == group.folderId {
+                if isCollection && hasCollectionMkdir && act.op == "mkdir" && act.mediaKind == "collection" {
+                    out.actions[aIdx].newName = targetFolder
+                    let enableFolder = eff.organizeEnabled && eff.renameFolders
+                    out.actions[aIdx].enabled = enableFolder
+                    out.actions[aIdx].selected = enableFolder
+                    if !enableFolder { disabledMkdirIds.append(act.id) }
+                } else if act.op == "rename" && act.kind == "folder" {
+                    if act.fileId == group.folderId && act.season == nil && (!isCollection || !hasCollectionMkdir) {
                         out.actions[aIdx].newName = targetFolder
                     }
                     let enableFolder = eff.organizeEnabled && eff.renameFolders
@@ -538,6 +548,9 @@ public enum PolicyResolver {
                     out.actions[aIdx].enabled = enableArt
                     out.actions[aIdx].selected = enableArt
                 }
+            }
+            if !disabledMkdirIds.isEmpty {
+                out = PlanSelection.setEnabled(plan: out, ids: disabledMkdirIds, enabled: false)
             }
         }
         return out

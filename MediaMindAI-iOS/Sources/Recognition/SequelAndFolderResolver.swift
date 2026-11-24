@@ -96,7 +96,7 @@ public enum SequelDisambiguator {
             if cjkBest >= 85 {
                 score += 30
             } else if !candNames.contains(where: { TmdbClient.hasCjk($0) }) {
-                score -= 30
+                score -= 18
             }
         }
         let qSeq = extractSequelNumber(query)

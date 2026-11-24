@@ -474,7 +474,7 @@ public actor AiRecognizerClient {
             let safeMsg = NetLog.redactSecrets(error.localizedDescription)
             let shouldTrip: Bool
             if case let DriveError.api(code, _) = error {
-                shouldTrip = (code == 401 || code == 403 || code == 429 || code == 451 || (500...599).contains(code))
+                shouldTrip = (code == 401 || code == 402 || code == 403 || code == 429 || code == 451 || (500...599).contains(code))
             } else {
                 shouldTrip = true
             }

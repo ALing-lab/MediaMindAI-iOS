@@ -856,32 +856,38 @@ public struct MediaDetailView: View {
 
         if eff.scrapeEnabled && eff.downloadClearlogo && fetchedClearlogoPath == nil {
             let kind = g.kind == "tv" ? "tv" : "movie"
-            fetchedClearlogoPath = await TmdbClient.shared.clearlogoPath(kind: kind, id: tid)
+            let logo = await TmdbClient.shared.clearlogoPath(kind: kind, id: tid)
+            guard !Task.isCancelled else { return }
+            fetchedClearlogoPath = logo
         }
 
         if eff.scrapeEnabled && eff.downloadFanart && fetchedBackdropPath == nil {
-            if g.kind == "tv" {
-                fetchedBackdropPath = await TmdbClient.shared.tvDetails(id: tid)?.backdropPath
-            } else {
-                fetchedBackdropPath = await TmdbClient.shared.movieDetails(id: tid)?.backdropPath
-            }
+            let bp = g.kind == "tv"
+                ? await TmdbClient.shared.tvDetails(id: tid)?.backdropPath
+                : await TmdbClient.shared.movieDetails(id: tid)?.backdropPath
+            guard !Task.isCancelled else { return }
+            fetchedBackdropPath = bp
         }
 
         if g.kind == "tv" {
             // 先批量拉取所有季的专属元数据与季海报，避免第 2/3 季海报被第 1 季分集请求阻塞
             for page in pageList {
+                guard !Task.isCancelled else { return }
                 guard let s = page.seasonNumber else { continue }
                 if seasonMetas[s] == nil {
                     if let sm = await TmdbClient.shared.seasonMeta(tvId: tid, season: s) {
+                        guard !Task.isCancelled else { return }
                         seasonMetas[s] = sm
                     }
                 }
             }
             for page in pageList {
                 for ep in page.episodes {
+                    guard !Task.isCancelled else { return }
                     guard let ms = ep.metadataSeason, let me = ep.metadataEpisode, let key = ep.metaLookupKey else { continue }
                     if episodeMetas[key] == nil {
                         if let em = await TmdbClient.shared.episodeFromSeasonBatch(tvId: tid, season: ms, episode: me) {
+                            guard !Task.isCancelled else { return }
                             episodeMetas[key] = em
                         }
                     }
@@ -889,8 +895,10 @@ public struct MediaDetailView: View {
             }
         } else if g.kind == "collection" {
             for page in pageList {
+                guard !Task.isCancelled else { return }
                 guard let mid = page.movieTmdbId, mid > 0, movieMetas[mid] == nil else { continue }
                 if let info = await TmdbClient.shared.movieDetails(id: mid) {
+                    guard !Task.isCancelled else { return }
                     movieMetas[mid] = info
                 }
             }

@@ -60,6 +60,9 @@ public enum SeriesMerger {
             guard parents.count == 1, let sharedParent = parents.first else { continue }
             let colName = list.compactMap(\.collectionName).first ?? list[0].title
             let colFolderName = MediaParser.buildCollectionName(name: colName, collectionId: cid, appendTag: appendTag)
+            if out.actions.contains(where: { $0.op == "mkdir" && $0.mediaKind == "collection" && $0.tmdbId == cid && $0.parentId == sharedParent }) {
+                continue
+            }
             let mkId = "mkcol-\(UUID().uuidString.prefix(8).lowercased())"
             let primaryGroupId = list[0].id
             out.actions.append(PlanAction(
@@ -137,6 +140,8 @@ public enum SeriesMerger {
                 let dupArtNames: Set<String> = ["tvshow.nfo", "poster.jpg", "fanart.jpg", "backdrop.jpg", "clearlogo.png"]
                 for act in plan.actions where act.groupId == extra.id {
                     if let fid = extra.folderId, act.op == "rename", act.kind == "folder", act.fileId == fid {
+                        droppedDuplicateFolderRenameIds.insert(act.id)
+                    } else if act.kind == AdaptiveDirectoryPlanner.kindAdaptiveMove {
                         droppedDuplicateFolderRenameIds.insert(act.id)
                     } else if act.op == "artwork", dupArtNames.contains(act.newName.lowercased()) {
                         droppedDuplicateFolderRenameIds.insert(act.id)

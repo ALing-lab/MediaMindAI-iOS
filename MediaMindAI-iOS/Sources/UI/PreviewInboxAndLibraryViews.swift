@@ -186,7 +186,8 @@ public struct FilmLibraryView: View {
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 64)
                 }
             }
         }

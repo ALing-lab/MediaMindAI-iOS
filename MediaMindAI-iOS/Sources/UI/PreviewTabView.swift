@@ -18,6 +18,7 @@ public struct PreviewTabView: View {
     @State private var rematchError: String?
     @State private var editingStrategyGroup: PlanGroup?
     @State private var strategyEpisodeGroups: [TmdbEpisodeGroupSummary] = []
+    @State private var strategyLoadEpoch = 0
     @State private var strategyApplying = false
     @State private var strategyError: String?
     @State private var showTaskPolicySheet = false
@@ -157,23 +158,32 @@ public struct PreviewTabView: View {
                                                                 planId: plan.id,
                                                                 groupId: group.id,
                                                                 onRematch: {
-                                                                    rematchTargets = [group]
+                                                                    let latest = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
+                                                                    rematchTargets = [latest]
                                                                     rematchSeasonFilter = nil
                                                                     showRematchSheet = true
                                                                 },
                                                                 onEditPolicy: {
-                                                                    editingFilmPolicyGroup = group
+                                                                    editingFilmPolicyGroup = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
                                                                 },
                                                                 onEditAssets: {
-                                                                    editingAssetsGroup = group
+                                                                    editingAssetsGroup = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
                                                                 },
                                                                 onEditEpisodeStrategy: group.kind == "tv" ? {
+                                                                    let latest = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
                                                                     strategyError = nil
                                                                     strategyEpisodeGroups = []
-                                                                    editingStrategyGroup = group
-                                                                    if let tid = group.tmdbId {
+                                                                    editingStrategyGroup = latest
+                                                                    if let tid = latest.tmdbId {
+                                                                        strategyLoadEpoch += 1
+                                                                        let epoch = strategyLoadEpoch
+                                                                        let targetGid = group.id
                                                                         Task {
-                                                                            strategyEpisodeGroups = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
+                                                                            let loaded = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
+                                                                            await MainActor.run {
+                                                                                guard strategyLoadEpoch == epoch, editingStrategyGroup?.id == targetGid else { return }
+                                                                                strategyEpisodeGroups = loaded
+                                                                            }
                                                                         }
                                                                     }
                                                                 } : nil
@@ -216,29 +226,47 @@ public struct PreviewTabView: View {
                             .padding()
                             .background(.bar)
                         } else if !manualTab {
-                            HStack {
+                            HStack(spacing: 12) {
                                 Button {
                                     showTaskPolicySheet = true
                                 } label: {
-                                    Label("设置", systemImage: "slider.horizontal.3")
-                                        .font(.subheadline.weight(.medium))
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "slider.horizontal.3")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(MMTheme.accent)
+                                        Text("任务策略")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(Color(.label))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 46)
+                                    .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+                                    .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
                                 }
-                                .buttonStyle(.bordered)
-                                Spacer()
+                                .buttonStyle(.plain)
+
                                 if selectedCount > 0 {
                                     Button {
                                         execute(plan: plan)
                                     } label: {
-                                        Text(ExecutionEngine.shared.isRunning ? "加入队列 (\(selectedCount))" : "立即执行 (\(selectedCount))")
-                                            .fontWeight(.semibold)
-                                            .padding(.horizontal, 18)
-                                            .padding(.vertical, 10)
-                                            .background(MMTheme.accent, in: Capsule())
-                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Image(systemName: ExecutionEngine.shared.isRunning ? "text.badge.plus" : "play.fill")
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(ExecutionEngine.shared.isRunning ? "加入队列" : "立即执行")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 46)
+                                        .background(MMTheme.accent, in: Capsule())
+                                        .foregroundStyle(.white)
+                                        .shadow(color: MMTheme.accent.opacity(0.28), radius: 8, y: 3)
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .padding()
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
                             .background(.bar)
                         }
                     }
@@ -248,12 +276,7 @@ public struct PreviewTabView: View {
                 }
                 }
             }
-            .bottomFloatingSearch(
-                text: $searchQuery,
-                prompt: "搜索片名、文件夹或年份",
-                bottomOffset: activePlan != nil ? 80 : 16,
-                visible: activePlan != nil
-            )
+            // iOS 18+/26+/27 已在底栏平行位置提供原生圆形放大镜搜索 Tab，此处不再重复悬浮遮挡卡片
             .navigationTitle("识别结果")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -571,7 +594,7 @@ public struct PreviewTabView: View {
         if let idx = plan.groups.firstIndex(where: { $0.id == group.id }) {
             plan.groups[idx].episodeStrategy = strategy.rawValue
             plan.groups[idx].episodeGroupId = episodeGroupId
-            plan.groups[idx].episodeGroupName = strategyEpisodeGroups.first(where: { $0.id == episodeGroupId })?.name
+            plan.groups[idx].episodeGroupName = strategyEpisodeGroups.first(where: { $0.id == episodeGroupId })?.name ?? (episodeGroupId == group.episodeGroupId ? group.episodeGroupName : nil)
         }
         let info = MatchInfo(
             kind: "tv",
@@ -766,7 +789,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
         }
 
         let customDestParent: String? = actions.first(where: {
-            ($0.op == "move" || $0.op == "mkdir") && ($0.destLabel ?? "").isEmpty == false
+            $0.op == "move" && $0.kind == "folder" && $0.fileId == group.folderId && ($0.destLabel ?? "").isEmpty == false
         })?.destLabel
         let dstParent: String = {
             if let dp = customDestParent, !dp.isEmpty {
@@ -1150,7 +1173,6 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                 }
             }
             .clipped()
-            .animation(.snappy(duration: 0.26), value: expanded)
         }
         .padding(.vertical, 2)
         .task(id: group.tmdbId) {
@@ -1158,7 +1180,9 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                 tmdbTotalCounts = nil
                 return
             }
-            tmdbTotalCounts = await TmdbClient.shared.tvSeasonEpisodeCounts(id: tid)
+            let counts = await TmdbClient.shared.tvSeasonEpisodeCounts(id: tid)
+            guard !Task.isCancelled else { return }
+            tmdbTotalCounts = counts
         }
     }
 

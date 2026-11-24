@@ -429,7 +429,7 @@ public final class RetentionZoneEngine: @unchecked Sendable {
             PlanAndTaskStore.shared.tasks.map { ($0.id, $0.status) },
             uniquingKeysWith: { first, _ in first }
         )
-        let pendingRowStates: Set<String> = ["prepared", "applied", "uncertain", "undo_prepared", "conflict"]
+        let pendingRowStates: Set<String> = ["prepared", "uncertain", "undo_prepared", "conflict"]
         let blockingControlStates: Set<String> = ["requested", "undoing", "conflict", "needs_backup_choice"]
         let openControls = Set(TaskCancellation.shared.controls.values.filter { blockingControlStates.contains($0.state) }.map(\.taskId))
         var out = Set<String>()

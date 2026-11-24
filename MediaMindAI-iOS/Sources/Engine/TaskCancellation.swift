@@ -153,6 +153,9 @@ public final class TaskCancellation: @unchecked Sendable {
                     substitutionActions: subs,
                     acceptedSubstitutions: Set(control.acceptedSubstitutions)
                 )
+                for jRow in OperationJournal.shared.rows(forRunId: control.taskId) where jRow.status == .applied {
+                    OperationJournal.shared.markStatus(rowId: jRow.id, status: .undone)
+                }
                 next.state = "completed"
                 next.missingBackupIds = []
                 syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "任务已停止并撤销已完成操作")

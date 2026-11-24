@@ -218,6 +218,8 @@ public final class LibraryScanRunner {
 
     public var isRunning: Bool { currentTask != nil }
 
+    private var activeToken = UUID()
+
     public func start(
         roots: [PlanRoot],
         drive: any CloudDrive,
@@ -226,8 +228,16 @@ public final class LibraryScanRunner {
         onProgress: Scanner.ProgressHandler? = nil
     ) -> Task<ScrapePlan, Error> {
         currentTask?.cancel()
+        let runToken = UUID()
+        activeToken = runToken
         let t = Task {
-            defer { Task { @MainActor in self.currentTask = nil } }
+            defer {
+                Task { @MainActor in
+                    if self.activeToken == runToken {
+                        self.currentTask = nil
+                    }
+                }
+            }
             return try await Scanner.scan(
                 roots: roots,
                 drive: drive,

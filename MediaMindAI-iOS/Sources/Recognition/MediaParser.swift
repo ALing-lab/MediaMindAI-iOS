@@ -211,7 +211,7 @@ public enum MediaParser {
             season = s; episode = e
         } else if let m = matchGroups(#"第\s*(\d{1,4})\s*[集话話期]"#, in: text) {
             episode = Int(m[1])
-        } else if let cnEp = firstMatch(#"第\s*([一二两三四五六七八九十百]+)\s*[集话話期]"#, in: text, group: 1),
+        } else if let cnEp = firstMatch(#"第\s*([零一二两三四五六七八九十百]+)\s*[集话話期]"#, in: text, group: 1),
                   let parsedEp = parseChineseCardinal(cnEp) {
             episode = parsedEp
         } else if let m = matchGroups(#"(?i)(?<![a-z0-9])EP?\.?\s*(\d{1,4})\b"#, in: text),
