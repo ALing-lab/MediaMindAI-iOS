@@ -1,0 +1,48 @@
+name: MediaMindAI
+options:
+  bundleIdPrefix: com.tamu
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.5.79"
+    CURRENT_PROJECT_VERSION: "98"
+targets:
+  MediaMindAI:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+      - path: Resources/Assets.xcassets
+      - path: Resources/splash_dark.mp4
+      - path: Resources/splash_light.mp4
+      - path: Resources/licenses
+        type: folder
+    info:
+      path: Resources/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tamu.mediamindai
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: YES
+        GENERATE_INFOPLIST_FILE: NO
+      configs:
+        Debug:
+          ENABLE_TESTABILITY: YES
+  MediaMindCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests/MediaMindCoreTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tamu.mediamindai.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: MediaMindAI

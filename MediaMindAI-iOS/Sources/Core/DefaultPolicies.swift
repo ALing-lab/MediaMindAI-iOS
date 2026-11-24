@@ -1,0 +1,464 @@
+import Foundation
+
+/// 1:1 复刻自 Android `DefaultPolicies.kt` + `NfoFields.kt`：
+/// 完整三级策略覆盖体系（影片/分组级 > 任务/计划级 > 全局默认级）+ 电影/剧集独立命名偏好 + NFO 字段过滤。
+
+public struct MediaDefaults: Codable, Hashable, Sendable {
+    public var nfo: Bool
+    public var poster: Bool
+    public var fanart: Bool
+    public var logo: Bool
+
+    public init(nfo: Bool = true, poster: Bool = true, fanart: Bool = true, logo: Bool = true) {
+        self.nfo = nfo
+        self.poster = poster
+        self.fanart = fanart
+        self.logo = logo
+    }
+}
+
+/// 单类影视（电影 / 剧集）的文件与文件夹命名偏好；默认值严格对齐 Android 定版命名规范。
+public struct MediaNamingPrefs: Codable, Hashable, Sendable {
+    public static let defaultTvQuality = ["HDR", "HDR10", "HDR10+", "HDRVivid", "DV", "EDR", "SDR"]
+    public static let defaultMovieQuality = ["HDR", "HDR10", "HDR10+", "HDRVivid", "DV", "EDR", "SDR", "UHD", "BluRay"]
+
+    // 文件名偏好
+    public var fileTmdbEnabled: Bool
+    public var fileTmdbStyle: String // "{tmdb-id}" | "[tmdb-id]" | "[tmdbid=id]" | "tmdb-id"
+    public var fileSeparator: String
+    public var fileYearEnabled: Bool
+    public var fileYearStyle: String // "(year)" | "[year]" | "year"
+    public var fileLanguage: String // "chinese" | "english" | "bilingual" | "none"
+    public var keepExtraInfo: Bool
+    public var keepResolution: Bool
+    public var keepQuality: Bool
+    public var keepFps: Bool
+    public var keepAudio: Bool
+    public var defaultSdrWhenMissing: Bool
+    public var qualityTokens: [String]
+
+    // 文件夹命名偏好
+    public var folderMatchFileName: Bool
+    public var folderTmdbEnabled: Bool
+    public var folderTmdbStyle: String
+    public var folderSeparator: String
+    public var folderYearEnabled: Bool
+    public var folderYearStyle: String
+    public var folderLanguage: String
+
+    public init(
+        fileTmdbEnabled: Bool = true,
+        fileTmdbStyle: String = "{tmdb-id}",
+        fileSeparator: String = " ",
+        fileYearEnabled: Bool = true,
+        fileYearStyle: String = "(year)",
+        fileLanguage: String = "chinese",
+        keepExtraInfo: Bool = true,
+        keepResolution: Bool = true,
+        keepQuality: Bool = true,
+        keepFps: Bool = true,
+        keepAudio: Bool = true,
+        defaultSdrWhenMissing: Bool = false,
+        qualityTokens: [String] = MediaNamingPrefs.defaultMovieQuality,
+        folderMatchFileName: Bool = true,
+        folderTmdbEnabled: Bool = true,
+        folderTmdbStyle: String = "{tmdb-id}",
+        folderSeparator: String = " ",
+        folderYearEnabled: Bool = true,
+        folderYearStyle: String = "(year)",
+        folderLanguage: String = "chinese"
+    ) {
+        self.fileTmdbEnabled = fileTmdbEnabled
+        self.fileTmdbStyle = fileTmdbStyle
+        self.fileSeparator = fileSeparator
+        self.fileYearEnabled = fileYearEnabled
+        self.fileYearStyle = fileYearStyle
+        self.fileLanguage = fileLanguage
+        self.keepExtraInfo = keepExtraInfo
+        self.keepResolution = keepResolution
+        self.keepQuality = keepQuality
+        self.keepFps = keepFps
+        self.keepAudio = keepAudio
+        self.defaultSdrWhenMissing = defaultSdrWhenMissing
+        self.qualityTokens = qualityTokens
+        self.folderMatchFileName = folderMatchFileName
+        self.folderTmdbEnabled = folderTmdbEnabled
+        self.folderTmdbStyle = folderTmdbStyle
+        self.folderSeparator = folderSeparator
+        self.folderYearEnabled = folderYearEnabled
+        self.folderYearStyle = folderYearStyle
+        self.folderLanguage = folderLanguage
+    }
+
+    public static func movieDefault() -> MediaNamingPrefs {
+        MediaNamingPrefs(
+            fileTmdbEnabled: true, fileTmdbStyle: "{tmdb-id}", fileSeparator: " ",
+            fileYearEnabled: true, fileYearStyle: "(year)", fileLanguage: "chinese",
+            keepExtraInfo: true, keepResolution: true, keepQuality: true, keepFps: true, keepAudio: true,
+            defaultSdrWhenMissing: false, qualityTokens: defaultMovieQuality,
+            folderMatchFileName: true, folderTmdbEnabled: true, folderTmdbStyle: "{tmdb-id}",
+            folderSeparator: " ", folderYearEnabled: true, folderYearStyle: "(year)", folderLanguage: "chinese"
+        )
+    }
+
+    public static func tvDefault() -> MediaNamingPrefs {
+        MediaNamingPrefs(
+            fileTmdbEnabled: true, fileTmdbStyle: "{tmdb-id}", fileSeparator: " ",
+            fileYearEnabled: false, fileYearStyle: "(year)", fileLanguage: "chinese",
+            keepExtraInfo: true, keepResolution: true, keepQuality: true, keepFps: true, keepAudio: true,
+            defaultSdrWhenMissing: false, qualityTokens: defaultTvQuality,
+            folderMatchFileName: true, folderTmdbEnabled: true, folderTmdbStyle: "{tmdb-id}",
+            folderSeparator: " ", folderYearEnabled: true, folderYearStyle: "(year)", folderLanguage: "chinese"
+        )
+    }
+
+    public func effectiveFolderLanguage() -> String {
+        folderMatchFileName ? fileLanguage : folderLanguage
+    }
+
+    public func fileOptions() -> StandardNaming.FileOptions {
+        StandardNaming.FileOptions(
+            keepExtraInfo: keepExtraInfo,
+            keepResolution: keepResolution,
+            keepQuality: keepQuality,
+            keepFps: keepFps,
+            keepAudio: keepAudio,
+            defaultSdrWhenMissing: defaultSdrWhenMissing,
+            qualityTokens: qualityTokens,
+            tmdbEnabled: fileTmdbEnabled,
+            tmdbStyle: fileTmdbStyle,
+            separator: fileSeparator,
+            yearEnabled: fileYearEnabled,
+            yearStyle: fileYearStyle
+        )
+    }
+
+    public func resolveTitle(lang: String, zh: String, en: String, orig: String) -> String {
+        switch lang {
+        case "english": return en.isEmpty ? zh : en
+        case "bilingual": return (en.isEmpty || en == zh) ? zh : "\(zh) \(en)"
+        case "none": return orig.isEmpty ? zh : orig
+        default: return zh
+        }
+    }
+
+    public func previewFolder(isTv: Bool, renameFolders: Bool) -> String {
+        let origFolder = isTv ? "iPartment.5.S05.2160p.HDRVivid" : "The.Wandering.Earth.2019.2160p.UHD.Blu-ray"
+        guard renameFolders else { return origFolder }
+        let title = resolveTitle(
+            lang: effectiveFolderLanguage(),
+            zh: isTv ? "爱情公寓5" : "流浪地球",
+            en: isTv ? "iPartment 5" : "The Wandering Earth",
+            orig: isTv ? "iPartment 5" : "The.Wandering.Earth"
+        )
+        return StandardNaming.folderName(title: title, year: isTv ? "2020" : "2019", tmdbId: isTv ? 68809 : 535167, prefs: self)
+    }
+
+    public func previewFile(isTv: Bool, renameFiles: Bool) -> String {
+        let origFile = isTv
+            ? "iPartment.5.S05E01.2160p.60fps.HDRVivid.DDP.5.1.mkv"
+            : "The.Wandering.Earth.2019.2160p.24fps.UHD.Blu-ray.TrueHD.7.1.mkv"
+        guard renameFiles else { return origFile }
+        let (stem, ext) = MediaParser.splitNameExt(origFile)
+        let title = resolveTitle(
+            lang: fileLanguage,
+            zh: isTv ? "爱情公寓5" : "流浪地球",
+            en: isTv ? "iPartment 5" : "The Wandering Earth",
+            orig: isTv ? "iPartment 5" : "The.Wandering.Earth"
+        )
+        if isTv {
+            return StandardNaming.episodeFileBase(
+                title: title, season: 5, episode: 1, tmdbId: 68809,
+                fileStem: stem, options: fileOptions(), year: "2020"
+            ) + ext
+        } else {
+            return StandardNaming.movieFileBase(
+                title: title, year: "2019", tmdbId: 535167,
+                fileStem: stem, options: fileOptions()
+            ) + ext
+        }
+    }
+}
+
+/// 第 1 层：全局默认策略（对标 Android `DefaultPolicies`）。
+public struct DefaultPolicies: Codable, Hashable, Sendable {
+    public var organizeEnabled: Bool = true
+    public var scrapeEnabled: Bool = true
+    public var renameFiles: Bool = true
+    public var renameFolders: Bool = true
+    public var seasonFolders: Bool = true
+    public var mergeSeries: Bool = true
+    public var episodeStrategy: String = EpisodeStrategy.original.rawValue
+    public var fullScrape: Bool = false
+    public var imageQuality: ImageQualityOption = .standard
+    public var movieNaming: MediaNamingPrefs = .movieDefault()
+    public var tvNaming: MediaNamingPrefs = .tvDefault()
+    public var movie: MediaDefaults = MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
+    public var tv: MediaDefaults = MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
+    public var seasonPoster: Bool = true
+    public var seasonNfo: Bool = true
+    public var episodeNfo: Bool = true
+    public var episodeThumb: Bool = false
+    public var adaptiveDirectory: Bool = false
+    public var adaptiveTargetDirId: String = ""
+    public var adaptiveTargetDirPath: String = ""
+    public var autoMoveConfirmedDuplicates: Bool = false
+
+    public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case organizeEnabled, scrapeEnabled, renameFiles, renameFolders, seasonFolders
+        case mergeSeries, episodeStrategy, fullScrape, imageQuality
+        case movieNaming, tvNaming, movie, tv
+        case seasonPoster, seasonNfo, episodeNfo, episodeThumb
+        case adaptiveDirectory, adaptiveTargetDirId, adaptiveTargetDirPath, autoMoveConfirmedDuplicates
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.organizeEnabled = try c.decodeIfPresent(Bool.self, forKey: .organizeEnabled) ?? true
+        self.scrapeEnabled = try c.decodeIfPresent(Bool.self, forKey: .scrapeEnabled) ?? true
+        self.renameFiles = try c.decodeIfPresent(Bool.self, forKey: .renameFiles) ?? true
+        self.renameFolders = try c.decodeIfPresent(Bool.self, forKey: .renameFolders) ?? true
+        self.seasonFolders = try c.decodeIfPresent(Bool.self, forKey: .seasonFolders) ?? true
+        self.mergeSeries = try c.decodeIfPresent(Bool.self, forKey: .mergeSeries) ?? true
+        self.episodeStrategy = try c.decodeIfPresent(String.self, forKey: .episodeStrategy) ?? EpisodeStrategy.original.rawValue
+        self.fullScrape = try c.decodeIfPresent(Bool.self, forKey: .fullScrape) ?? false
+        self.imageQuality = try c.decodeIfPresent(ImageQualityOption.self, forKey: .imageQuality) ?? .standard
+        self.movieNaming = try c.decodeIfPresent(MediaNamingPrefs.self, forKey: .movieNaming) ?? .movieDefault()
+        self.tvNaming = try c.decodeIfPresent(MediaNamingPrefs.self, forKey: .tvNaming) ?? .tvDefault()
+        self.movie = try c.decodeIfPresent(MediaDefaults.self, forKey: .movie) ?? MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
+        self.tv = try c.decodeIfPresent(MediaDefaults.self, forKey: .tv) ?? MediaDefaults(nfo: true, poster: true, fanart: false, logo: false)
+        self.seasonPoster = try c.decodeIfPresent(Bool.self, forKey: .seasonPoster) ?? true
+        self.seasonNfo = try c.decodeIfPresent(Bool.self, forKey: .seasonNfo) ?? true
+        self.episodeNfo = try c.decodeIfPresent(Bool.self, forKey: .episodeNfo) ?? true
+        self.episodeThumb = try c.decodeIfPresent(Bool.self, forKey: .episodeThumb) ?? false
+        self.adaptiveDirectory = try c.decodeIfPresent(Bool.self, forKey: .adaptiveDirectory) ?? false
+        self.adaptiveTargetDirId = try c.decodeIfPresent(String.self, forKey: .adaptiveTargetDirId) ?? ""
+        self.adaptiveTargetDirPath = try c.decodeIfPresent(String.self, forKey: .adaptiveTargetDirPath) ?? ""
+        self.autoMoveConfirmedDuplicates = try c.decodeIfPresent(Bool.self, forKey: .autoMoveConfirmedDuplicates) ?? false
+    }
+}
+
+/// 第 2 层（任务/计划级）与第 3 层（影片/分组级）可覆写策略切片。
+/// 非 nil 字段优先生效，nil 字段自动向下继承上一层策略。
+public struct PolicyOverride: Codable, Hashable, Sendable {
+    public var organizeEnabled: Bool?
+    public var scrapeEnabled: Bool?
+    public var renameFiles: Bool?
+    public var renameFolders: Bool?
+    public var mergeSeries: Bool?
+    public var imageQuality: ImageQualityOption?
+    public var movieNaming: MediaNamingPrefs?
+    public var tvNaming: MediaNamingPrefs?
+    public var writeNfo: Bool?
+    public var downloadPoster: Bool?
+    public var downloadFanart: Bool?
+    public var downloadClearlogo: Bool?
+    public var downloadEpisodeThumb: Bool?
+
+    public init(
+        organizeEnabled: Bool? = nil,
+        scrapeEnabled: Bool? = nil,
+        renameFiles: Bool? = nil,
+        renameFolders: Bool? = nil,
+        mergeSeries: Bool? = nil,
+        imageQuality: ImageQualityOption? = nil,
+        movieNaming: MediaNamingPrefs? = nil,
+        tvNaming: MediaNamingPrefs? = nil,
+        writeNfo: Bool? = nil,
+        downloadPoster: Bool? = nil,
+        downloadFanart: Bool? = nil,
+        downloadClearlogo: Bool? = nil,
+        downloadEpisodeThumb: Bool? = nil
+    ) {
+        self.organizeEnabled = organizeEnabled
+        self.scrapeEnabled = scrapeEnabled
+        self.renameFiles = renameFiles
+        self.renameFolders = renameFolders
+        self.mergeSeries = mergeSeries
+        self.imageQuality = imageQuality
+        self.movieNaming = movieNaming
+        self.tvNaming = tvNaming
+        self.writeNfo = writeNfo
+        self.downloadPoster = downloadPoster
+        self.downloadFanart = downloadFanart
+        self.downloadClearlogo = downloadClearlogo
+        self.downloadEpisodeThumb = downloadEpisodeThumb
+    }
+}
+
+/// 合并后的生效策略快照（由 `PolicyResolver` 按 影片级 > 任务级 > 全局级 解析生成）。
+public struct EffectivePolicy: Hashable, Sendable {
+    public let organizeEnabled: Bool
+    public let scrapeEnabled: Bool
+    public let renameFiles: Bool
+    public let renameFolders: Bool
+    public let mergeSeries: Bool
+    public let imageQuality: ImageQualityOption
+    public let naming: MediaNamingPrefs
+    public let writeNfo: Bool
+    public let downloadPoster: Bool
+    public let downloadFanart: Bool
+    public let downloadClearlogo: Bool
+    public let downloadEpisodeThumb: Bool
+    public let seasonNfo: Bool
+    public let episodeNfo: Bool
+    public let sourceLayer: String // "影片策略" | "任务策略" | "全局策略"
+}
+
+/// 三级策略优先级解析器：影片/分组策略（Layer 3） > 任务/计划策略（Layer 2） > 全局默认策略（Layer 1）。
+public enum PolicyResolver {
+    public static func resolve(
+        isTv: Bool,
+        global: DefaultPolicies,
+        task: PolicyOverride? = nil,
+        film: PolicyOverride? = nil
+    ) -> EffectivePolicy {
+        let baseMedia = isTv ? global.tv : global.movie
+        let baseNaming = isTv ? global.tvNaming : global.movieNaming
+        let taskNaming = isTv ? task?.tvNaming : task?.movieNaming
+        let filmNaming = isTv ? film?.tvNaming : film?.movieNaming
+
+        let sourceLayer: String
+        if film != nil { sourceLayer = "影片策略" }
+        else if task != nil { sourceLayer = "任务策略" }
+        else { sourceLayer = "全局策略" }
+
+        return EffectivePolicy(
+            organizeEnabled: film?.organizeEnabled ?? task?.organizeEnabled ?? global.organizeEnabled,
+            scrapeEnabled: film?.scrapeEnabled ?? task?.scrapeEnabled ?? global.scrapeEnabled,
+            renameFiles: film?.renameFiles ?? task?.renameFiles ?? global.renameFiles,
+            renameFolders: film?.renameFolders ?? task?.renameFolders ?? global.renameFolders,
+            mergeSeries: film?.mergeSeries ?? task?.mergeSeries ?? global.mergeSeries,
+            imageQuality: film?.imageQuality ?? task?.imageQuality ?? global.imageQuality,
+            naming: filmNaming ?? taskNaming ?? baseNaming,
+            writeNfo: film?.writeNfo ?? task?.writeNfo ?? baseMedia.nfo,
+            downloadPoster: film?.downloadPoster ?? task?.downloadPoster ?? baseMedia.poster,
+            downloadFanart: film?.downloadFanart ?? task?.downloadFanart ?? baseMedia.fanart,
+            downloadClearlogo: film?.downloadClearlogo ?? task?.downloadClearlogo ?? baseMedia.logo,
+            downloadEpisodeThumb: film?.downloadEpisodeThumb ?? task?.downloadEpisodeThumb ?? global.episodeThumb,
+            seasonNfo: global.seasonNfo,
+            episodeNfo: global.episodeNfo,
+            sourceLayer: sourceLayer
+        )
+    }
+
+    /// 当用户在预览页修改「任务策略」或单部「影片策略」后，按三级优先级即时重算计划中对应分组的文件名与开关状态。
+    public static func applyOverrides(to plan: ScrapePlan, global: DefaultPolicies) -> ScrapePlan {
+        var out = plan
+        for gIdx in out.groups.indices {
+            let group = out.groups[gIdx]
+            guard group.kind == "movie" || group.kind == "tv" else { continue }
+            let isTv = group.kind == "tv"
+            let eff = resolve(isTv: isTv, global: global, task: out.taskPolicy, film: group.policyOverride)
+            let fileOpts = eff.naming.fileOptions()
+
+            let targetFolder = StandardNaming.folderName(title: group.title, year: group.year, tmdbId: group.tmdbId, prefs: eff.naming)
+            out.groups[gIdx].folderNewName = (eff.organizeEnabled && eff.renameFolders && targetFolder != group.folderName) ? targetFolder : nil
+
+            for aIdx in out.actions.indices where out.actions[aIdx].groupId == group.id && !out.actions[aIdx].done {
+                let act = out.actions[aIdx]
+                if act.op == "rename" && act.kind == "folder" {
+                    out.actions[aIdx].newName = targetFolder
+                    out.actions[aIdx].selected = eff.organizeEnabled && eff.renameFolders
+                } else if act.op == "rename" && act.kind == "file" {
+                    let (oldStem, ext) = MediaParser.splitNameExt(act.oldName)
+                    let recomputed: String
+                    if isTv {
+                        let pm = MediaParser.parse(act.oldName, folderHint: group.folderName)
+                        recomputed = StandardNaming.episodeFileBase(
+                            title: group.title,
+                            season: act.season ?? pm.season ?? 1,
+                            episode: act.episode ?? pm.episode ?? 1,
+                            episodeEnd: pm.episodeEnd,
+                            tmdbId: group.tmdbId,
+                            fileStem: oldStem,
+                            releaseDirName: group.folderName,
+                            options: fileOpts,
+                            year: group.year
+                        ) + ext
+                    } else {
+                        recomputed = StandardNaming.movieFileBase(
+                            title: group.title,
+                            year: group.year,
+                            tmdbId: group.tmdbId,
+                            fileStem: oldStem,
+                            releaseDirName: group.folderName,
+                            options: fileOpts
+                        ) + ext
+                    }
+                    out.actions[aIdx].newName = recomputed
+                    out.actions[aIdx].selected = eff.organizeEnabled && eff.renameFiles
+                } else if act.op == "artwork" {
+                    let enableArt: Bool
+                    switch act.kind {
+                    case "movie_nfo", "tvshow_nfo":
+                        enableArt = eff.scrapeEnabled && eff.writeNfo
+                    case "season_nfo":
+                        enableArt = eff.scrapeEnabled && eff.seasonNfo
+                    case "episode_nfo":
+                        enableArt = eff.scrapeEnabled && eff.episodeNfo
+                    case "clearlogo":
+                        enableArt = eff.scrapeEnabled && eff.downloadClearlogo
+                    case "image":
+                        let low = act.newName.lowercased()
+                        if low.hasPrefix("fanart") || low.hasPrefix("backdrop") {
+                            enableArt = eff.scrapeEnabled && eff.downloadFanart
+                        } else if act.episode != nil {
+                            enableArt = eff.scrapeEnabled && eff.downloadEpisodeThumb
+                        } else if low.contains("season") && low.contains("poster") {
+                            enableArt = eff.scrapeEnabled && global.seasonPoster
+                        } else {
+                            enableArt = eff.scrapeEnabled && eff.downloadPoster
+                        }
+                    default:
+                        enableArt = eff.scrapeEnabled
+                    }
+                    out.actions[aIdx].selected = enableArt
+                }
+            }
+        }
+        return out
+    }
+}
+
+public struct NfoFieldSelection: Codable, Hashable, Sendable {
+    public var title: Bool = true
+    public var originalTitle: Bool = true
+    public var year: Bool = true
+    public var rating: Bool = true
+    public var plot: Bool = true
+    public var aired: Bool = true
+    public var tmdbId: Bool = true
+    public var season: Bool = true
+    public var episode: Bool = true
+
+    public init() {}
+}
+
+public enum NfoFields {
+    /// 根据用户勾选的 NFO 字段精细过滤 XML 标签（对标 Android NfoFields.filter）。
+    public static func filter(xml: String, selection: NfoFieldSelection) -> String {
+        var out = xml
+        let rules: [(Bool, String)] = [
+            (selection.title, "title"),
+            (selection.originalTitle, "originaltitle"),
+            (selection.year, "year"),
+            (selection.rating, "rating"),
+            (selection.plot, "plot"),
+            (selection.aired, "aired"),
+            (selection.aired, "premiered"),
+            (selection.tmdbId, "tmdbid"),
+            (selection.season, "season"),
+            (selection.episode, "episode"),
+        ]
+        for (keep, tag) in rules where !keep {
+            if let rx = try? NSRegularExpression(pattern: #"\s*<\#(tag)>[\s\S]*?</\#(tag)>"#) {
+                let r = NSRange(out.startIndex..<out.endIndex, in: out)
+                out = rx.stringByReplacingMatches(in: out, range: r, withTemplate: "")
+            }
+        }
+        return out
+    }
+}
