@@ -125,11 +125,11 @@ public struct VideoScanResult: Equatable, Sendable {
 public final class ExecutionEngine {
     public static let shared = ExecutionEngine()
 
-    public static let execOps: Set<String> = ["rename", "mkdir", "move", "artwork", "delete", "trash"]
-    public static let maxConsecutiveFails = 5
-    public static let settleDelayNs: UInt64 = 1_200_000_000
-    public static let uploadRetryDelaysNs: [UInt64] = [2_000_000_000, 5_000_000_000]
-    public static let deleteTooBigMessage = "文件夹太大，未检查完，已跳过删除"
+    public nonisolated static let execOps: Set<String> = ["rename", "mkdir", "move", "artwork", "delete", "trash"]
+    public nonisolated static let maxConsecutiveFails = 5
+    public nonisolated static let settleDelayNs: UInt64 = 1_200_000_000
+    public nonisolated static let uploadRetryDelaysNs: [UInt64] = [2_000_000_000, 5_000_000_000]
+    public nonisolated static let deleteTooBigMessage = "文件夹太大，未检查完，已跳过删除"
 
     private nonisolated static let sequentialMoveKinds: Set<String> = [
         "folder", "disc_folder", "cleanup",
@@ -252,7 +252,7 @@ public final class ExecutionEngine {
         return (a.op == "rename" || a.op == "move" || a.op == "artwork") && !sequentialMoveKinds.contains(a.kind)
     }
 
-    public static func labelOf(_ a: PlanAction) -> String {
+    public nonisolated static func labelOf(_ a: PlanAction) -> String {
         switch a.op {
         case "rename": return "改名 \(a.oldName) → \(a.newName)"
         case "mkdir": return "新建 \(a.newName)"
@@ -273,7 +273,7 @@ public final class ExecutionEngine {
     }
 
     /// 删除前有界 BFS 视频计数（1:1 对标 Android `countVideosBounded`：超过层级/条目/目录上限立即返回 complete=false 拒绝删除）。
-    public static func countVideosBounded(
+    public nonisolated static func countVideosBounded(
         drive: any CloudDrive,
         folderId: String,
         maxDepth: Int = 8,
@@ -452,7 +452,7 @@ public final class ExecutionEngine {
             var stoppedOnFails = false
             var stoppedEarly = false
 
-            func syncPlanAction(_ id: String, done: Bool, error: String?, note: String? = nil) {
+            @MainActor func syncPlanAction(_ id: String, done: Bool, error: String?, note: String? = nil) {
                 if var a = planActions[id] {
                     if done && !a.done { newlyOkIds.append(id) }
                     a.done = done
@@ -467,7 +467,7 @@ public final class ExecutionEngine {
                 }
             }
 
-            func recordOutcome(actionId: String, ok: Bool, skipped: Bool = false, noopNote: String? = nil, markDone: Bool = true, err: String?) {
+            @MainActor func recordOutcome(actionId: String, ok: Bool, skipped: Bool = false, noopNote: String? = nil, markDone: Bool = true, err: String?) {
                 run.completed += 1
                 if let noopNote {
                     // 禁用项 / 非执行 op / TMDB 暂无素材：不标 done、不计入 newlyOkIds、不覆盖为「已存在，未覆盖」
@@ -487,7 +487,7 @@ public final class ExecutionEngine {
                 currentRun = run
             }
 
-            func waitIfPaused() async -> Bool {
+            @MainActor func waitIfPaused() async -> Bool {
                 while isPaused && !stopRequested && !Task.isCancelled {
                     run.status = "paused"
                     run.message = "已暂停"
@@ -507,7 +507,7 @@ public final class ExecutionEngine {
                 return true
             }
 
-            func executeOne(_ act: PlanAction) async throws -> (resultId: String?, note: String?) {
+            @MainActor func executeOne(_ act: PlanAction) async throws -> (resultId: String?, note: String?) {
                 switch act.op {
                 case "rename":
                     guard let rawFid = act.fileId else { throw DriveError.invalidInput("缺少 fileId") }
@@ -660,7 +660,7 @@ public final class ExecutionEngine {
                 }
             }
 
-            func runSingleAction(_ id: String) async {
+            @MainActor func runSingleAction(_ id: String) async {
                 guard !stopRequested && !Task.isCancelled else { return }
                 guard let act = planActions[id] else {
                     recordOutcome(actionId: id, ok: false, noopNote: "", err: nil)
