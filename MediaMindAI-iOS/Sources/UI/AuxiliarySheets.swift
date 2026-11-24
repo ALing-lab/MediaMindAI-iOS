@@ -9,11 +9,11 @@ public struct LibraryScrapeAssetsSheet: View {
     public let onSave: (PolicyOverride) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var writeNfo = true
-    @State private var downloadPoster = true
-    @State private var downloadFanart = false
-    @State private var downloadClearlogo = false
-    @State private var downloadEpisodeThumb = false
+    @State private var writeNfo: Bool
+    @State private var downloadPoster: Bool
+    @State private var downloadFanart: Bool
+    @State private var downloadClearlogo: Bool
+    @State private var downloadEpisodeThumb: Bool
 
     public init(title: String, isTv: Bool, initial: PolicyOverride?, fallback: EffectivePolicy, onSave: @escaping (PolicyOverride) -> Void) {
         self.title = title
@@ -21,44 +21,52 @@ public struct LibraryScrapeAssetsSheet: View {
         self.initial = initial
         self.fallback = fallback
         self.onSave = onSave
+        _writeNfo = State(initialValue: initial?.writeNfo ?? fallback.writeNfo)
+        _downloadPoster = State(initialValue: initial?.downloadPoster ?? fallback.downloadPoster)
+        _downloadFanart = State(initialValue: initial?.downloadFanart ?? fallback.downloadFanart)
+        _downloadClearlogo = State(initialValue: initial?.downloadClearlogo ?? fallback.downloadClearlogo)
+        _downloadEpisodeThumb = State(initialValue: initial?.downloadEpisodeThumb ?? fallback.downloadEpisodeThumb)
+    }
+
+    private func liveBinding(_ state: Binding<Bool>) -> Binding<Bool> {
+        Binding(
+            get: { state.wrappedValue },
+            set: { newValue in
+                state.wrappedValue = newValue
+                applyNow()
+            }
+        )
+    }
+
+    private func applyNow() {
+        var ov = initial ?? PolicyOverride()
+        ov.writeNfo = writeNfo
+        ov.downloadPoster = downloadPoster
+        ov.downloadFanart = downloadFanart
+        ov.downloadClearlogo = downloadClearlogo
+        if isTv { ov.downloadEpisodeThumb = downloadEpisodeThumb }
+        onSave(ov)
     }
 
     public var body: some View {
         NavigationStack {
             Form {
-                Section("《\(title)》素材勾选") {
-                    Toggle("写入 NFO 元数据", isOn: $writeNfo)
-                    Toggle("下载海报（poster.jpg）", isOn: $downloadPoster)
-                    Toggle("下载背景图（fanart.jpg）", isOn: $downloadFanart)
-                    Toggle("下载透明 Logo（clearlogo.png）", isOn: $downloadClearlogo)
+                Section(header: Text("《\(title)》素材勾选"), footer: Text("所有开关修改后实时生效，无需点击保存。")) {
+                    Toggle("写入 NFO 元数据", isOn: liveBinding($writeNfo))
+                    Toggle("下载海报（poster.jpg）", isOn: liveBinding($downloadPoster))
+                    Toggle("下载背景图（fanart.jpg）", isOn: liveBinding($downloadFanart))
+                    Toggle("下载透明 Logo（clearlogo.png）", isOn: liveBinding($downloadClearlogo))
                     if isTv {
-                        Toggle("下载单集剧照（-thumb.jpg）", isOn: $downloadEpisodeThumb)
+                        Toggle("下载单集剧照（-thumb.jpg）", isOn: liveBinding($downloadEpisodeThumb))
                     }
                 }
             }
             .navigationTitle("自定义刮削素材")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
-                        var ov = initial ?? PolicyOverride()
-                        ov.writeNfo = writeNfo
-                        ov.downloadPoster = downloadPoster
-                        ov.downloadFanart = downloadFanart
-                        ov.downloadClearlogo = downloadClearlogo
-                        if isTv { ov.downloadEpisodeThumb = downloadEpisodeThumb }
-                        onSave(ov)
-                        dismiss()
-                    }
+                    Button("完成") { dismiss() }
                 }
-            }
-            .onAppear {
-                writeNfo = initial?.writeNfo ?? fallback.writeNfo
-                downloadPoster = initial?.downloadPoster ?? fallback.downloadPoster
-                downloadFanart = initial?.downloadFanart ?? fallback.downloadFanart
-                downloadClearlogo = initial?.downloadClearlogo ?? fallback.downloadClearlogo
-                downloadEpisodeThumb = initial?.downloadEpisodeThumb ?? fallback.downloadEpisodeThumb
             }
         }
     }

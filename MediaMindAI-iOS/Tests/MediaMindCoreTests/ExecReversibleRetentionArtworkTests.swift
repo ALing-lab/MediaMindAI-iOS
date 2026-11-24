@@ -322,9 +322,9 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         let stillDemoted = await gate.currentLimit
         XCTAssertEqual(stillDemoted, 3, "命中真实风控后只降不升")
 
-        let afterSecond = await gate.onRateLimited(backoffMs: 1)
+        let afterSecond = await gate.onRateLimited(backoffMs: 1, minStepDownGapNs: 0)
         XCTAssertEqual(afterSecond, 1)
-        let afterThird = await gate.onRateLimited(backoffMs: 1)
+        let afterThird = await gate.onRateLimited(backoffMs: 1, minStepDownGapNs: 0)
         XCTAssertEqual(afterThird, 1)
 
         let value = try await gate.withPermit(skipBackoff: true) { 42 }

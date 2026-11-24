@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 import UIKit
 
 /// 添加网盘账号入口页（123云盘 / 光鸭云盘原生验证码 / WebDAV）。
@@ -65,6 +64,7 @@ public struct GuangyaLoginView: View {
     @State private var captchaToken = ""
     @State private var showCaptcha = false
     @State private var challenge: GySmsChallenge?
+    @State private var challengePhone = ""
     @State private var sending = false
     @State private var submitting = false
     @State private var countdown = 0
@@ -87,17 +87,28 @@ public struct GuangyaLoginView: View {
             Section(footer: Text("直接填 11 位中国大陆手机号（自动补 +86），也支持 +1 / +44 / +852 等国际号码。")) {
                 TextField("手机号（默认 +86）", text: $phone)
                     .keyboardType(.phonePad)
-                    .onChange(of: phone) { _, _ in
-                        challenge = nil
+                    .onChange(of: phone) { _, newVal in
+                        if challenge != nil, GuangyaDrive.normalizePhone(newVal) != challengePhone {
+                            challenge = nil
+                            countdown = 0
+                            status = "手机号已变更，请重新获取验证码"
+                        }
                         errorMsg = nil
                     }
 
                 HStack {
                     TextField("短信验证码", text: $smsCode)
                         .keyboardType(.numberPad)
-                    Button(countdown > 0 ? "\(countdown)s" : (sending ? "发送中…" : "获取验证码")) {
+                        .textContentType(.oneTimeCode)
+                    Button {
                         Task { await requestSms() }
+                    } label: {
+                        Text(countdown > 0 ? "\(countdown)s" : (sending ? "发送中…" : "获取验证码"))
+                            .monospacedDigit()
+                            .frame(minWidth: 76)
+                            .contentTransition(.identity)
                     }
+                    .transaction { $0.animation = nil }
                     .disabled(sending || countdown > 0 || phone.trimmingCharacters(in: .whitespaces).count < 7)
                     .buttonStyle(.bordered)
                 }
@@ -126,7 +137,7 @@ public struct GuangyaLoginView: View {
                         Spacer()
                     }
                 }
-                .disabled(submitting || challenge == nil || smsCode.trimmingCharacters(in: .whitespaces).count < 4)
+                .disabled(submitting || smsCode.trimmingCharacters(in: .whitespaces).count < 4)
             }
         }
         .navigationTitle("光鸭云盘登录")
@@ -146,6 +157,7 @@ public struct GuangyaLoginView: View {
         do {
             let res = try await GuangyaDrive.sendSmsCode(rawPhone: phone, captchaToken: captchaToken)
             challenge = res
+            challengePhone = GuangyaDrive.normalizePhone(phone)
             countdown = 60
             status = "验证码已发送，请查收短信"
         } catch let cap as GyCaptchaRequiredError {
@@ -159,7 +171,10 @@ public struct GuangyaLoginView: View {
     }
 
     private func submitLogin() async {
-        guard let ch = challenge else { return }
+        guard let ch = challenge else {
+            errorMsg = "请先点击「获取验证码」后再登录"
+            return
+        }
         submitting = true
         errorMsg = nil
         status = "正在校验验证码并验证账号…"
@@ -189,7 +204,7 @@ public struct GuangyaLoginView: View {
     }
 }
 
-// MARK: - 123 云盘登录（原生账号密码 + 官方登录中心 WKWebView 短信/扫码验证）
+// MARK: - 123 云盘登录（原生账号密码直连）
 
 public struct Pan123LoginView: View {
     public var targetAccountId: String? = nil
@@ -199,62 +214,35 @@ public struct Pan123LoginView: View {
         self.onSuccess = onSuccess
     }
 
-    @State private var mode = 0 // 0 = 密码, 1 = 短信/扫码网页
     @State private var passport = ""
     @State private var password = ""
     @State private var busy = false
     @State private var errorMsg: String?
-    @State private var webStatus = "请在 123 官方登录页完成短信或扫码验证"
-    @State private var webReloadEpoch = 0
 
     public var body: some View {
-        VStack(spacing: 0) {
-            Picker("登录方式", selection: $mode) {
-                Text("账号密码").tag(0)
-                Text("短信 / 扫码验证").tag(1)
+        Form {
+            Section(footer: Text("手机号不带 +86；密码不会保存在本机。")) {
+                TextField("手机号或邮箱", text: $passport)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SecureField("密码", text: $password)
             }
-            .pickerStyle(.segmented)
-            .padding()
-
-            if mode == 0 {
-                Form {
-                    Section(footer: Text("手机号不带 +86；密码不会保存在本机。若触发风控验证，请切换「短信 / 扫码验证」。")) {
-                        TextField("手机号或邮箱", text: $passport)
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        SecureField("密码", text: $password)
-                    }
-                    if let errorMsg {
-                        Section { Text(errorMsg).foregroundStyle(MMTheme.redErr).font(.footnote) }
-                    }
-                    Section {
-                        Button {
-                            Task { await loginPassword() }
-                        } label: {
-                            HStack {
-                                Spacer()
-                                if busy { ProgressView().padding(.trailing, 6) }
-                                Text(busy ? "登录中…" : "登录").fontWeight(.semibold)
-                                Spacer()
-                            }
-                        }
-                        .disabled(busy || passport.isEmpty || password.isEmpty)
+            if let errorMsg {
+                Section { Text(errorMsg).foregroundStyle(MMTheme.redErr).font(.footnote) }
+            }
+            Section {
+                Button {
+                    Task { await loginPassword() }
+                } label: {
+                    HStack {
+                        Spacer()
+                        if busy { ProgressView().padding(.trailing, 6) }
+                        Text(busy ? "登录中…" : "登录").fontWeight(.semibold)
+                        Spacer()
                     }
                 }
-            } else {
-                VStack(spacing: 8) {
-                    Text(webStatus).font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                    if let loginUrl = URL(string: Pan123Drive.webLoginUrls[0]) {
-                        Pan123WebView(url: loginUrl) { token in
-                            Task { await verifyAndSave(token: token, labelSuffix: "网页") }
-                        }
-                        .id(webReloadEpoch)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                    }
-                }
+                .disabled(busy || passport.isEmpty || password.isEmpty)
             }
         }
         .navigationTitle("123 云盘登录")
@@ -286,93 +274,7 @@ public struct Pan123LoginView: View {
             onSuccess()
         } else {
             errorMsg = "Token 探测失败，请重新登录"
-            webStatus = "Token 验证失败，已重置登录页，请重新完成登录"
-            webReloadEpoch += 1
         }
-    }
-}
-
-private struct Pan123WebView: UIViewRepresentable {
-    let url: URL
-    let onToken: (String) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(onToken: onToken) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let cfg = WKWebViewConfiguration()
-        cfg.websiteDataStore = .nonPersistent()
-        let wv = WKWebView(frame: .zero, configuration: cfg)
-        wv.navigationDelegate = context.coordinator
-        wv.load(URLRequest(url: url))
-        context.coordinator.startPolling(webView: wv)
-        return wv
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
-        coordinator.stop()
-        uiView.stopLoading()
-        uiView.navigationDelegate = nil
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        private static let officialHosts = ["123pan.com", "123pan.cn"]
-
-        private static func isOfficial(_ url: URL?) -> Bool {
-            guard let url, url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else { return false }
-            return officialHosts.contains { host == $0 || host.hasSuffix("." + $0) }
-        }
-
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if navigationAction.targetFrame?.isMainFrame == false {
-                decisionHandler(.allow)
-                return
-            }
-            decisionHandler(Self.isOfficial(navigationAction.request.url) ? .allow : .cancel)
-        }
-        private let onToken: (String) -> Void
-        private var timer: Timer?
-        private var captured = false
-        private let extractJs = """
-        (function(){
-          function looksJwt(s){ return typeof s==='string' && s.split('.').length>=3 && s.length>40; }
-          function dig(st){
-            try {
-              for(var i=0;i<st.length;i++){
-                var k=st.key(i), v=st.getItem(k); if(!v) continue;
-                var b=v.replace(/^Bearer\\s+/i,'');
-                if(/authorToken|token|Authorization/i.test(k) && looksJwt(b)) return b;
-              }
-            } catch(e){}
-            return '';
-          }
-          return dig(localStorage) || dig(sessionStorage) || '';
-        })();
-        """
-
-        init(onToken: @escaping (String) -> Void) { self.onToken = onToken }
-
-        func startPolling(webView: WKWebView) {
-            timer?.invalidate()
-            timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self, weak webView] _ in
-                Task { @MainActor in
-                    guard let self, let wv = webView, !self.captured, Self.isOfficial(wv.url) else { return }
-                    wv.evaluateJavaScript(self.extractJs) { res, _ in
-                        Task { @MainActor in
-                            if let tok = res as? String, tok.count > 40, !self.captured {
-                                self.captured = true
-                                self.timer?.invalidate()
-                                self.onToken(tok)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        func stop() { timer?.invalidate(); timer = nil }
-        deinit { timer?.invalidate() }
     }
 }
 

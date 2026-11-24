@@ -77,7 +77,6 @@
 		2C05A06C763796A5602D5BFE /* PreviewTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AA98E44A2AD6B27E848277 /* PreviewTabView.swift */; };
 		34F3C97BFB3640C85BD09A26 /* ManualMatchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDE8D7D1036CDB5698DA784 /* ManualMatchSheet.swift */; };
 		99D16A4371DC87679E8ED789 /* DefaultPolicyScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92D077186F8EDD9B07FC904 /* DefaultPolicyScreen.swift */; };
-		D3C37D25E9FBC7F895FD4204 /* AccountsScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91E924314A3A80DEA99351C8 /* AccountsScreens.swift */; };
 		9BC6AF078F8AE98A1DAEEF31 /* CompletedTaskDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9CF4C15C1FECB083145C87 /* CompletedTaskDetailScreen.swift */; };
 		520AE2D1E7611E7730BE36E3 /* SettingsMoreScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C15FA23FF00D876AB64E983 /* SettingsMoreScreens.swift */; };
 		DE025B9FFCD9C5267DB8B637 /* SettingsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707A4506B776031165FEF70A /* SettingsTabView.swift */; };
@@ -164,7 +163,6 @@
 		A9AA98E44A2AD6B27E848277 /* PreviewTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PreviewTabView.swift"; path = "Sources/UI/PreviewTabView.swift"; sourceTree = "<group>"; };
 		AEDE8D7D1036CDB5698DA784 /* ManualMatchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ManualMatchSheet.swift"; path = "Sources/UI/ManualMatchSheet.swift"; sourceTree = "<group>"; };
 		B92D077186F8EDD9B07FC904 /* DefaultPolicyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DefaultPolicyScreen.swift"; path = "Sources/UI/DefaultPolicyScreen.swift"; sourceTree = "<group>"; };
-		91E924314A3A80DEA99351C8 /* AccountsScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AccountsScreens.swift"; path = "Sources/UI/AccountsScreens.swift"; sourceTree = "<group>"; };
 		7C9CF4C15C1FECB083145C87 /* CompletedTaskDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "CompletedTaskDetailScreen.swift"; path = "Sources/UI/CompletedTaskDetailScreen.swift"; sourceTree = "<group>"; };
 		0C15FA23FF00D876AB64E983 /* SettingsMoreScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "SettingsMoreScreens.swift"; path = "Sources/UI/SettingsMoreScreens.swift"; sourceTree = "<group>"; };
 		707A4506B776031165FEF70A /* SettingsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "SettingsTabView.swift"; path = "Sources/UI/SettingsTabView.swift"; sourceTree = "<group>"; };
@@ -284,7 +282,6 @@
 				A9AA98E44A2AD6B27E848277 /* PreviewTabView.swift */,
 				AEDE8D7D1036CDB5698DA784 /* ManualMatchSheet.swift */,
 				B92D077186F8EDD9B07FC904 /* DefaultPolicyScreen.swift */,
-				91E924314A3A80DEA99351C8 /* AccountsScreens.swift */,
 				7C9CF4C15C1FECB083145C87 /* CompletedTaskDetailScreen.swift */,
 				0C15FA23FF00D876AB64E983 /* SettingsMoreScreens.swift */,
 				707A4506B776031165FEF70A /* SettingsTabView.swift */,
@@ -441,7 +438,6 @@
 				2C05A06C763796A5602D5BFE /* PreviewTabView.swift in Sources */,
 				34F3C97BFB3640C85BD09A26 /* ManualMatchSheet.swift in Sources */,
 				99D16A4371DC87679E8ED789 /* DefaultPolicyScreen.swift in Sources */,
-				D3C37D25E9FBC7F895FD4204 /* AccountsScreens.swift in Sources */,
 				9BC6AF078F8AE98A1DAEEF31 /* CompletedTaskDetailScreen.swift in Sources */,
 				520AE2D1E7611E7730BE36E3 /* SettingsMoreScreens.swift in Sources */,
 				DE025B9FFCD9C5267DB8B637 /* SettingsTabView.swift in Sources */,

@@ -273,7 +273,7 @@ public final class PacedDrive: CloudDrive, @unchecked Sendable {
         if isAuto {
             delayMs = await rate.nextDelayWithJitter()
         } else {
-            delayMs = AppSettings.shared.scanSpeed.intervalMs
+            delayMs = profile.defaultIntervalMs
         }
         let activeSem = delayMs >= 1000 ? serialGate : semaphore
         await activeSem.acquire()

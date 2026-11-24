@@ -312,7 +312,7 @@ public actor TmdbNet {
     }
 
     /// 依次尝试多个图片镜像源，经 `TmdbRequestPacer` 限频，附带 Referer（media.themoviedb.org 必需）并做魔数防劫持校验。
-    public func downloadImageWithFallback(urlStr: String, config c: TmdbNetConfig, session customSession: URLSession? = nil) async throws -> Data {
+    public func downloadImageWithFallback(urlStr: String, config c: TmdbNetConfig, session customSession: URLSession? = nil, bypassCache: Bool = false) async throws -> Data {
         let candidates = imageCandidates(for: urlStr, config: c)
         guard !candidates.isEmpty else { throw DriveError.invalidInput("无效的图片 URL") }
 
@@ -329,6 +329,7 @@ public actor TmdbNet {
             let activeSession = customSession ?? session(for: c)
             var req = URLRequest(url: url)
             req.timeoutInterval = 30
+            if bypassCache { req.cachePolicy = .reloadIgnoringLocalCacheData }
             if host.lowercased() == "media.themoviedb.org" {
                 req.setValue("https://www.themoviedb.org/", forHTTPHeaderField: "Referer")
             }

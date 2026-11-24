@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 识别结果预览页（1:1 对标 Android ScrapeScreens + FilmPolicySheets：任务级第 2 层策略 + 影片级第 3 层策略实时重算 + 冲突预警 + 批量手动修正 + 保留区）。
 public struct PreviewTabView: View {
@@ -21,14 +22,12 @@ public struct PreviewTabView: View {
     @State private var showTaskPolicySheet = false
     @State private var showInboxSheet = false
     @State private var filterKind: PreviewFilterKind = .all
-    @State private var twoRowFilter = PreviewTwoRowFilter.State()
     @State private var groupBySource = false
     @State private var editingAssetsGroup: PlanGroup?
     @State private var searchQuery = ""
     @State private var editingFilmPolicyGroup: PlanGroup?
     @State private var batchSelectedManualIds: Set<String> = []
     @State private var errorMsg: String?
-    @State private var infoBanner: String?
 
     private var activePlan: ScrapePlan? {
         if let id = selectedPlanId, let hit = planStore.plans.first(where: { $0.id == id }) { return hit }
@@ -57,8 +56,7 @@ public struct PreviewTabView: View {
                         .padding(.bottom, 6)
 
                         if !manualTab {
-                            let twoRowSummary = PreviewTwoRowFilter.aggregate(plan: plan, state: twoRowFilter)
-                            VStack(spacing: 6) {
+                                VStack(spacing: 6) {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
                                         ForEach(PreviewFilterKind.allCases) { fk in
@@ -79,25 +77,6 @@ public struct PreviewTabView: View {
                                         .foregroundStyle(MMTheme.accent)
                                     }
                                     .padding(.horizontal)
-                                }
-                                if PreviewTwoRowFilter.opsEnabled(twoRowFilter.status) {
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 6) {
-                                            ForEach(twoRowSummary.tiles) { tile in
-                                                let cnt = twoRowSummary.opCount(tile.key)
-                                                let active = twoRowFilter.op == tile.key
-                                                Button("\(tile.label) \(cnt.selected)/\(cnt.total)") {
-                                                    twoRowFilter = PreviewTwoRowFilter.toggleOp(twoRowFilter, tile.key)
-                                                }
-                                                .font(.caption2.weight(active ? .semibold : .regular))
-                                                .padding(.horizontal, 9)
-                                                .padding(.vertical, 4)
-                                                .background(active ? MMTheme.accent.opacity(0.2) : Color.secondary.opacity(0.1), in: Capsule())
-                                                .foregroundStyle(active ? MMTheme.accent : .secondary)
-                                            }
-                                        }
-                                        .padding(.horizontal)
-                                    }
                                 }
                             }
                             .padding(.bottom, 6)
@@ -121,9 +100,6 @@ public struct PreviewTabView: View {
                         if let errorMsg {
                             Text(errorMsg).font(.footnote).foregroundStyle(MMTheme.redErr).padding(.horizontal)
                         }
-                        if let infoBanner {
-                            Text(infoBanner).font(.footnote).foregroundStyle(MMTheme.greenOk).padding(.horizontal)
-                        }
 
                         if shown.isEmpty {
                             ContentUnavailableView(
@@ -132,85 +108,101 @@ public struct PreviewTabView: View {
                                 description: Text(manualTab ? "未识别的文件会显示在这里。" : "在「云盘」选择目录开始扫描。")
                             )
                         } else {
-                            let opFilteredGroups: [PlanGroup] = {
-                                guard let opKey = twoRowFilter.op, !manualTab else { return shown }
-                                let matchedGids = Set(plan.actions.filter { PreviewTwoRowFilter.opMatches($0, op: opKey) }.map { $0.groupId })
-                                return shown.filter { matchedGids.contains($0.id) }
-                            }()
-                            let sections = PreviewSectionGrouping.sections(plan: plan, groups: opFilteredGroups, bySource: groupBySource)
-                            List {
-                                ForEach(sections) { sec in
-                                    Section(sec.title) {
-                                        ForEach(sec.groups) { group in
-                                            let groupActions = plan.actions.filter { $0.groupId == group.id }
-                                            VStack(alignment: .leading, spacing: 6) {
-                                                if group.confirmRequired {
-                                                    Label("需人工确认：\(group.confirmReasons.joined(separator: "、"))", systemImage: "exclamationmark.shield.fill")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(.orange)
-                                                }
-                                                MediaGroupCardRow(
-                                                    group: group,
-                                                    actions: groupActions,
-                                                    hasTaskOverride: plan.taskPolicy != nil,
-                                                    isManualMode: manualTab,
-                                                    isBatchSelected: batchSelectedManualIds.contains(group.id),
-                                                    onToggleBatchManual: {
-                                                        if batchSelectedManualIds.contains(group.id) {
-                                                            batchSelectedManualIds.remove(group.id)
-                                                        } else {
-                                                            batchSelectedManualIds.insert(group.id)
-                                                        }
-                                                    },
-                                                    onToggleGroup: { on in toggleGroup(groupId: group.id, selected: on) },
-                                                    onToggleAction: { aid in toggleAction(actionId: aid) },
-                                                    onRematch: {
-                                                        rematchTargets = [group]
-                                                        showRematchSheet = true
-                                                    },
-                                                    onEditFilmPolicy: {
-                                                        editingFilmPolicyGroup = group
-                                                    },
-                                                    onParkRetention: {
-                                                        parkToRetention(plan: plan, group: group, actions: groupActions)
+                            let sections = PreviewSectionGrouping.sections(plan: plan, groups: shown, bySource: groupBySource)
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 14) {
+                                    ForEach(sections) { sec in
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text(sec.title)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+                                                .padding(.horizontal, 4)
+
+                                            ForEach(sec.groups) { group in
+                                                let groupActions = plan.actions.filter { $0.groupId == group.id && $0.enabled }
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    if group.confirmRequired {
+                                                        Label("需人工确认：\(group.confirmReasons.joined(separator: "、"))", systemImage: "exclamationmark.shield.fill")
+                                                            .font(.caption2)
+                                                            .foregroundStyle(.orange)
                                                     }
-                                                )
-                                                NavigationLink {
-                                                    MediaDetailView(
-                                                        planId: plan.id,
-                                                        groupId: group.id,
+                                                    MediaGroupCardRow(
+                                                        group: group,
+                                                        actions: groupActions,
+                                                        hasTaskOverride: plan.taskPolicy != nil,
+                                                        isManualMode: manualTab,
+                                                        isBatchSelected: batchSelectedManualIds.contains(group.id),
+                                                        onToggleBatchManual: {
+                                                            if batchSelectedManualIds.contains(group.id) {
+                                                                batchSelectedManualIds.remove(group.id)
+                                                            } else {
+                                                                batchSelectedManualIds.insert(group.id)
+                                                            }
+                                                        },
+                                                        onToggleGroup: { on in toggleGroup(groupId: group.id, selected: on) },
+                                                        onToggleAction: { aid in toggleAction(actionId: aid) },
                                                         onRematch: {
                                                             rematchTargets = [group]
                                                             showRematchSheet = true
                                                         },
-                                                        onEditPolicy: {
+                                                        onEditFilmPolicy: {
                                                             editingFilmPolicyGroup = group
                                                         },
-                                                        onEditAssets: {
-                                                            editingAssetsGroup = group
-                                                        },
-                                                        onEditEpisodeStrategy: group.kind == "tv" ? {
-                                                            strategyError = nil
-                                                            strategyEpisodeGroups = []
-                                                            editingStrategyGroup = group
-                                                            if let tid = group.tmdbId {
-                                                                Task {
-                                                                    strategyEpisodeGroups = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
-                                                                }
-                                                            }
-                                                        } : nil
+                                                        onParkRetention: {
+                                                            parkToRetention(plan: plan, group: group, actions: groupActions)
+                                                        }
                                                     )
-                                                } label: {
-                                                    Text("查看完整作品详情与操作明细")
-                                                        .font(.caption)
-                                                        .foregroundStyle(MMTheme.accent)
+                                                    Divider()
+                                                    NavigationLink {
+                                                        MediaDetailView(
+                                                            planId: plan.id,
+                                                            groupId: group.id,
+                                                            onRematch: {
+                                                                rematchTargets = [group]
+                                                                showRematchSheet = true
+                                                            },
+                                                            onEditPolicy: {
+                                                                editingFilmPolicyGroup = group
+                                                            },
+                                                            onEditAssets: {
+                                                                editingAssetsGroup = group
+                                                            },
+                                                            onEditEpisodeStrategy: group.kind == "tv" ? {
+                                                                strategyError = nil
+                                                                strategyEpisodeGroups = []
+                                                                editingStrategyGroup = group
+                                                                if let tid = group.tmdbId {
+                                                                    Task {
+                                                                        strategyEpisodeGroups = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
+                                                                    }
+                                                                }
+                                                            } : nil
+                                                        )
+                                                    } label: {
+                                                        HStack {
+                                                            Text("查看完整作品详情与操作明细")
+                                                                .font(.caption)
+                                                                .foregroundStyle(MMTheme.accent)
+                                                            Spacer()
+                                                            Image(systemName: "chevron.right")
+                                                                .font(.caption2)
+                                                                .foregroundStyle(.tertiary)
+                                                        }
+                                                        .contentShape(Rectangle())
+                                                    }
+                                                    .buttonStyle(.plain)
                                                 }
+                                                .padding(14)
+                                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                .clipped()
                                             }
                                         }
                                     }
                                 }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
                             }
-                            .listStyle(.insetGrouped)
+                            .background(Color(.systemGroupedBackground))
                         }
 
                         if manualTab && !batchSelectedManualIds.isEmpty {
@@ -231,19 +223,27 @@ public struct PreviewTabView: View {
                             }
                             .padding()
                             .background(.bar)
-                        } else if selectedCount > 0 && !manualTab {
+                        } else if !manualTab {
                             HStack {
-                                Text("共 \(selectedCount) 项可执行操作").font(.subheadline).foregroundStyle(.secondary)
-                                Spacer()
                                 Button {
-                                    execute(plan: plan)
+                                    showTaskPolicySheet = true
                                 } label: {
-                                    Text(ExecutionEngine.shared.isRunning ? "加入队列 (\(selectedCount))" : "立即执行 (\(selectedCount))")
-                                        .fontWeight(.semibold)
-                                        .padding(.horizontal, 18)
-                                        .padding(.vertical, 10)
-                                        .background(MMTheme.accent, in: Capsule())
-                                        .foregroundStyle(.white)
+                                    Label("设置", systemImage: "slider.horizontal.3")
+                                        .font(.subheadline.weight(.medium))
+                                }
+                                .buttonStyle(.bordered)
+                                Spacer()
+                                if selectedCount > 0 {
+                                    Button {
+                                        execute(plan: plan)
+                                    } label: {
+                                        Text(ExecutionEngine.shared.isRunning ? "加入队列 (\(selectedCount))" : "立即执行 (\(selectedCount))")
+                                            .fontWeight(.semibold)
+                                            .padding(.horizontal, 18)
+                                            .padding(.vertical, 10)
+                                            .background(MMTheme.accent, in: Capsule())
+                                            .foregroundStyle(.white)
+                                    }
                                 }
                             }
                             .padding()
@@ -279,7 +279,6 @@ public struct PreviewTabView: View {
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("收件箱") { showInboxSheet = true }
-                        Button("任务策略") { showTaskPolicySheet = true }
                         if planStore.plans.count > 1 {
                             Menu("切换") {
                                 ForEach(planStore.plans) { p in
@@ -339,14 +338,18 @@ public struct PreviewTabView: View {
             }
             .sheet(isPresented: $showTaskPolicySheet) {
                 if let plan = activePlan {
-                    PolicyOverrideSheet(
-                        title: "任务策略（第 2 层 · 覆盖全局）",
-                        isTv: false,
-                        isTaskScope: true,
-                        current: plan.taskPolicy,
-                        fallback: PolicyResolver.resolve(isTv: false, global: AppSettings.shared.policies)
-                    ) { updated in
-                        applyTaskPolicy(updated)
+                    NavigationStack {
+                        DefaultPolicyScreen(
+                            initialCategory: .organize,
+                            taskOverride: plan.taskPolicy
+                        ) { updated in
+                            applyTaskPolicy(updated)
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("完成") { showTaskPolicySheet = false }
+                            }
+                        }
                     }
                 }
             }
@@ -382,7 +385,6 @@ public struct PreviewTabView: View {
         plan.taskPolicy = override
         plan = PolicyResolver.applyOverrides(to: plan, global: AppSettings.shared.policies)
         PlanAndTaskStore.shared.savePlan(plan)
-        infoBanner = override == nil ? "已清除任务策略，恢复继承全局默认" : "已应用任务级策略并重算本计划命名"
     }
 
     private func applyFilmPolicy(groupId: String, override: PolicyOverride?) {
@@ -390,7 +392,6 @@ public struct PreviewTabView: View {
         plan.groups[idx].policyOverride = override
         plan = PolicyResolver.applyOverrides(to: plan, global: AppSettings.shared.policies)
         PlanAndTaskStore.shared.savePlan(plan)
-        infoBanner = override == nil ? "已清除单部影片策略，恢复继承上层策略" : "已应用影片级策略并重算文件名"
     }
 
     private func execute(plan: ScrapePlan) {
@@ -415,7 +416,6 @@ public struct PreviewTabView: View {
         }
         let targets = actions.filter { ($0.fileId ?? "").isEmpty == false }
         guard !targets.isEmpty else {
-            infoBanner = "该分组暂无可移入保留区的云端文件"
             return
         }
         Task {
@@ -440,7 +440,6 @@ public struct PreviewTabView: View {
                 await MainActor.run {
                     let latest = PlanAndTaskStore.shared.plans.first(where: { $0.id == plan.id }) ?? plan
                     PlanAndTaskStore.shared.savePlan(PlanSelection.set(plan: latest, ids: movedIds, on: false))
-                    infoBanner = "已将「\(group.folderName)」共 \(movedCount) 项移入云端保留区并取消勾选"
                 }
             }
         }
@@ -504,7 +503,6 @@ public struct PreviewTabView: View {
                         rematchApplying = false
                         rematchError = nil
                         showRematchSheet = false
-                        infoBanner = "已通过 1:1 引擎重新规划 \(groups.count) 个作品（含旧产物检测）"
                     }
                 } catch {
                     await MainActor.run {
@@ -565,7 +563,6 @@ public struct PreviewTabView: View {
                     if let updated = replanned.groups.first(where: { $0.id == group.id }) {
                         editingStrategyGroup = updated
                     }
-                    infoBanner = "已切换剧集策略为「\(strategy.label)」并重新生成预览"
                 }
             } catch {
                 await MainActor.run {
@@ -670,55 +667,115 @@ public struct PreviewTabView: View {
             }
         }
         PlanAndTaskStore.shared.savePlan(plan)
-        infoBanner = "已完成 \(groups.count) 组手动匹配并自动沉淀本地识别规则"
     }
 }
 
-/// 第 2 层（任务策略）与第 3 层（影片策略）覆盖编辑器（对标 Android FilmPolicySheets）。
+/// 第 3 层（影片策略）覆盖编辑器（对标 Android FilmPolicySheets）。
 struct PolicyOverrideSheet: View {
     let title: String
     let isTv: Bool
-    var isTaskScope: Bool = false
     let current: PolicyOverride?
     let fallback: EffectivePolicy
     let onSave: (PolicyOverride?) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var renameFiles: Bool = true
-    @State private var renameFolders: Bool = true
-    @State private var fileTmdbEnabled: Bool = true
-    @State private var keepResolution: Bool = true
-    @State private var keepFps: Bool = true
-    @State private var keepQuality: Bool = true
-    @State private var keepAudio: Bool = true
-    @State private var defaultSdrWhenMissing: Bool = false
-    @State private var writeNfo: Bool = true
-    @State private var downloadPoster: Bool = true
-    @State private var downloadFanart: Bool = false
+    @State private var renameFiles: Bool
+    @State private var renameFolders: Bool
+    @State private var fileTmdbEnabled: Bool
+    @State private var keepResolution: Bool
+    @State private var keepFps: Bool
+    @State private var keepQuality: Bool
+    @State private var keepAudio: Bool
+    @State private var defaultSdrWhenMissing: Bool
+    @State private var writeNfo: Bool
+    @State private var downloadPoster: Bool
+    @State private var downloadFanart: Bool
+    @State private var hasOverride: Bool
+
+    init(
+        title: String,
+        isTv: Bool,
+        current: PolicyOverride?,
+        fallback: EffectivePolicy,
+        onSave: @escaping (PolicyOverride?) -> Void
+    ) {
+        self.title = title
+        self.isTv = isTv
+        self.current = current
+        self.fallback = fallback
+        self.onSave = onSave
+        let n = (isTv ? current?.tvNaming : current?.movieNaming) ?? fallback.naming
+        _renameFiles = State(initialValue: current?.renameFiles ?? fallback.renameFiles)
+        _renameFolders = State(initialValue: current?.renameFolders ?? fallback.renameFolders)
+        _fileTmdbEnabled = State(initialValue: n.fileTmdbEnabled)
+        _keepResolution = State(initialValue: n.keepResolution)
+        _keepFps = State(initialValue: n.keepFps)
+        _keepQuality = State(initialValue: n.keepQuality)
+        _keepAudio = State(initialValue: n.keepAudio)
+        _defaultSdrWhenMissing = State(initialValue: n.defaultSdrWhenMissing)
+        _writeNfo = State(initialValue: current?.writeNfo ?? fallback.writeNfo)
+        _downloadPoster = State(initialValue: current?.downloadPoster ?? fallback.downloadPoster)
+        _downloadFanart = State(initialValue: current?.downloadFanart ?? fallback.downloadFanart)
+        _hasOverride = State(initialValue: current != nil)
+    }
+
+    private func liveBinding(_ state: Binding<Bool>) -> Binding<Bool> {
+        Binding(
+            get: { state.wrappedValue },
+            set: { newValue in
+                state.wrappedValue = newValue
+                applyNow()
+            }
+        )
+    }
+
+    private func applyNow() {
+        var naming = (isTv ? current?.tvNaming : current?.movieNaming) ?? fallback.naming
+        naming.fileTmdbEnabled = fileTmdbEnabled
+        naming.keepResolution = keepResolution
+        naming.keepFps = keepFps
+        naming.keepQuality = keepQuality
+        naming.keepAudio = keepAudio
+        naming.defaultSdrWhenMissing = defaultSdrWhenMissing
+        var ov = current ?? PolicyOverride()
+        ov.renameFiles = renameFiles
+        ov.renameFolders = renameFolders
+        if isTv {
+            ov.tvNaming = naming
+        } else {
+            ov.movieNaming = naming
+        }
+        ov.writeNfo = writeNfo
+        ov.downloadPoster = downloadPoster
+        ov.downloadFanart = downloadFanart
+        hasOverride = true
+        onSave(ov)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("文件与版本标签覆盖") {
-                    Toggle("重命名文件", isOn: $renameFiles)
-                    Toggle("重命名目录", isOn: $renameFolders)
-                    Toggle("文件名包含 {tmdb-ID}", isOn: $fileTmdbEnabled)
-                    Toggle("保留分辨率（2160p / 1080p）", isOn: $keepResolution)
-                    Toggle("保留帧率（fps）", isOn: $keepFps)
-                    Toggle("保留画质（DV / HDR / UHD / BluRay）", isOn: $keepQuality)
-                    Toggle("保留音轨（TrueHD / Atmos / DDP）", isOn: $keepAudio)
-                    Toggle("缺失画质时自动补全 SDR", isOn: $defaultSdrWhenMissing)
+                Section(header: Text("文件与版本标签覆盖"), footer: Text("所有开关修改后实时生效，无需点击保存。")) {
+                    Toggle("重命名文件", isOn: liveBinding($renameFiles))
+                    Toggle("重命名目录", isOn: liveBinding($renameFolders))
+                    Toggle("文件名包含 {tmdb-ID}", isOn: liveBinding($fileTmdbEnabled))
+                    Toggle("保留分辨率（2160p / 1080p）", isOn: liveBinding($keepResolution))
+                    Toggle("保留帧率（fps）", isOn: liveBinding($keepFps))
+                    Toggle("保留画质（DV / HDR / UHD / BluRay）", isOn: liveBinding($keepQuality))
+                    Toggle("保留音轨（TrueHD / Atmos / DDP）", isOn: liveBinding($keepAudio))
+                    Toggle("缺失画质时自动补全 SDR", isOn: liveBinding($defaultSdrWhenMissing))
                 }
 
                 Section("刮削素材覆盖") {
-                    Toggle("写入 NFO", isOn: $writeNfo)
-                    Toggle("下载海报（poster.jpg）", isOn: $downloadPoster)
-                    Toggle("下载背景图（fanart.jpg）", isOn: $downloadFanart)
+                    Toggle("写入 NFO", isOn: liveBinding($writeNfo))
+                    Toggle("下载海报（poster.jpg）", isOn: liveBinding($downloadPoster))
+                    Toggle("下载背景图（fanart.jpg）", isOn: liveBinding($downloadFanart))
                 }
 
-                if current != nil {
+                if hasOverride {
                     Section {
                         Button("恢复继承上层策略", role: .destructive) {
+                            hasOverride = false
                             onSave(nil)
                             dismiss()
                         }
@@ -728,55 +785,9 @@ struct PolicyOverrideSheet: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("应用") {
-                        var naming = (isTv ? current?.tvNaming : current?.movieNaming) ?? fallback.naming
-                        naming.fileTmdbEnabled = fileTmdbEnabled
-                        naming.keepResolution = keepResolution
-                        naming.keepFps = keepFps
-                        naming.keepQuality = keepQuality
-                        naming.keepAudio = keepAudio
-                        naming.defaultSdrWhenMissing = defaultSdrWhenMissing
-                        var ov = current ?? PolicyOverride()
-                        ov.renameFiles = renameFiles
-                        ov.renameFolders = renameFolders
-                        if isTaskScope {
-                            ov.movieNaming = naming
-                            var tvN = current?.tvNaming ?? AppSettings.shared.policies.tvNaming
-                            tvN.fileTmdbEnabled = fileTmdbEnabled
-                            tvN.keepResolution = keepResolution
-                            tvN.keepFps = keepFps
-                            tvN.keepQuality = keepQuality
-                            tvN.keepAudio = keepAudio
-                            tvN.defaultSdrWhenMissing = defaultSdrWhenMissing
-                            ov.tvNaming = tvN
-                        } else if isTv {
-                            ov.tvNaming = naming
-                        } else {
-                            ov.movieNaming = naming
-                        }
-                        ov.writeNfo = writeNfo
-                        ov.downloadPoster = downloadPoster
-                        ov.downloadFanart = downloadFanart
-                        onSave(ov)
-                        dismiss()
-                    }
+                    Button("完成") { dismiss() }
                 }
-            }
-            .onAppear {
-                let n = (isTv ? current?.tvNaming : current?.movieNaming) ?? fallback.naming
-                renameFiles = current?.renameFiles ?? fallback.renameFiles
-                renameFolders = current?.renameFolders ?? fallback.renameFolders
-                fileTmdbEnabled = n.fileTmdbEnabled
-                keepResolution = n.keepResolution
-                keepFps = n.keepFps
-                keepQuality = n.keepQuality
-                keepAudio = n.keepAudio
-                defaultSdrWhenMissing = n.defaultSdrWhenMissing
-                writeNfo = current?.writeNfo ?? fallback.writeNfo
-                downloadPoster = current?.downloadPoster ?? fallback.downloadPoster
-                downloadFanart = current?.downloadFanart ?? fallback.downloadFanart
             }
         }
     }
@@ -893,10 +904,12 @@ private struct MediaGroupCardRow: View {
                         Button("策略") { onEditFilmPolicy() }
                             .font(.caption2)
                             .foregroundStyle(MMTheme.accent)
+                            .buttonStyle(.borderless)
                     } else {
                         Button("保留区") { onParkRetention() }
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .buttonStyle(.borderless)
                     }
                 }
             }
@@ -909,35 +922,56 @@ private struct MediaGroupCardRow: View {
             }
 
             if !actions.isEmpty {
-                DisclosureGroup("查看 \(actions.count) 项整理操作", isExpanded: $expanded) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(actions) { act in
-                            HStack(spacing: 8) {
-                                if act.op != "unmatched" && !act.done {
-                                    Button {
-                                        onToggleAction(act.id)
-                                    } label: {
-                                        Image(systemName: act.selected ? "checkmark.square.fill" : "square")
-                                            .foregroundStyle(act.selected ? MMTheme.accent : .secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            expanded.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Text("查看 \(actions.count) 项整理操作")
+                                .font(.caption)
+                                .foregroundStyle(MMTheme.accent)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(MMTheme.accent)
+                                .rotationEffect(.degrees(expanded ? 90 : 0))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if expanded {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(actions) { act in
+                                HStack(spacing: 8) {
+                                    if act.op != "unmatched" && !act.done {
+                                        Button {
+                                            onToggleAction(act.id)
+                                        } label: {
+                                            Image(systemName: act.selected ? "checkmark.square.fill" : "square")
+                                                .foregroundStyle(act.selected ? MMTheme.accent : .secondary)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
-                                }
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("[\(act.op)] \(act.newName.isEmpty ? act.oldName : act.newName)")
-                                        .font(.caption.monospaced())
-                                        .lineLimit(2)
-                                    if !act.oldName.isEmpty && act.oldName != act.newName {
-                                        Text("原：\(act.oldName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text("[\(MMTheme.opLabel(act.op))] \(act.newName.isEmpty ? act.oldName : act.newName)")
+                                            .font(.caption.monospaced())
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(2)
+                                        if !act.oldName.isEmpty && act.oldName != act.newName {
+                                            Text("原：\(act.oldName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                        }
                                     }
+                                    Spacer()
                                 }
-                                Spacer()
                             }
                         }
+                        .padding(.top, 4)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    .padding(.top, 4)
                 }
-                .font(.caption)
-                .foregroundStyle(MMTheme.accent)
             }
         }
         .padding(.vertical, 4)

@@ -296,7 +296,9 @@ public enum StandardNaming {
     public static func stripTmdbMark(_ text: String) -> String {
         guard let rx = tmdbMarkRegex else { return text }
         let r = NSRange(text.startIndex..<text.endIndex, in: text)
-        return rx.stringByReplacingMatches(in: text, range: r, withTemplate: " ")
+        let stripped = rx.stringByReplacingMatches(in: text, range: r, withTemplate: " ")
+        return stripped.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
     }
 
     private static func matches(_ rx: NSRegularExpression?, in text: String) -> Bool {

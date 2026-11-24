@@ -240,6 +240,51 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
     }
 }
 
+public extension DefaultPolicies {
+    /// 将第 2 层任务策略覆写合并到当前全局策略副本，供完整任务策略页展示与实时编辑。
+    func applying(_ override: PolicyOverride?) -> DefaultPolicies {
+        guard let ov = override else { return self }
+        var out = self
+        if let v = ov.organizeEnabled { out.organizeEnabled = v }
+        if let v = ov.scrapeEnabled { out.scrapeEnabled = v }
+        if let v = ov.renameFiles { out.renameFiles = v }
+        if let v = ov.renameFolders { out.renameFolders = v }
+        if let v = ov.mergeSeries { out.mergeSeries = v }
+        if let v = ov.imageQuality { out.imageQuality = v }
+        if let v = ov.movieNaming { out.movieNaming = v }
+        if let v = ov.tvNaming { out.tvNaming = v }
+        if let v = ov.writeNfo { out.movie.nfo = v; out.tv.nfo = v }
+        if let v = ov.downloadPoster { out.movie.poster = v; out.tv.poster = v }
+        if let v = ov.downloadFanart { out.movie.fanart = v; out.tv.fanart = v }
+        if let v = ov.downloadClearlogo { out.movie.logo = v; out.tv.logo = v }
+        if let v = ov.downloadEpisodeThumb { out.episodeThumb = v }
+        return out
+    }
+
+    /// 计算相对全局默认策略的差量覆写，仅记录第 2 层任务级差异。
+    func diffOverride(from base: DefaultPolicies) -> PolicyOverride {
+        var ov = PolicyOverride()
+        if organizeEnabled != base.organizeEnabled { ov.organizeEnabled = organizeEnabled }
+        if scrapeEnabled != base.scrapeEnabled { ov.scrapeEnabled = scrapeEnabled }
+        if renameFiles != base.renameFiles { ov.renameFiles = renameFiles }
+        if renameFolders != base.renameFolders { ov.renameFolders = renameFolders }
+        if mergeSeries != base.mergeSeries { ov.mergeSeries = mergeSeries }
+        if imageQuality != base.imageQuality { ov.imageQuality = imageQuality }
+        if movieNaming != base.movieNaming { ov.movieNaming = movieNaming }
+        if tvNaming != base.tvNaming { ov.tvNaming = tvNaming }
+        if movie.nfo != base.movie.nfo { ov.writeNfo = movie.nfo }
+        else if tv.nfo != base.tv.nfo { ov.writeNfo = tv.nfo }
+        if movie.poster != base.movie.poster { ov.downloadPoster = movie.poster }
+        else if tv.poster != base.tv.poster { ov.downloadPoster = tv.poster }
+        if movie.fanart != base.movie.fanart { ov.downloadFanart = movie.fanart }
+        else if tv.fanart != base.tv.fanart { ov.downloadFanart = tv.fanart }
+        if movie.logo != base.movie.logo { ov.downloadClearlogo = movie.logo }
+        else if tv.logo != base.tv.logo { ov.downloadClearlogo = tv.logo }
+        if episodeThumb != base.episodeThumb { ov.downloadEpisodeThumb = episodeThumb }
+        return ov
+    }
+}
+
 /// 第 2 层（任务/计划级）与第 3 层（影片/分组级）可覆写策略切片。
 /// 非 nil 字段优先生效，nil 字段自动向下继承上一层策略。
 public struct PolicyOverride: Codable, Hashable, Sendable {
@@ -361,7 +406,9 @@ public enum PolicyResolver {
                 let act = out.actions[aIdx]
                 if act.op == "rename" && act.kind == "folder" {
                     out.actions[aIdx].newName = targetFolder
-                    out.actions[aIdx].selected = eff.organizeEnabled && eff.renameFolders
+                    let enableFolder = eff.organizeEnabled && eff.renameFolders
+                    out.actions[aIdx].enabled = enableFolder
+                    out.actions[aIdx].selected = enableFolder
                 } else if act.op == "rename" && act.kind == "file" {
                     let (oldStem, ext) = MediaParser.splitNameExt(act.oldName)
                     let recomputed: String
@@ -389,7 +436,9 @@ public enum PolicyResolver {
                         ) + ext
                     }
                     out.actions[aIdx].newName = recomputed
-                    out.actions[aIdx].selected = eff.organizeEnabled && eff.renameFiles
+                    let enableFile = eff.organizeEnabled && eff.renameFiles
+                    out.actions[aIdx].enabled = enableFile
+                    out.actions[aIdx].selected = enableFile
                 } else if act.op == "artwork" {
                     let enableArt: Bool
                     switch act.kind {
@@ -415,6 +464,7 @@ public enum PolicyResolver {
                     default:
                         enableArt = eff.scrapeEnabled
                     }
+                    out.actions[aIdx].enabled = enableArt
                     out.actions[aIdx].selected = enableArt
                 }
             }

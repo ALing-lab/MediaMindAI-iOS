@@ -29,7 +29,7 @@ public enum ProviderKind: String, CaseIterable, Codable, Sendable, Identifiable 
 
     public var loginHint: String {
         switch self {
-        case .p123: return "账号密码或短信 / 扫码验证"
+        case .p123: return "账号密码登录"
         case .guangya: return "手机号 + 短信验证码登录"
         case .webdav: return "服务器地址 + 用户名 + 密码"
         }

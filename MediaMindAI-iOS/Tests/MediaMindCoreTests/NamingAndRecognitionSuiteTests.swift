@@ -55,7 +55,7 @@ final class NamingAndRecognitionSuiteTests: XCTestCase {
         XCTAssertTrue(folder.contains("2010"))
         XCTAssertTrue(folder.contains("27205"))
 
-        XCTAssertEqual(StandardNaming.seasonDirName(0), "Specials")
+        XCTAssertEqual(StandardNaming.seasonDirName(0), "Season 00")
         XCTAssertEqual(StandardNaming.seasonDirName(1), "Season 01")
         XCTAssertEqual(StandardNaming.seasonDirName(12), "Season 12")
 

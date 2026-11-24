@@ -32,6 +32,10 @@ public struct DefaultPolicyScreen: View {
     @State private var showDestinationPicker: Bool = false
     @State private var nfoSheetTitle: String? = nil
     @State private var nfoSheetIsEpisode: Bool = false
+    @State private var taskPolicies: DefaultPolicies
+    @State private var hasTaskOverride: Bool
+    private let isTaskScope: Bool
+    private let onTaskOverrideChange: ((PolicyOverride?) -> Void)?
 
     private let tmdbStyles: [(value: String, label: String)] = [
         ("{tmdb-id}", "{tmdb-842675}"),
@@ -57,16 +61,43 @@ public struct DefaultPolicyScreen: View {
         ("none", "无（保持原语言）"),
     ]
 
-    public init(initialCategory: PolicyCategory = .organize) {
+    public init(
+        initialCategory: PolicyCategory = .organize,
+        taskOverride: PolicyOverride? = nil,
+        onTaskOverrideChange: ((PolicyOverride?) -> Void)? = nil
+    ) {
         self._category = State(initialValue: initialCategory)
+        let base = AppSettings.shared.policies
+        self._taskPolicies = State(initialValue: base.applying(taskOverride))
+        self._hasTaskOverride = State(initialValue: taskOverride != nil)
+        self.isTaskScope = onTaskOverrideChange != nil
+        self.onTaskOverrideChange = onTaskOverrideChange
+    }
+
+    private var currentPolicies: DefaultPolicies {
+        isTaskScope ? taskPolicies : settings.policies
+    }
+
+    private var policiesBinding: Binding<DefaultPolicies> {
+        if isTaskScope {
+            return Binding(
+                get: { taskPolicies },
+                set: { updated in
+                    taskPolicies = updated
+                    hasTaskOverride = true
+                    onTaskOverrideChange?(updated.diffOverride(from: settings.policies))
+                }
+            )
+        }
+        return $settings.policies
     }
 
     private var activeNamingBinding: Binding<MediaNamingPrefs> {
-        organizeIsTv ? $settings.policies.tvNaming : $settings.policies.movieNaming
+        organizeIsTv ? policiesBinding.tvNaming : policiesBinding.movieNaming
     }
 
     private var activeMediaDefaultsBinding: Binding<MediaDefaults> {
-        scrapeIsTv ? $settings.policies.tv : $settings.policies.movie
+        scrapeIsTv ? policiesBinding.tv : policiesBinding.movie
     }
 
     public var body: some View {
@@ -79,7 +110,9 @@ public struct DefaultPolicyScreen: View {
                 }
                 .pickerStyle(.segmented)
             } footer: {
-                Text("全局策略会在任务生成时同步为该任务的任务策略；任务策略、影片策略优先于全局策略。所有修改实时生效。")
+                Text(isTaskScope
+                     ? "当前为任务策略（第 2 层）：仅覆盖本次识别任务，不影响全局默认设置，所有修改实时生效。"
+                     : "全局策略会在任务生成时同步为该任务的任务策略；任务策略、影片策略优先于全局策略。所有修改实时生效。")
             }
 
             switch category {
@@ -91,14 +124,27 @@ public struct DefaultPolicyScreen: View {
                 episodeSections
             }
 
-            Section {
-                Button("恢复本页默认值", role: .destructive) {
-                    resetCurrentCategory()
+            if isTaskScope {
+                if hasTaskOverride {
+                    Section {
+                        Button("恢复继承全局策略", role: .destructive) {
+                            taskPolicies = settings.policies
+                            hasTaskOverride = false
+                            onTaskOverrideChange?(nil)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                Section {
+                    Button("恢复本页默认值", role: .destructive) {
+                        resetCurrentCategory()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
         }
-        .navigationTitle(category.title)
+        .navigationTitle(isTaskScope ? "任务策略" : category.title)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showDestinationPicker) {
             if let acct = AccountStore.shared.activeAccount {
@@ -106,8 +152,8 @@ public struct DefaultPolicyScreen: View {
                     accountId: acct.id,
                     sourceId: nil
                 ) { folderId, displayPath in
-                    settings.policies.adaptiveTargetDirId = folderId
-                    settings.policies.adaptiveTargetDirPath = displayPath
+                    policiesBinding.wrappedValue.adaptiveTargetDirId = folderId
+                    policiesBinding.wrappedValue.adaptiveTargetDirPath = displayPath
                 }
             }
         }
@@ -127,10 +173,10 @@ public struct DefaultPolicyScreen: View {
     @ViewBuilder
     private var organizeSections: some View {
         Section {
-            Toggle("启用文件与目录整理", isOn: $settings.policies.organizeEnabled)
-            Toggle("文件重命名", isOn: $settings.policies.renameFiles)
-            Toggle("文件夹重命名", isOn: $settings.policies.renameFolders)
-            Toggle("整理季目录", isOn: $settings.policies.seasonFolders)
+            Toggle("启用文件与目录整理", isOn: policiesBinding.organizeEnabled)
+            Toggle("文件重命名", isOn: policiesBinding.renameFiles)
+            Toggle("文件夹重命名", isOn: policiesBinding.renameFolders)
+            Toggle("整理季目录", isOn: policiesBinding.seasonFolders)
         } header: {
             Text("整理开关")
         } footer: {
@@ -144,14 +190,14 @@ public struct DefaultPolicyScreen: View {
             }
             .pickerStyle(.segmented)
 
-            let prefs = organizeIsTv ? settings.policies.tvNaming : settings.policies.movieNaming
+            let prefs = organizeIsTv ? currentPolicies.tvNaming : currentPolicies.movieNaming
             VStack(spacing: 12) {
                 NamingPreviewShowcaseCard(
                     categoryLabel: (organizeIsTv ? "剧集" : "电影") + "文件夹命名示例",
                     posterLetter: organizeIsTv ? "爱" : "流",
                     posterPath: organizeIsTv ? "/65VjxRnfqguutyL7LdOEQ3UcCUF.jpg" : "/tXuQCgx69DxVgeTsU0TkruR3i9O.jpg",
                     before: prefs.previewFolder(isTv: organizeIsTv, renameFolders: false),
-                    after: prefs.previewFolder(isTv: organizeIsTv, renameFolders: settings.policies.renameFolders),
+                    after: prefs.previewFolder(isTv: organizeIsTv, renameFolders: currentPolicies.renameFolders),
                     isFolder: true
                 )
                 NamingPreviewShowcaseCard(
@@ -159,14 +205,14 @@ public struct DefaultPolicyScreen: View {
                     posterLetter: organizeIsTv ? "爱" : "流",
                     posterPath: organizeIsTv ? "/65VjxRnfqguutyL7LdOEQ3UcCUF.jpg" : "/tXuQCgx69DxVgeTsU0TkruR3i9O.jpg",
                     before: prefs.previewFile(isTv: organizeIsTv, renameFiles: false),
-                    after: prefs.previewFile(isTv: organizeIsTv, renameFiles: settings.policies.renameFiles),
+                    after: prefs.previewFile(isTv: organizeIsTv, renameFiles: currentPolicies.renameFiles),
                     isFolder: false
                 )
             }
             .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
         }
 
-        if settings.policies.renameFiles {
+        if currentPolicies.renameFiles {
             Section(organizeIsTv ? "剧集文件名偏好" : "电影文件名偏好") {
                 Toggle("TMDB 标签", isOn: activeNamingBinding.fileTmdbEnabled)
                 if activeNamingBinding.wrappedValue.fileTmdbEnabled {
@@ -207,7 +253,7 @@ public struct DefaultPolicyScreen: View {
             }
         }
 
-        if settings.policies.renameFolders {
+        if currentPolicies.renameFolders {
             Section(organizeIsTv ? "剧集文件夹命名偏好" : "电影文件夹命名偏好") {
                 Toggle("与文件名保持一致", isOn: activeNamingBinding.folderMatchFileName)
                 Toggle("TMDB 标签", isOn: activeNamingBinding.folderTmdbEnabled)
@@ -242,15 +288,15 @@ public struct DefaultPolicyScreen: View {
         }
 
         Section {
-            Toggle("启用自定义归档目标库", isOn: $settings.policies.adaptiveDirectory)
-            if settings.policies.adaptiveDirectory {
+            Toggle("启用自定义归档目标库", isOn: policiesBinding.adaptiveDirectory)
+            if currentPolicies.adaptiveDirectory {
                 Button {
                     showDestinationPicker = true
                 } label: {
                     HStack {
                         Text("目标媒体库目录").foregroundStyle(.primary)
                         Spacer()
-                        Text(settings.policies.adaptiveTargetDirPath.isEmpty ? "点击选择" : settings.policies.adaptiveTargetDirPath)
+                        Text(currentPolicies.adaptiveTargetDirPath.isEmpty ? "点击选择" : currentPolicies.adaptiveTargetDirPath)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -261,14 +307,14 @@ public struct DefaultPolicyScreen: View {
                 }
                 .disabled(AccountStore.shared.activeAccount == nil)
 
-                if !settings.policies.adaptiveTargetDirId.isEmpty {
+                if !currentPolicies.adaptiveTargetDirId.isEmpty {
                     Button("清除已选目标目录", role: .destructive) {
-                        settings.policies.adaptiveTargetDirId = ""
-                        settings.policies.adaptiveTargetDirPath = ""
+                        policiesBinding.wrappedValue.adaptiveTargetDirId = ""
+                        policiesBinding.wrappedValue.adaptiveTargetDirPath = ""
                     }
                 }
             }
-            Toggle("确定重复项自动移入保留区", isOn: $settings.policies.autoMoveConfirmedDuplicates)
+            Toggle("确定重复项自动移入保留区", isOn: policiesBinding.autoMoveConfirmedDuplicates)
         } header: {
             Text("目标库归档与重复处理")
         } footer: {
@@ -283,85 +329,54 @@ public struct DefaultPolicyScreen: View {
     @ViewBuilder
     private var scrapeSections: some View {
         Section {
-            Toggle("启用海报与 NFO 刮削", isOn: $settings.policies.scrapeEnabled)
-            Picker("刮削模式", selection: $settings.policies.fullScrape) {
-                Text("只刮削缺失文件").tag(false)
-                Text("完整刮削").tag(true)
+            Toggle("启用海报与 NFO 刮削", isOn: policiesBinding.scrapeEnabled)
+            if currentPolicies.scrapeEnabled {
+                Picker("刮削模式", selection: policiesBinding.fullScrape) {
+                    Text("只刮削缺失文件").tag(false)
+                    Text("完整刮削").tag(true)
+                }
+                .pickerStyle(.segmented)
             }
-            .pickerStyle(.segmented)
         } header: {
             Text("刮削文件策略")
         } footer: {
-            Text(settings.policies.fullScrape
-                 ? "重新生成所选素材，同名旧文件先备份。"
-                 : "默认只补缺失项：复用历史影视匹配，仍实时检查文件是否存在。")
+            Text(!currentPolicies.scrapeEnabled
+                 ? "已关闭海报与 NFO 刮削，扫描与执行时仅做文件整理。"
+                 : (currentPolicies.fullScrape
+                    ? "重新生成所选素材，同名旧文件先备份。"
+                    : "默认只补缺失项：复用历史影视匹配，仍实时检查文件是否存在。"))
         }
 
-        Section {
-            Picker("图片清晰度", selection: $settings.policies.imageQuality) {
-                ForEach(ImageQualityOption.allCases, id: \.self) { q in
-                    Text(q.label).tag(q)
-                }
-            }
-        } header: {
-            Text("海报下载设置")
-        } footer: {
-            Text(qualityDescription(settings.policies.imageQuality))
-        }
-
-        Section {
-            Picker("素材类型", selection: $scrapeIsTv) {
-                Text("剧集").tag(true)
-                Text("电影").tag(false)
-            }
-            .pickerStyle(.segmented)
-
-            Toggle(scrapeIsTv ? "剧 NFO" : "电影 NFO", isOn: activeMediaDefaultsBinding.nfo)
-            if activeMediaDefaultsBinding.wrappedValue.nfo {
-                Button {
-                    nfoSheetTitle = scrapeIsTv ? "剧 NFO 基础信息设置" : "电影 NFO 基础信息设置"
-                    nfoSheetIsEpisode = false
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("基础信息字段").foregroundStyle(.primary)
-                            Text(selectedBasicFieldSummary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+        if currentPolicies.scrapeEnabled {
+            Section {
+                Picker("图片清晰度", selection: policiesBinding.imageQuality) {
+                    ForEach(ImageQualityOption.allCases, id: \.self) { q in
+                        Text(q.label).tag(q)
                     }
                 }
+            } header: {
+                Text("海报下载设置")
+            } footer: {
+                Text(qualityDescription(currentPolicies.imageQuality))
             }
-            Toggle("海报 · poster.jpg", isOn: activeMediaDefaultsBinding.poster)
-            Toggle("背景图 · fanart.jpg", isOn: activeMediaDefaultsBinding.fanart)
-            Toggle("Logo 图片 · clearlogo.png", isOn: activeMediaDefaultsBinding.logo)
-        } header: {
-            Text(scrapeIsTv ? "剧素材设置" : "电影素材设置")
-        } footer: {
-            Text("已有同名文件会保留，不覆盖；只补充缺失素材。")
-        }
 
-        if scrapeIsTv {
-            Section("季素材设置") {
-                Toggle("季海报", isOn: $settings.policies.seasonPoster)
-                Toggle("季 NFO", isOn: $settings.policies.seasonNfo)
-            }
-            Section("集素材设置") {
-                Toggle("集 NFO", isOn: $settings.policies.episodeNfo)
-                if settings.policies.episodeNfo {
+            Section {
+                Picker("素材类型", selection: $scrapeIsTv) {
+                    Text("剧集").tag(true)
+                    Text("电影").tag(false)
+                }
+                .pickerStyle(.segmented)
+
+                Toggle(scrapeIsTv ? "剧 NFO" : "电影 NFO", isOn: activeMediaDefaultsBinding.nfo)
+                if activeMediaDefaultsBinding.wrappedValue.nfo {
                     Button {
-                        nfoSheetTitle = "集 NFO 基础信息设置"
-                        nfoSheetIsEpisode = true
+                        nfoSheetTitle = scrapeIsTv ? "剧 NFO 基础信息设置" : "电影 NFO 基础信息设置"
+                        nfoSheetIsEpisode = false
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("集基础信息字段").foregroundStyle(.primary)
-                                Text(selectedEpisodeFieldSummary)
+                                Text("基础信息字段").foregroundStyle(.primary)
+                                Text(selectedBasicFieldSummary)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
@@ -373,7 +388,44 @@ public struct DefaultPolicyScreen: View {
                         }
                     }
                 }
-                Toggle("集缩略图", isOn: $settings.policies.episodeThumb)
+                Toggle("海报 · poster.jpg", isOn: activeMediaDefaultsBinding.poster)
+                Toggle("背景图 · fanart.jpg", isOn: activeMediaDefaultsBinding.fanart)
+                Toggle("Logo 图片 · clearlogo.png", isOn: activeMediaDefaultsBinding.logo)
+            } header: {
+                Text(scrapeIsTv ? "剧素材设置" : "电影素材设置")
+            } footer: {
+                Text("已有同名文件会保留，不覆盖；只补充缺失素材。")
+            }
+
+            if scrapeIsTv {
+                Section("季素材设置") {
+                    Toggle("季海报", isOn: policiesBinding.seasonPoster)
+                    Toggle("季 NFO", isOn: policiesBinding.seasonNfo)
+                }
+                Section("集素材设置") {
+                    Toggle("集 NFO", isOn: policiesBinding.episodeNfo)
+                    if currentPolicies.episodeNfo {
+                        Button {
+                            nfoSheetTitle = "集 NFO 基础信息设置"
+                            nfoSheetIsEpisode = true
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("集基础信息字段").foregroundStyle(.primary)
+                                    Text(selectedEpisodeFieldSummary)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    Toggle("集缩略图", isOn: policiesBinding.episodeThumb)
+                }
             }
         }
     }
@@ -384,9 +436,9 @@ public struct DefaultPolicyScreen: View {
     private var episodeSections: some View {
         Section("季集处理（默认策略）") {
             ForEach(EpisodeStrategy.allCases, id: \.self) { option in
-                let isSelected = settings.policies.episodeStrategy == option.rawValue
+                let isSelected = currentPolicies.episodeStrategy == option.rawValue
                 Button {
-                    settings.policies.episodeStrategy = option.rawValue
+                    policiesBinding.wrappedValue.episodeStrategy = option.rawValue
                 } label: {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -408,7 +460,7 @@ public struct DefaultPolicyScreen: View {
         }
 
         Section {
-            Toggle("合并同系列（电影合集 / 同剧多季）", isOn: $settings.policies.mergeSeries)
+            Toggle("合并同系列（电影合集 / 同剧多季）", isOn: policiesBinding.mergeSeries)
         } header: {
             Text("同系列归并")
         } footer: {

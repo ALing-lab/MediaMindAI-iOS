@@ -1,28 +1,6 @@
 import Foundation
 import Observation
 
-public enum ScanSpeedPreset: String, CaseIterable, Codable, Sendable {
-    case fast
-    case standard
-    case limited
-
-    public var label: String {
-        switch self {
-        case .fast: return "快速"
-        case .standard: return "标准"
-        case .limited: return "限流"
-        }
-    }
-
-    public var intervalMs: UInt64 {
-        switch self {
-        case .fast: return 100
-        case .standard: return 350
-        case .limited: return 1500
-        }
-    }
-}
-
 public enum ImageQualityOption: String, CaseIterable, Codable, Sendable {
     case compact
     case standard
@@ -63,9 +41,6 @@ public final class AppSettings: @unchecked Sendable {
     // 扫描限流
     public var scanAutomatic: Bool {
         didSet { defaults.set(scanAutomatic, forKey: "scan_auto") }
-    }
-    public var scanSpeed: ScanSpeedPreset {
-        didSet { defaults.set(scanSpeed.rawValue, forKey: "scan_speed") }
     }
 
     // 第 1 层：全局默认策略（完整包含电影/剧集独立 MediaNamingPrefs 与 MediaDefaults）
@@ -236,7 +211,6 @@ public final class AppSettings: @unchecked Sendable {
 
     private init() {
         self.scanAutomatic = defaults.object(forKey: "scan_auto") as? Bool ?? true
-        self.scanSpeed = ScanSpeedPreset(rawValue: defaults.string(forKey: "scan_speed") ?? "") ?? .standard
         if let d = defaults.data(forKey: "global_default_policies_v2"),
            let p = try? JSONDecoder().decode(DefaultPolicies.self, from: d) {
             self.policies = p

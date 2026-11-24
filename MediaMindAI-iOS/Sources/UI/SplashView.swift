@@ -83,7 +83,7 @@ private struct SplashVideoPlayerView: UIViewRepresentable {
         player.isMuted = true
         player.actionAtItemEnd = .pause
         view.playerLayer.player = player
-        view.playerLayer.videoGravity = .resizeAspectFill
+        view.playerLayer.videoGravity = .resizeAspect
         context.coordinator.observe(item: item, player: player)
         player.play()
         return view

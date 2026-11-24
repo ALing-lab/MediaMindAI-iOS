@@ -91,9 +91,9 @@ public actor AdaptiveConcurrencyGate {
     }
 
     @discardableResult
-    public func onRateLimited(backoffMs: UInt64 = 1500) -> Int {
+    public func onRateLimited(backoffMs: UInt64 = 1500, minStepDownGapNs: UInt64 = 1_500_000_000) -> Int {
         let now = DispatchTime.now().uptimeNanoseconds
-        if lastStepDownNs == 0 || (now - lastStepDownNs) >= 1_500_000_000 {
+        if lastStepDownNs == 0 || (now - lastStepDownNs) >= minStepDownGapNs {
             if levelIndex + 1 < levels.count {
                 levelIndex += 1
                 lastStepDownNs = now

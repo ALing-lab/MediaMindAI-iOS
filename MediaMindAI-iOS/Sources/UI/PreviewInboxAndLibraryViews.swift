@@ -105,7 +105,7 @@ public struct FilmLibraryView: View {
                 }
             }
         }
-        .searchable(text: $search, prompt: "搜索片名或年份")
+        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索片名或年份")
         .navigationTitle("影视库总览")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: Binding(get: { rematchTarget != nil }, set: { if !$0 { rematchTarget = nil } })) {
@@ -214,7 +214,6 @@ public struct FilmLibraryView: View {
                     }
                     updated = PolicyResolver.applyOverrides(to: updated, global: AppSettings.shared.policies)
                     store.savePlan(updated)
-                    policyTarget = nil
                 }
             }
         }
@@ -235,7 +234,6 @@ public struct FilmLibraryView: View {
                     }
                     updated = PolicyResolver.applyOverrides(to: updated, global: AppSettings.shared.policies)
                     store.savePlan(updated)
-                    assetsTarget = nil
                 }
             }
         }

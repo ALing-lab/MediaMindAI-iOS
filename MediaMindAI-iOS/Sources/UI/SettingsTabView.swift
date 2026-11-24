@@ -4,19 +4,13 @@ import SwiftUI
 public struct SettingsTabView: View {
     public init() {}
     @State private var settings = AppSettings.shared
-    @State private var accounts = AccountStore.shared
     @State private var retention = RetentionZoneStore.shared
     @State private var showClearConfirm = false
 
     public var body: some View {
         NavigationStack {
             List {
-                Section("账号与识别") {
-                    NavigationLink {
-                        AccountsManageView()
-                    } label: {
-                        LabeledContent("云盘账号", value: "\(accounts.accounts.count) 个")
-                    }
+                Section("识别与网络") {
                     NavigationLink {
                         TmdbSettingsView()
                     } label: {
@@ -36,13 +30,6 @@ public struct SettingsTabView: View {
 
                 Section("扫描与默认整理策略（第 1 层 · 全局）") {
                     Toggle("自动防风控限速（AIMD）", isOn: $settings.scanAutomatic)
-                    if !settings.scanAutomatic {
-                        Picker("手动扫描速度", selection: $settings.scanSpeed) {
-                            ForEach(ScanSpeedPreset.allCases, id: \.self) { p in
-                                Text("\(p.label) (\(p.intervalMs)ms)").tag(p)
-                            }
-                        }
-                    }
                     NavigationLink {
                         DefaultPolicyScreen(initialCategory: .organize)
                     } label: {

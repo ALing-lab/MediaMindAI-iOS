@@ -272,7 +272,7 @@ public actor TmdbClient {
         "无法连接 TMDB（\(host)）：\(why)。请开启代理，或在「设置 › TMDB 网络」填写 TMDB 代理或反代地址"
     }
 
-    private func fetchApi(path: String, query: [String: String]) async throws -> (statusCode: Int, data: Data) {
+    private func fetchApi(path: String, query: [String: String], bypassCache: Bool = false) async throws -> (statusCode: Int, data: Data) {
         let rawKey = KeychainStore.tmdbApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rawKey.isEmpty else {
             throw DriveError.unauthorized("未设置 TMDB API 密钥")
@@ -298,6 +298,7 @@ public actor TmdbClient {
             var req = URLRequest(url: url)
             req.httpMethod = "GET"
             req.timeoutInterval = 25
+            if bypassCache { req.cachePolicy = .reloadIgnoringLocalCacheData }
             req.setValue("MediaMindAI/\(UpdateChecker.currentVersion)", forHTTPHeaderField: "User-Agent")
             if isBearer {
                 req.setValue("Bearer \(cleanKey)", forHTTPHeaderField: "Authorization")
@@ -461,7 +462,7 @@ public actor TmdbClient {
         resetFailures()
         let started = DispatchTime.now().uptimeNanoseconds
         do {
-            let (status, _) = try await fetchApi(path: "/configuration", query: [:])
+            let (status, _) = try await fetchApi(path: "/configuration", query: [:], bypassCache: true)
             let ms = (DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
             let cfg = activeConfig()
             let usedBase = autoBase ?? cfg.apiBase
@@ -486,7 +487,7 @@ public actor TmdbClient {
         let cfg = activeConfig()
         let url = TmdbNetConfig.defaultImage + Self.imageTestPath
         do {
-            let bytes = try await TmdbNet.shared.downloadImageWithFallback(urlStr: url, config: cfg, session: customSession)
+            let bytes = try await TmdbNet.shared.downloadImageWithFallback(urlStr: url, config: cfg, session: customSession, bypassCache: true)
             let ms = (DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
             let pref = await TmdbNet.shared.preferredImageBase ?? cfg.imageBase
             let host = URL(string: pref)?.host ?? pref

@@ -161,3 +161,23 @@ public struct TmdbImageView: View {
         }
     }
 }
+
+extension MMTheme {
+    public static func opLabel(_ op: String) -> String {
+        switch op {
+        case "rename": return "重命名"
+        case "mkdir": return "新建目录"
+        case "move": return "移动"
+        case "artwork": return "刮削"
+        case "delete", "trash": return "清理"
+        case "skip": return "跳过"
+        case "unmatched": return "待匹配"
+        case "upload": return "上传"
+        case "backup": return "备份"
+        case "quarantine": return "暂存"
+        case "retention_move": return "保留区"
+        case "undo_stash": return "撤销暂存"
+        default: return op
+        }
+    }
+}

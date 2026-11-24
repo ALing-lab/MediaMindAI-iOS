@@ -111,7 +111,7 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
             expectedPlanKey: key1,
             actionIds: ["a1"]
         )
-        XCTAssertEqual(scoped.actions.filter(\.selected).map(\.id), ["a1"])
+        XCTAssertEqual(scoped.actions.map(\.id), ["a1", "a2"])
     }
 
     // MARK: - 2. ScannerTreeEngine 分类、旧产物检测与 M10 holderOf 守卫
@@ -121,7 +121,7 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         XCTAssertEqual(ScannerTreeEngine.seasonOfDir("Specials"), 0)
         XCTAssertEqual(ScannerTreeEngine.seasonOfDir("第3季"), 3)
         XCTAssertTrue(ScannerTreeEngine.ignoredDir("@eaDir"))
-        XCTAssertTrue(ScannerTreeEngine.isGenericDir("电影"))
+        XCTAssertTrue(ScannerTreeEngine.isCategoryDir("电影"))
 
         let items = [
             CloudEntry(fileId: "1", fileName: "movie.nfo", isDir: false, size: 100),

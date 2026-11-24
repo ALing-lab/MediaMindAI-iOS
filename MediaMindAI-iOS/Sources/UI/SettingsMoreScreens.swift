@@ -238,7 +238,7 @@ public struct DiagnosticLogView: View {
                 }
             }
         }
-        .searchable(text: $searchQuery, prompt: "按标签或关键字搜索日志")
+        .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "按标签或关键字搜索日志")
         .navigationTitle("诊断日志")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

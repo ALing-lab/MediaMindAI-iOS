@@ -152,7 +152,7 @@ public struct CompletedTaskDetailScreen: View {
                         let primaryName = row.before?.name ?? row.after?.name ?? row.actionId
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
-                                Text("[\(row.operation)] \(primaryName)")
+                                Text("[\(MMTheme.opLabel(row.operation))] \(primaryName)")
                                     .font(.caption.monospaced())
                                     .lineLimit(2)
                                 Spacer()
@@ -175,7 +175,7 @@ public struct CompletedTaskDetailScreen: View {
                     ForEach(filteredJournalRows) { row in
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
-                                Text("[\(row.op)] \(row.newName.isEmpty ? row.oldName : row.newName)")
+                                Text("[\(MMTheme.opLabel(row.op))] \(row.newName.isEmpty ? row.oldName : row.newName)")
                                     .font(.caption.monospaced())
                                     .lineLimit(2)
                                 Spacer()
@@ -197,7 +197,7 @@ public struct CompletedTaskDetailScreen: View {
                 }
             }
         }
-        .searchable(text: $searchQuery, prompt: "按文件名、操作类型或错误信息搜索")
+        .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "按文件名、操作类型或错误信息搜索")
         .navigationTitle("任务详情")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("确认撤销本次任务的全部已执行操作？", isPresented: $showRollbackConfirm, titleVisibility: .visible) {

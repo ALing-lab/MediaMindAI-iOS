@@ -112,7 +112,7 @@ public struct TaskItemsView: View {
 
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
-                                Text("[\(act.op)] \(act.newName.isEmpty ? act.oldName : act.newName)")
+                                Text("[\(MMTheme.opLabel(act.op))] \(act.newName.isEmpty ? act.oldName : act.newName)")
                                     .font(.caption.monospaced())
                                     .lineLimit(2)
                                 Spacer()
@@ -136,7 +136,7 @@ public struct TaskItemsView: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: "搜索文件名")
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索文件名")
         .navigationTitle("任务操作明细")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

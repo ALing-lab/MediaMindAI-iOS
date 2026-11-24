@@ -22,12 +22,6 @@ public final class Pan123Drive: CloudDrive, @unchecked Sendable {
     public static let loginUrl = "https://login.123pan.com/api/user/sign_in"
     public static let listSleepMs: UInt64 = 500
     public static let userAgent = "Mozilla/5.0 AppleWebKit/600 Safari/600 Chrome/124.0.0.0 Edg/124.0.0.0"
-    public static let webLoginUrls = [
-        "https://user.123pan.cn/centerlogin",
-        "https://www.123pan.com/",
-        "https://www.123pan.cn/",
-        "https://yun.123pan.cn/",
-    ]
 
     private let token: String
     private let session: URLSession
@@ -56,15 +50,15 @@ public final class Pan123Drive: CloudDrive, @unchecked Sendable {
         let credWords = ["密码", "账号", "用户不存在", "不正确"]
         let hint: String
         if captchaWords.contains(where: { message.contains($0) }) || lower.contains("captcha") {
-            hint = "123 要求短信/图形验证码。请改用「网页登录」完成验证，或先在官网登录一次后再试。"
+            hint = "123 要求短信或图形验证码，请先在 123 官网或官方 App 完成一次登录后再试。"
         } else if credWords.contains(where: { message.contains($0) }) {
             hint = "账号或密码不对（手机号不要带 +86）。"
         } else if message.contains("频繁") || message.contains("稍后") || code == 429 {
             hint = "登录太频繁，请隔一段时间再试。"
         } else if code == 7012 {
-            hint = "登录被风控（海外 IP 常见）。请改用「网页登录」，或在中国大陆网络环境下用密码登录。"
+            hint = "登录被风控（海外 IP 常见），请切换至中国大陆网络环境后再试。"
         } else {
-            hint = "如果网页登录正常而这里失败，可能是账号开启了额外验证，请改用网页登录。"
+            hint = "请确认账号密码正确；若账号开启了额外登录验证，请先在官方 App 完成一次登录。"
         }
         return "登录失败（code=\(code)）：\(message)\n\(hint)"
     }
