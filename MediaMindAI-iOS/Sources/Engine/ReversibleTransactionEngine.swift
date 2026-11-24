@@ -316,7 +316,7 @@ public final class ReversibleWalStore: @unchecked Sendable {
         }
     }
 
-    public func reverted(_ rec: ReversibleWalRecord, undoResult: RemoteSnapshot, substituted: Bool = false) {
+    public func reverted(_ rec: ReversibleWalRecord, undoResult: RemoteSnapshot?, substituted: Bool = false) {
         lock.lock(); defer { lock.unlock() }
         if let idx = records.lastIndex(where: { $0.id == rec.id }) {
             records[idx].state = substituted ? "substituted" : "reverted"
