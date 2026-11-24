@@ -18,7 +18,7 @@ jobs:
         run: |
           xcodebuild build \
             -project MediaMindAI.xcodeproj \
-            -target MediaMindAI \
+            -scheme MediaMindAI \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
