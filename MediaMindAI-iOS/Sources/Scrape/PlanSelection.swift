@@ -180,13 +180,19 @@ public enum PlanSelection {
     public static func summary(plan: ScrapePlan, ids: [String]) -> String {
         let set = Set(ids)
         let acts = plan.actions.filter { set.contains($0.id) }
+        let renameCount = acts.filter { $0.op == "rename" }.count
+        let mkdirCount = acts.filter { $0.op == "mkdir" && $0.kind != "cleanup" }.count
+        let moveCount = acts.filter { $0.op == "move" && $0.kind != "cleanup" }.count
+        let artworkCount = acts.filter { $0.op == "artwork" }.count
+        let cleanupCount = acts.filter { $0.kind == "cleanup" && $0.op == "move" }.count
+        let deleteCount = acts.filter { $0.op == "delete" }.count
         let parts: [(String, Int)] = [
-            ("命名", acts.filter { $0.op == "rename" }.count),
-            ("新建", acts.filter { $0.op == "mkdir" && $0.kind != "cleanup" }.count),
-            ("移动", acts.filter { $0.op == "move" && $0.kind != "cleanup" }.count),
-            ("海报", acts.filter { $0.op == "artwork" }.count),
-            ("清理", acts.filter { $0.kind == "cleanup" && $0.op == "move" }.count),
-            ("删除", acts.filter { $0.op == "delete" }.count),
+            ("命名", renameCount),
+            ("新建", mkdirCount),
+            ("移动", moveCount),
+            ("海报", artworkCount),
+            ("清理", cleanupCount),
+            ("删除", deleteCount),
         ].filter { $0.1 > 0 }
         return parts.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
     }

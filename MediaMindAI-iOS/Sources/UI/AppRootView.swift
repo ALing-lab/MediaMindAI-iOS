@@ -34,9 +34,14 @@ public struct AppRootView: View {
     public var body: some View {
         if sizeClass == .regular {
             NavigationSplitView {
-                List(MainTab.allCases, selection: $selectedTab) { tab in
-                    Label(tab.label, systemImage: tab.icon)
-                        .tag(tab)
+                List(selection: Binding<MainTab?>(
+                    get: { selectedTab },
+                    set: { if let v = $0 { selectedTab = v } }
+                )) {
+                    ForEach(MainTab.allCases) { tab in
+                        Label(tab.label, systemImage: tab.icon)
+                            .tag(tab)
+                    }
                 }
                 .navigationTitle("MediaMind AI")
             } detail: {

@@ -208,7 +208,6 @@ public struct CompletedTaskDetailScreen: View {
         }
     }
 
-    @ViewBuilder
     private func stateBadge(_ state: String) -> some View {
         let color: Color
         switch state {
@@ -217,7 +216,7 @@ public struct CompletedTaskDetailScreen: View {
         case "failed", "uncertain", "conflict": color = MMTheme.redErr
         default: color = .orange
         }
-        Text(state)
+        return Text(state)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
     }

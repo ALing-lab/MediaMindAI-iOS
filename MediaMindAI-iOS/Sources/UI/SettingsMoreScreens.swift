@@ -266,7 +266,12 @@ public struct DiagnosticLogView: View {
         let outUrl = FileManager.default.temporaryDirectory.appendingPathComponent("mediamind-diagnostic.log")
         do {
             let file = try await NetLog.shared.exportTo(fileUrl: outUrl, header: header)
-            let text = (try? String(contentsOf: file, encoding: .utf8)) ?? (await NetLog.shared.exportText())
+            let text: String
+            if let loaded = try? String(contentsOf: file, encoding: .utf8) {
+                text = loaded
+            } else {
+                text = await NetLog.shared.exportText()
+            }
             #if canImport(UIKit)
             UIPasteboard.general.string = text
             #endif
