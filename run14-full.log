@@ -1,0 +1,991 @@
+build	Set up job	﻿2026-11-24T20:07:14.7174930Z Current runner version: '2.338.2'
+build	Set up job	2026-11-24T20:07:14.7225150Z ##[group]Runner Image Provisioner
+build	Set up job	2026-11-24T20:07:14.7225870Z Hosted Compute Agent
+build	Set up job	2026-11-24T20:07:14.7226310Z Version: 20261103.629
+build	Set up job	2026-11-24T20:07:14.7226740Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+build	Set up job	2026-11-24T20:07:14.7227210Z Build Date: 2026-11-03T17:26:59Z
+build	Set up job	2026-11-24T20:07:14.7227720Z Worker ID: {42362fba-c9bc-4012-8bbf-30d56bfd7b82}
+build	Set up job	2026-11-24T20:07:14.7228270Z Region: westus
+build	Set up job	2026-11-24T20:07:14.7228600Z Cloud: MacCloud
+build	Set up job	2026-11-24T20:07:14.7229000Z ##[endgroup]
+build	Set up job	2026-11-24T20:07:14.7230180Z ##[group]Operating System
+build	Set up job	2026-11-24T20:07:14.7230630Z macOS
+build	Set up job	2026-11-24T20:07:14.7230970Z 27.0.1
+build	Set up job	2026-11-24T20:07:14.7231300Z 26A434
+build	Set up job	2026-11-24T20:07:14.7231700Z ##[endgroup]
+build	Set up job	2026-11-24T20:07:14.7232070Z ##[group]Runner Image
+build	Set up job	2026-11-24T20:07:14.7232530Z Image: xcode-27-arm64
+build	Set up job	2026-11-24T20:07:14.7234020Z Version: 20261104.0337.1
+build	Set up job	2026-11-24T20:07:14.7235100Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261104.0337/images/macos/xcode-27-arm64-Readme.md
+build	Set up job	2026-11-24T20:07:14.7245520Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261104.0337
+build	Set up job	2026-11-24T20:07:14.7246390Z ##[endgroup]
+build	Set up job	2026-11-24T20:07:14.7247280Z ##[group]GITHUB_TOKEN Permissions
+build	Set up job	2026-11-24T20:07:14.7264800Z Contents: read
+build	Set up job	2026-11-24T20:07:14.7265330Z Metadata: read
+build	Set up job	2026-11-24T20:07:14.7265710Z Packages: read
+build	Set up job	2026-11-24T20:07:14.7266150Z ##[endgroup]
+build	Set up job	2026-11-24T20:07:14.7271250Z Secret source: Actions
+build	Set up job	2026-11-24T20:07:14.7274140Z Cache mode: write
+build	Set up job	2026-11-24T20:07:14.7274770Z Prepare workflow directory
+build	Set up job	2026-11-24T20:07:14.7647830Z Prepare all required actions
+build	Set up job	2026-11-24T20:07:14.7687320Z Getting action download info
+build	Set up job	2026-11-24T20:07:15.0993910Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+build	Set up job	2026-11-24T20:07:15.3068930Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+build	Set up job	2026-11-24T20:07:15.5383490Z Complete job name: build
+build	Run actions/checkout@v4	﻿2026-11-24T20:07:15.6681330Z ##[group]Run actions/checkout@v4
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6682320Z with:
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6682740Z   repository: ALing-lab/MediaMindAI-iOS
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6687740Z   token: ***
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6688340Z   ssh-strict: true
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6688660Z   ssh-user: git
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6688980Z   persist-credentials: true
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6689340Z   clean: true
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6689660Z   sparse-checkout-cone-mode: true
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6690050Z   fetch-depth: 1
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6690360Z   fetch-tags: false
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6690690Z   show-progress: true
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6691020Z   lfs: false
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6691330Z   submodules: false
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6691650Z   set-safe-directory: true
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6692020Z   allow-unsafe-pr-checkout: false
+build	Run actions/checkout@v4	2026-11-24T20:07:15.6692680Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:16.1669600Z Syncing repository: ALing-lab/MediaMindAI-iOS
+build	Run actions/checkout@v4	2026-11-24T20:07:16.1676870Z ##[group]Getting Git version info
+build	Run actions/checkout@v4	2026-11-24T20:07:16.1678810Z Working directory is '/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS'
+build	Run actions/checkout@v4	2026-11-24T20:07:16.1702550Z [command]/opt/homebrew/bin/git version
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2212510Z git version 2.56.0
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2291780Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2300450Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/cc4eebc9-0a23-442f-81fa-0579e9c3963e/.gitconfig'
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2301640Z Temporarily overriding HOME='/Users/runner/work/_temp/cc4eebc9-0a23-442f-81fa-0579e9c3963e' before making global git config changes
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2302780Z Adding repository directory to the temporary git global config as a safe directory
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2303830Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2460310Z Deleting the contents of '/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS'
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2466450Z ##[group]Initializing the repository
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2470820Z [command]/opt/homebrew/bin/git init /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2771610Z hint: Using 'master' as the name for the initial branch. This default branch name
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2772650Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2773440Z hint: to use in all of your new repositories, which will suppress this warning,
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2774050Z hint: call:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2774430Z hint:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2774910Z hint: 	git config --global init.defaultBranch <name>
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2775430Z hint:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2775930Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2776660Z hint: 'development'. The just-created branch can be renamed via this command:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2777270Z hint:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2777660Z hint: 	git branch -m <name>
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2778090Z hint:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2778620Z hint: Disable this message with "git config set advice.defaultBranchName false"
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2799050Z Initialized empty Git repository in /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/.git/
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2809970Z [command]/opt/homebrew/bin/git remote add origin https://github.com/ALing-lab/MediaMindAI-iOS
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2948350Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2949140Z ##[group]Disabling automatic garbage collection
+build	Run actions/checkout@v4	2026-11-24T20:07:16.2951570Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+build	Run actions/checkout@v4	2026-11-24T20:07:16.3053200Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:16.3054130Z ##[group]Setting up auth
+build	Run actions/checkout@v4	2026-11-24T20:07:16.3058040Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+build	Run actions/checkout@v4	2026-11-24T20:07:16.3255160Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build	Run actions/checkout@v4	2026-11-24T20:07:16.4589180Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build	Run actions/checkout@v4	2026-11-24T20:07:16.4725500Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build	Run actions/checkout@v4	2026-11-24T20:07:16.6290600Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+build	Run actions/checkout@v4	2026-11-24T20:07:16.6602780Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+build	Run actions/checkout@v4	2026-11-24T20:07:16.8559500Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+build	Run actions/checkout@v4	2026-11-24T20:07:16.8869610Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:16.8951050Z ##[group]Fetching the repository
+build	Run actions/checkout@v4	2026-11-24T20:07:16.8956620Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +09270f0b61b1b928ac2b3f9ef59218dcf2045b35:refs/remotes/origin/main
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1506810Z From https://github.com/ALing-lab/MediaMindAI-iOS
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1508780Z  * [new ref]         09270f0b61b1b928ac2b3f9ef59218dcf2045b35 -> origin/main
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1511730Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1512290Z ##[group]Determining the checkout info
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1512920Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1518280Z [command]/opt/homebrew/bin/git sparse-checkout disable
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1659030Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1790150Z ##[group]Checking out the ref
+build	Run actions/checkout@v4	2026-11-24T20:07:20.1813370Z [command]/opt/homebrew/bin/git checkout --progress --force -B main refs/remotes/origin/main
+build	Run actions/checkout@v4	2026-11-24T20:07:20.2944100Z Switched to a new branch 'main'
+build	Run actions/checkout@v4	2026-11-24T20:07:20.2972830Z branch 'main' set up to track 'origin/main'.
+build	Run actions/checkout@v4	2026-11-24T20:07:20.2974770Z ##[endgroup]
+build	Run actions/checkout@v4	2026-11-24T20:07:20.3084560Z [command]/opt/homebrew/bin/git log -1 --format=%H
+build	Run actions/checkout@v4	2026-11-24T20:07:20.3177850Z 09270f0b61b1b928ac2b3f9ef59218dcf2045b35
+build	Core logic tests (SwiftPM, macOS)	﻿2026-11-24T20:07:20.3384450Z ##[group]Run swift test
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:20.3384850Z ^[[36;1mswift test^[[0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:20.3435060Z shell: /bin/bash -e {0}
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:20.3435490Z ##[endgroup]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:45.2511080Z Building for debugging...
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:45.2522350Z [Computing dependencies]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:45.3722680Z [Pre-planning 1 / 125]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:45.7701550Z [Planning deferred tasks]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:07:46.0453790Z [40 / 67] MediaMindAI_MediaMindCoreTests
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:01.4680500Z [42 / 67]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:04.2321530Z [43 / 68] MediaMindCore
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:04.4032910Z [47 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:04.5282870Z [50 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:04.6355490Z [52 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:04.8147530Z [55 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:04.9488550Z [58 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:05.0814470Z [61 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:05.1851970Z [62 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:05.8146060Z [63 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:05.9330660Z [66 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:06.1113230Z [67 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:06.2360530Z [68 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:06.4450060Z [70 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:06.5767440Z [72 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:06.6938870Z [75 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:07.0430540Z [76 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:07.1983450Z [77 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:07.6488990Z [78 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:08.1839120Z [79 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:08.3066930Z [80 / 109]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:11.9648430Z [84 / 109] MediaMindCore
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:11.9778270Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: ^[[1;33mwarning: ^[[1;39mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:11.9878560Z  ^[[0;36m39 |^[[0;0m 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:11.9983480Z  ^[[0;36m40 |^[[0;0m     @MainActor
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0161560Z  ^[[0;36m41 |^[[0;0m     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0264220Z     ^[[0;36m|^[[0;0m                                                                                  `- ^[[1;33mwarning: ^[[1;39mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0367740Z  ^[[0;36m42 |^[[0;0m         guard !runId.isEmpty else { return [] }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0495540Z  ^[[0;36m43 |^[[0;0m         return journal.rows(forRunId: runId).filter {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0601330Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0722350Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: ^[[1;39mnote: ^[[1;39mstatic property declared here^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0838860Z  ^[[0;36m77 |^[[0;0m @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.0941770Z  ^[[0;36m78 |^[[0;0m public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1052250Z  ^[[0;36m79 |^[[0;0m     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1178850Z     ^[[0;36m|^[[0;0m                       `- ^[[1;39mnote: ^[[1;39mstatic property declared here^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1281770Z  ^[[0;36m80 |^[[0;0m 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1385990Z  ^[[0;36m81 |^[[0;0m     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1512470Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1642450Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift:116:38: ^[[1;33mwarning: ^[[1;39mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1741080Z ^[[0;36m114 |^[[0;0m         drive: any CloudDrive,
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1869320Z ^[[0;36m115 |^[[0;0m         substitutionActions: [String: PlanAction] = [:],
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.1971020Z ^[[0;36m116 |^[[0;0m         journal: OperationJournal = .shared
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2134090Z     ^[[0;36m|^[[0;0m                                      `- ^[[1;33mwarning: ^[[1;39mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2173130Z ^[[0;36m117 |^[[0;0m     ) async -> TaskControl {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2276410Z ^[[0;36m118 |^[[0;0m         var next = control
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2381710Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2484830Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: ^[[1;39mnote: ^[[1;39mstatic property declared here^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2540080Z  ^[[0;36m77 |^[[0;0m @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2543090Z  ^[[0;36m78 |^[[0;0m public final class OperationJournal {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2545620Z  ^[[0;36m79 |^[[0;0m     public static let shared = OperationJournal()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2648840Z     ^[[0;36m|^[[0;0m                       `- ^[[1;39mnote: ^[[1;39mstatic property declared here^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2751810Z  ^[[0;36m80 |^[[0;0m 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:12.2854390Z  ^[[0;36m81 |^[[0;0m     public private(set) var rows: [JournalRow] = []
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.2958750Z error: SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift failed with a nonzero exit code. Command line:     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3060460Z     builtin-SwiftPerFileCompile AppSettings.swift
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3062350Z [85 / 109] MediaMindCore
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3064570Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift:247:29: ^[[1;31merror: ^[[1;39mcall to main actor-isolated instance method 'setEnabled' in a synchronous nonisolated context^[[0;0m [#^[]8;;https://docs.swift.org/compiler/documentation/diagnostics/actor-isolated-call^[\ActorIsolatedCall^[]8;;^[\]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3067360Z ^[[0;36m245 |^[[0;0m         }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3068150Z ^[[0;36m246 |^[[0;0m         self.rememberHistory = defaults.object(forKey: "history_enabled") as? Bool ?? true
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3072950Z ^[[0;36m247 |^[[0;0m         HistoryStore.shared.setEnabled(self.rememberHistory)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3076160Z     ^[[0;36m|^[[0;0m                             `- ^[[1;31merror: ^[[1;39mcall to main actor-isolated instance method 'setEnabled' in a synchronous nonisolated context^[[0;0m [#^[]8;;https://docs.swift.org/compiler/documentation/diagnostics/actor-isolated-call^[\ActorIsolatedCall^[]8;;^[\]
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3252480Z ^[[0;36m248 |^[[0;0m         self.tmdbApiBase = defaults.string(forKey: "tmdb_api_base") ?? TmdbNetConfig.altApi
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3328250Z ^[[0;36m249 |^[[0;0m         self.tmdbImageBase = defaults.string(forKey: "tmdb_img_base") ?? TmdbNetConfig.defaultImage
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3342670Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3344160Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift:164:17: ^[[1;39mnote: ^[[1;39mcalls to instance method 'setEnabled' from outside of its actor context are implicitly asynchronous^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3345380Z ^[[0;36m162 |^[[0;0m     }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3345850Z ^[[0;36m163 |^[[0;0m 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3346280Z ^[[0;36m164 |^[[0;0m     public func setEnabled(_ on: Bool) {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3347440Z     ^[[0;36m|^[[0;0m                 `- ^[[1;39mnote: ^[[1;39mcalls to instance method 'setEnabled' from outside of its actor context are implicitly asynchronous^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3354470Z ^[[0;36m165 |^[[0;0m         enabled = on
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3355050Z ^[[0;36m166 |^[[0;0m         persist()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3355420Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3356620Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift:247:22: ^[[1;33mwarning: ^[[1;39mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3358120Z ^[[0;36m245 |^[[0;0m         }
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3359000Z ^[[0;36m246 |^[[0;0m         self.rememberHistory = defaults.object(forKey: "history_enabled") as? Bool ?? true
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3360010Z ^[[0;36m247 |^[[0;0m         HistoryStore.shared.setEnabled(self.rememberHistory)
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3361130Z     ^[[0;36m|^[[0;0m                      `- ^[[1;33mwarning: ^[[1;39mmain actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3363740Z ^[[0;36m248 |^[[0;0m         self.tmdbApiBase = defaults.string(forKey: "tmdb_api_base") ?? TmdbNetConfig.altApi
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3366270Z ^[[0;36m249 |^[[0;0m         self.tmdbImageBase = defaults.string(forKey: "tmdb_img_base") ?? TmdbNetConfig.defaultImage
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3366700Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3367300Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift:129:23: ^[[1;39mnote: ^[[1;39mstatic property declared here^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3368070Z ^[[0;36m127 |^[[0;0m @Observable
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3368470Z ^[[0;36m128 |^[[0;0m public final class HistoryStore {
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3368940Z ^[[0;36m129 |^[[0;0m     public static let shared = HistoryStore()
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3369380Z     ^[[0;36m|^[[0;0m                       `- ^[[1;39mnote: ^[[1;39mstatic property declared here^[[0;0m
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3369750Z ^[[0;36m130 |^[[0;0m     private static let maxRuns = 300
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3370180Z ^[[0;36m131 |^[[0;0m     private static let maxRecords = 1000
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3370430Z 
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3370790Z [#ActorIsolatedCall]: <https://docs.swift.org/compiler/documentation/diagnostics/actor-isolated-call>
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3371260Z Failed frontend command:
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3444050Z /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiPipelineModules.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiRecognizer.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiResponseParser.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/BackgroundAndCrash.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/DefaultPolicies.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/KeychainStore.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/NetLog.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/UpdateChecker.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CertPinning.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CloudDrive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/GuangyaDrive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/IdRemap.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/Pan123Drive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/ScanFrequency.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/WebDavDrive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/AdaptiveAndConflictEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ArtworkFetcher.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/DuplicateAndRetentionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ExecutionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/NfoXml.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/PlanModels.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/RetentionZoneEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ReversibleTransactionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/Scanner.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/SeriesMergerAndRetention.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/AnimeEpisodeParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeMapping.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeRangeParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ExternalIdExtractor.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/MediaParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ReleaseTokenizer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/SequelAndFolderResolver.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/StandardNaming.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleDeobfuscator.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleScorer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/DuplicateRetentionPlanner.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/EpisodeStrategy.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/LibraryDestinationAndTargets.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ManualConfirmation.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanSelection.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PreviewFilterFull.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerHeuristics.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerMovieLooseAndArtwork.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerReplan.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTvAndBdmv.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTypesAndTree.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbClient.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift -supplementary-output-file-map /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/supplementaryOutputs-1 -target arm64-apple-macos14.0 -disable-cross-import-overlay-search -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server\#FoundationMacros -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libObservationMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server\#ObservationMacros -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server\#SwiftMacros -disable-implicit-swift-modules -Xcc -fno-implicit-modules -Xcc -fno-implicit-module-maps -explicit-swift-module-map-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/MediaMindCore-dependencies-1.json -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -I /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Products/Debug -Isystem /Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Products/Debug -F /Applications/Xcode_27.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -module-cache-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/SwiftExplicitPrecompiledModules -color-diagnostics -Xcc -fcolor-diagnostics -enable-testing -g -debug-info-format\=dwarf -dwarf-version\=4 -swift-version 5 -Onone -D SWIFT_PACKAGE -D DEBUG -D SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE -D Xcode -serialize-debugging-options -enable-experimental-feature DebugDescriptionMacro -empty-abi-descriptor -validate-clang-modules-once -clang-build-session-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS -enable-anonymous-context-mangled-names -file-compilation-dir /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -Xcc -ivfsstatcache -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/SDKStatCaches.noindex/macosx27.0-26A425-80c5bbf1d171475443272936d42f90a34621a33692987793de5955334bf0a0a8.sdkstatcache -Xcc -fmodules-prune-interval\=86400 -Xcc -fmodules-prune-after\=345600 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Products/Debug/include -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -no-auto-bridging-header-chaining -module-name MediaMindCore -package-name mediamindai_ios -const-gather-protocols-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/MediaMindCore_const_extract_protocols.json -disable-clang-spi -clang-target arm64-apple-macos27.0 -target-sdk-version 27.0 -target-sdk-name macosx27.0 -in-process-plugin-server-path /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -parse-as-library -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AiPipelineModules.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AiRecognizer.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AiResponseParser.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AppSettings.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/BackgroundAndCrash.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/DefaultPolicies.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/HistoryStore.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/KeychainStore.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/NetLog.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/UpdateChecker.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/CertPinning.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/CloudDrive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/GuangyaDrive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/IdRemap.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/Pan123Drive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/ScanFrequency.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/WebDavDrive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AdaptiveAndConflictEngine.o -debug-module-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out/Intermediates.noindex/MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/MediaMindCore.swiftmodule -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AiPipelineModules.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AiRecognizer.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AiResponseParser.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AppSettings.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/BackgroundAndCrash.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/DefaultPolicies.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/HistoryStore.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/KeychainStore.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/NetLog.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/UpdateChecker.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/CertPinning.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/CloudDrive.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/GuangyaDrive.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/IdRemap.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/Pan123Drive.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/ScanFrequency.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/WebDavDrive.o -index-unit-output-path /MediaMindAI.build/Debug/MediaMindCore-t.build/Objects-normal/arm64/AdaptiveAndConflictEngine.o -index-store-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/.build/out -index-system-modules
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.3727070Z error: Build failed
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.4164450Z error: fatalError
+build	Core logic tests (SwiftPM, macOS)	2026-11-24T20:08:15.4376740Z ##[error]Process completed with exit code 1.
+build	Build unsigned app	﻿2026-11-24T20:08:15.4546940Z ##[group]Run xcodebuild build \
+build	Build unsigned app	2026-11-24T20:08:15.4547450Z ^[[36;1mxcodebuild build \^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.4547770Z ^[[36;1m  -project MediaMindAI.xcodeproj \^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.4548010Z ^[[36;1m  -scheme MediaMindAI \^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.4548430Z ^[[36;1m  -configuration Release \^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.4548720Z ^[[36;1m  -destination 'generic/platform=iOS' \^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.4549000Z ^[[36;1m  -derivedDataPath build \^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.4549250Z ^[[36;1m  CODE_SIGNING_ALLOWED=NO^[[0m
+build	Build unsigned app	2026-11-24T20:08:15.5000050Z shell: /bin/bash -e {0}
+build	Build unsigned app	2026-11-24T20:08:15.5000460Z ##[endgroup]
+build	Build unsigned app	2026-11-24T20:08:19.2267790Z Command line invocation:
+build	Build unsigned app	2026-11-24T20:08:19.2275120Z     /Applications/Xcode_27.1.app/Contents/Developer/usr/bin/xcodebuild build -project MediaMindAI.xcodeproj -scheme MediaMindAI -configuration Release -destination generic/platform=iOS -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+build	Build unsigned app	2026-11-24T20:08:19.2276460Z 
+build	Build unsigned app	2026-11-24T20:08:19.2276670Z Build settings from command line:
+build	Build unsigned app	2026-11-24T20:08:19.2278200Z     CODE_SIGNING_ALLOWED = NO
+build	Build unsigned app	2026-11-24T20:08:19.2278390Z 
+build	Build unsigned app	2026-11-24T20:08:24.2844500Z ComputePackagePrebuildTargetDependencyGraph
+build	Build unsigned app	2026-11-24T20:08:24.5129050Z 
+build	Build unsigned app	2026-11-24T20:08:24.5179260Z Prepare packages
+build	Build unsigned app	2026-11-24T20:08:24.5197050Z 
+build	Build unsigned app	2026-11-24T20:08:24.5317510Z CreateBuildRequest
+build	Build unsigned app	2026-11-24T20:08:24.5318340Z 
+build	Build unsigned app	2026-11-24T20:08:24.5318740Z SendProjectDescription
+build	Build unsigned app	2026-11-24T20:08:24.5319270Z 
+build	Build unsigned app	2026-11-24T20:08:24.5319730Z CreateBuildOperation
+build	Build unsigned app	2026-11-24T20:08:24.5349870Z 
+build	Build unsigned app	2026-11-24T20:08:24.5383920Z ComputeTargetDependencyGraph
+build	Build unsigned app	2026-11-24T20:08:24.5528820Z note: Building targets in dependency order
+build	Build unsigned app	2026-11-24T20:08:24.5542130Z note: Target dependency graph (1 target)
+build	Build unsigned app	2026-11-24T20:08:24.5542740Z     Target 'MediaMindAI' in project 'MediaMindAI' (no dependencies)
+build	Build unsigned app	2026-11-24T20:08:24.5543150Z 
+build	Build unsigned app	2026-11-24T20:08:24.5543380Z GatherProvisioningInputs
+build	Build unsigned app	2026-11-24T20:08:24.5543700Z 
+build	Build unsigned app	2026-11-24T20:08:24.5543900Z CreateBuildDescription
+build	Build unsigned app	2026-11-24T20:08:24.6663080Z 
+build	Build unsigned app	2026-11-24T20:08:24.6667390Z ExecuteExternalTool /Applications/Xcode_27.1.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Assets.xcassets
+build	Build unsigned app	2026-11-24T20:08:31.0106880Z 
+build	Build unsigned app	2026-11-24T20:08:31.0167510Z ExecuteExternalTool /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.1.sdk -x c -c /dev/null
+build	Build unsigned app	2026-11-24T20:08:31.0170420Z 
+build	Build unsigned app	2026-11-24T20:08:31.0170800Z ExecuteExternalTool /Applications/Xcode_27.1.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+build	Build unsigned app	2026-11-24T20:08:31.0280790Z 
+build	Build unsigned app	2026-11-24T20:08:31.0338720Z ExecuteExternalTool /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+build	Build unsigned app	2026-11-24T20:08:31.3964750Z 
+build	Build unsigned app	2026-11-24T20:08:31.4232540Z ExecuteExternalTool /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+build	Build unsigned app	2026-11-24T20:08:31.4535350Z 
+build	Build unsigned app	2026-11-24T20:08:31.5011520Z Build description signature: d5b2b0ecfc0b5e21b9f9e45631427a3c
+build	Build unsigned app	2026-11-24T20:08:31.5021290Z Build description path: /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/XCBuildData/d5b2b0ecfc0b5e21b9f9e45631427a3c.xcbuilddata
+build	Build unsigned app	2026-11-24T20:08:31.5349380Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:31.5354710Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:31.5355850Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:31.5494610Z 
+build	Build unsigned app	2026-11-24T20:08:31.5598230Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/ModuleCache.noindex
+build	Build unsigned app	2026-11-24T20:08:31.5698380Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:31.5801780Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/ModuleCache.noindex
+build	Build unsigned app	2026-11-24T20:08:31.5908300Z 
+build	Build unsigned app	2026-11-24T20:08:31.6018580Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/CompilationCache.noindex
+build	Build unsigned app	2026-11-24T20:08:31.6128870Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:31.6172430Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/CompilationCache.noindex
+build	Build unsigned app	2026-11-24T20:08:31.6173500Z 
+build	Build unsigned app	2026-11-24T20:08:31.6173990Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products
+build	Build unsigned app	2026-11-24T20:08:31.6174820Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:31.6175760Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products
+build	Build unsigned app	2026-11-24T20:08:31.6176410Z 
+build	Build unsigned app	2026-11-24T20:08:31.6176840Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex
+build	Build unsigned app	2026-11-24T20:08:31.6177980Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:31.6178950Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex
+build	Build unsigned app	2026-11-24T20:08:31.6179580Z 
+build	Build unsigned app	2026-11-24T20:08:31.6180950Z ClangStatCache /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.1.sdk /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKStatCaches.noindex/iphoneos27.1-24A94232-e829b21a6f8c9b70876ba0858053c0442866d66f27be705873c55a4609c58824.sdkstatcache
+build	Build unsigned app	2026-11-24T20:08:31.6183520Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:31.6219040Z     /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.1.sdk -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKStatCaches.noindex/iphoneos27.1-24A94232-e829b21a6f8c9b70876ba0858053c0442866d66f27be705873c55a4609c58824.sdkstatcache
+build	Build unsigned app	2026-11-24T20:08:35.3475550Z 
+build	Build unsigned app	2026-11-24T20:08:35.3482400Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI-17e3f79e655980e4a3da8dafe6c2c53b-VFS-iphoneos/all-product-headers.yaml
+build	Build unsigned app	2026-11-24T20:08:35.3485070Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:35.3486510Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI-17e3f79e655980e4a3da8dafe6c2c53b-VFS-iphoneos/all-product-headers.yaml
+build	Build unsigned app	2026-11-24T20:08:35.3487420Z 
+build	Build unsigned app	2026-11-24T20:08:35.3487750Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos
+build	Build unsigned app	2026-11-24T20:08:35.3490410Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:35.3493190Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos
+build	Build unsigned app	2026-11-24T20:08:35.3494590Z 
+build	Build unsigned app	2026-11-24T20:08:35.3495980Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:35.3500260Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:35.3502330Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:35.3503190Z 
+build	Build unsigned app	2026-11-24T20:08:35.3505680Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/PrecompiledHeaders
+build	Build unsigned app	2026-11-24T20:08:35.3508760Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:35.3513140Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/PrecompiledHeaders
+build	Build unsigned app	2026-11-24T20:08:35.3515420Z 
+build	Build unsigned app	2026-11-24T20:08:35.3520810Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/ExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:35.3527670Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:35.3539090Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/ExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:35.3539920Z 
+build	Build unsigned app	2026-11-24T20:08:35.3540370Z CreateBuildDirectory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/EagerLinkingTBDs/Release-iphoneos
+build	Build unsigned app	2026-11-24T20:08:35.3541680Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI.xcodeproj
+build	Build unsigned app	2026-11-24T20:08:35.3542950Z     builtin-create-build-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/EagerLinkingTBDs/Release-iphoneos
+build	Build unsigned app	2026-11-24T20:08:35.3543530Z 
+build	Build unsigned app	2026-11-24T20:08:35.3544550Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI_const_extract_protocols.json (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3546020Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3547120Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI_const_extract_protocols.json
+build	Build unsigned app	2026-11-24T20:08:35.3560980Z 
+build	Build unsigned app	2026-11-24T20:08:35.3563650Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.SwiftFileList (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3567020Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3569520Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.SwiftFileList
+build	Build unsigned app	2026-11-24T20:08:35.3571670Z 
+build	Build unsigned app	2026-11-24T20:08:35.3575090Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.SwiftConstValuesFileList (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3578290Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3581270Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.SwiftConstValuesFileList
+build	Build unsigned app	2026-11-24T20:08:35.3583640Z 
+build	Build unsigned app	2026-11-24T20:08:35.3585710Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.LinkFileList (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3590910Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3593190Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.LinkFileList
+build	Build unsigned app	2026-11-24T20:08:35.3595190Z 
+build	Build unsigned app	2026-11-24T20:08:35.3597380Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI-OutputFileMap.json (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3600430Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3602860Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI-OutputFileMap.json
+build	Build unsigned app	2026-11-24T20:08:35.3605390Z 
+build	Build unsigned app	2026-11-24T20:08:35.3606320Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI.hmap (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3870600Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3871760Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI.hmap
+build	Build unsigned app	2026-11-24T20:08:35.3872470Z 
+build	Build unsigned app	2026-11-24T20:08:35.3873310Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI.DependencyStaticMetadataFileList (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3874480Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3875420Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI.DependencyStaticMetadataFileList
+build	Build unsigned app	2026-11-24T20:08:35.3876170Z 
+build	Build unsigned app	2026-11-24T20:08:35.3877040Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI.DependencyMetadataFileList (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3883440Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3884260Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI.DependencyMetadataFileList
+build	Build unsigned app	2026-11-24T20:08:35.3884940Z 
+build	Build unsigned app	2026-11-24T20:08:35.3885960Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-project-headers.hmap (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3887250Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3888200Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-project-headers.hmap
+build	Build unsigned app	2026-11-24T20:08:35.3888970Z 
+build	Build unsigned app	2026-11-24T20:08:35.3889740Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-own-target-headers.hmap (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3891150Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3892180Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-own-target-headers.hmap
+build	Build unsigned app	2026-11-24T20:08:35.3892930Z 
+build	Build unsigned app	2026-11-24T20:08:35.3893680Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-generated-files.hmap (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3894840Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3896310Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-generated-files.hmap
+build	Build unsigned app	2026-11-24T20:08:35.3897140Z 
+build	Build unsigned app	2026-11-24T20:08:35.3898030Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-all-target-headers.hmap (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3899260Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3900440Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-all-target-headers.hmap
+build	Build unsigned app	2026-11-24T20:08:35.3901240Z 
+build	Build unsigned app	2026-11-24T20:08:35.3902250Z WriteAuxiliaryFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-all-non-framework-target-headers.hmap (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3903520Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3904520Z     write-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-all-non-framework-target-headers.hmap
+build	Build unsigned app	2026-11-24T20:08:35.3905320Z 
+build	Build unsigned app	2026-11-24T20:08:35.3906320Z MkDir /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3907760Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3908640Z     /bin/mkdir -p /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app
+build	Build unsigned app	2026-11-24T20:08:35.3909200Z 
+build	Build unsigned app	2026-11-24T20:08:35.3909920Z MkDir /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/unthinned (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3910860Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3911750Z     /bin/mkdir -p /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/unthinned
+build	Build unsigned app	2026-11-24T20:08:35.3912550Z 
+build	Build unsigned app	2026-11-24T20:08:35.3913250Z MkDir /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3914350Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3915440Z     /bin/mkdir -p /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned
+build	Build unsigned app	2026-11-24T20:08:35.3917060Z 
+build	Build unsigned app	2026-11-24T20:08:35.3918080Z GenerateAssetSymbols /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Assets.xcassets (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3918900Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3925670Z     /Applications/Xcode_27.1.app/Contents/Developer/usr/bin/actool /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Assets.xcassets --compile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app --output-format human-readable-text --notices --warnings --export-dependency-info /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_dependencies --output-partial-info-plist /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist --app-icon AppIcon --compress-pngs --enable-on-demand-resources YES --development-region zh-Hans --target-device iphone --target-device ipad --minimum-deployment-target 17.0 --platform iphoneos --bundle-identifier com.tamu.mediamindai --generate-swift-asset-symbol-extensions NO --generate-swift-asset-symbols /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.swift --generate-objc-asset-symbols /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.h --generate-asset-symbol-index /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols-Index.plist
+build	Build unsigned app	2026-11-24T20:08:35.3931580Z /* com.apple.actool.compilation-results */
+build	Build unsigned app	2026-11-24T20:08:35.3932440Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols-Index.plist
+build	Build unsigned app	2026-11-24T20:08:35.3933690Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.h
+build	Build unsigned app	2026-11-24T20:08:35.3935440Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.swift
+build	Build unsigned app	2026-11-24T20:08:35.3936160Z 
+build	Build unsigned app	2026-11-24T20:08:35.3936170Z 
+build	Build unsigned app	2026-11-24T20:08:35.3937010Z CpResource /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/splash_light.mp4 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/splash_light.mp4 (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3938320Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3940080Z     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/splash_light.mp4 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app
+build	Build unsigned app	2026-11-24T20:08:35.3941580Z 
+build	Build unsigned app	2026-11-24T20:08:35.3942440Z CpResource /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/splash_dark.mp4 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/splash_dark.mp4 (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3943730Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3945420Z     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/splash_dark.mp4 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app
+build	Build unsigned app	2026-11-24T20:08:35.3946910Z 
+build	Build unsigned app	2026-11-24T20:08:35.3947790Z CpResource /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/licenses /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/licenses (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3949140Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3950880Z     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/licenses /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app
+build	Build unsigned app	2026-11-24T20:08:35.3952440Z 
+build	Build unsigned app	2026-11-24T20:08:35.3953260Z CompileAssetCatalogVariant thinned /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Assets.xcassets (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3954370Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3957760Z     /Applications/Xcode_27.1.app/Contents/Developer/usr/bin/actool /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Assets.xcassets --compile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned --output-format human-readable-text --notices --warnings --export-dependency-info /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_dependencies_thinned --output-partial-info-plist /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist_thinned --app-icon AppIcon --compress-pngs --enable-on-demand-resources YES --development-region zh-Hans --target-device iphone --target-device ipad --minimum-deployment-target 17.0 --platform iphoneos
+build	Build unsigned app	2026-11-24T20:08:35.3961610Z /* com.apple.actool.compilation-results */
+build	Build unsigned app	2026-11-24T20:08:35.3962720Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist_thinned
+build	Build unsigned app	2026-11-24T20:08:35.3964070Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned/AppIcon60x60@2x.png
+build	Build unsigned app	2026-11-24T20:08:35.3965380Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned/AppIcon76x76@2x~ipad.png
+build	Build unsigned app	2026-11-24T20:08:35.3966990Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned/Assets.car
+build	Build unsigned app	2026-11-24T20:08:35.3967690Z 
+build	Build unsigned app	2026-11-24T20:08:35.3967700Z 
+build	Build unsigned app	2026-11-24T20:08:35.3968230Z LinkAssetCatalog /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Assets.xcassets (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3969000Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3974250Z     builtin-linkAssetCatalog --thinned /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/thinned --thinned-dependencies /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist_thinned --unthinned /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_output/unthinned --unthinned-dependencies /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist_unthinned --output /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app --plist-output /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist
+build	Build unsigned app	2026-11-24T20:08:35.3980150Z note: Emplaced /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/Assets.car (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3981470Z note: Emplaced /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/AppIcon60x60@2x.png (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3983070Z note: Emplaced /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/AppIcon76x76@2x~ipad.png (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3983840Z 
+build	Build unsigned app	2026-11-24T20:08:35.3984810Z ProcessInfoPlistFile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/Info.plist /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Info.plist (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3986120Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.3988830Z     builtin-infoPlistUtility /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Resources/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/PkgInfo -expandbuildsettings -format binary -platform iphoneos -additionalcontentfile /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/assetcatalog_generated_info.plist -requiredArchitecture arm64 -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/MediaMindAI.app/Info.plist
+build	Build unsigned app	2026-11-24T20:08:35.3991740Z 
+build	Build unsigned app	2026-11-24T20:08:35.3992330Z SwiftDriver MediaMindAI normal arm64 com.apple.xcode.tools.swift.compiler (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:35.3992970Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:35.4014610Z     builtin-SwiftDriver -- /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name MediaMindAI -O @/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.1.sdk -target arm64-apple-ios17.0 -g -module-cache-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos -F /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos -emit-localized-strings -emit-localized-strings-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64 -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKStatCaches.noindex/iphoneos27.1-24A94232-e829b21a6f8c9b70876ba0858053c0442866d66f27be705873c55a4609c58824.sdkstatcache -output-file-map /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI-OutputFileMap.json -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules -emit-dependencies -emit-module -emit-module-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.swiftmodule -serialize-diagnostics -dependency-scan-serialize-diagnostics-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI-dependency-scan.dia -validate-clang-modules-once -clang-build-session-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/ModuleCache.noindex/Session.modulevalidation -Xcc -fmodules-prune-interval\=86400 -Xcc -fmodules-prune-after\=345600 -emit-const-values -const-gather-protocols-list /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-generated-files.hmap -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-own-target-headers.hmap -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-project-headers.hmap -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/include -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI-Swift.h -working-directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS -experimental-emit-module-separately -disable-cmo
+build	Build unsigned app	2026-11-24T20:08:37.1187550Z 
+build	Build unsigned app	2026-11-24T20:08:37.1612640Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/DeveloperToolsSupport-CMJGV49686AU31CE90DSXZYD2.pcm
+build	Build unsigned app	2026-11-24T20:08:37.2862630Z 
+build	Build unsigned app	2026-11-24T20:08:37.2882760Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/ptrauth-DZ943FKYR2NHLUENAUYOS4SL0.pcm
+build	Build unsigned app	2026-11-24T20:08:37.2884800Z 
+build	Build unsigned app	2026-11-24T20:08:37.2886200Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/SwiftShims-4F69N80A5FTWW05Z4W3U7T93W.pcm
+build	Build unsigned app	2026-11-24T20:08:37.3099430Z 
+build	Build unsigned app	2026-11-24T20:08:37.3218260Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_stdarg-3P2YE27PN4FB1OO2OHMTTZ6DJ.pcm
+build	Build unsigned app	2026-11-24T20:08:37.3948240Z 
+build	Build unsigned app	2026-11-24T20:08:37.4012250Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_AvailabilityInternal-1ZMGLP2F7OCT6O62G6VSZCB3S.pcm
+build	Build unsigned app	2026-11-24T20:08:37.4126080Z 
+build	Build unsigned app	2026-11-24T20:08:37.4227950Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_stdbool-C7US2CTG7D73CWYDVVKPMCW1Y.pcm
+build	Build unsigned app	2026-11-24T20:08:37.4344570Z 
+build	Build unsigned app	2026-11-24T20:08:37.4458980Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_stddef-2DCWFXIS61GZE62J3WAISJK98.pcm
+build	Build unsigned app	2026-11-24T20:08:37.4668440Z 
+build	Build unsigned app	2026-11-24T20:08:37.4771360Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_float-8JQ4MMPFM868QCCEJTJS80NAG.pcm
+build	Build unsigned app	2026-11-24T20:08:37.4871180Z 
+build	Build unsigned app	2026-11-24T20:08:37.4891780Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/ptrcheck-EUIMNEMIKPSJKAGDESXAQZUPC.pcm
+build	Build unsigned app	2026-11-24T20:08:37.4893940Z 
+build	Build unsigned app	2026-11-24T20:08:37.4895840Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_SwiftConcurrencyShims-6LFGSZ473PR7XUKOAH7HBOC80.pcm
+build	Build unsigned app	2026-11-24T20:08:37.5283880Z 
+build	Build unsigned app	2026-11-24T20:08:37.5288230Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_DarwinFoundation1-3F8WJX5SQUY272WJWRKW974VZ.pcm
+build	Build unsigned app	2026-11-24T20:08:37.5799330Z 
+build	Build unsigned app	2026-11-24T20:08:37.5806120Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_DarwinFoundation2-9ZJIK5N8UIWIG5D8BBGUO6JYL.pcm
+build	Build unsigned app	2026-11-24T20:08:37.7025350Z 
+build	Build unsigned app	2026-11-24T20:08:37.7029670Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_limits-4SMWFG7FJD0V8HNW8IG96EQRY.pcm
+build	Build unsigned app	2026-11-24T20:08:37.7031480Z 
+build	Build unsigned app	2026-11-24T20:08:37.7033200Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_tgmath-9UMYSGH4EFQBBHDO54RY2LOEW.pcm
+build	Build unsigned app	2026-11-24T20:08:37.7781740Z 
+build	Build unsigned app	2026-11-24T20:08:37.7856760Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_stdint-3HY6O63JQI58RWD9JICJOO6P6.pcm
+build	Build unsigned app	2026-11-24T20:08:37.7886070Z 
+build	Build unsigned app	2026-11-24T20:08:37.7887310Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/string_h-6JQ60JEHZXBHSWN7U0TI1ZRHP.pcm
+build	Build unsigned app	2026-11-24T20:08:37.7975760Z 
+build	Build unsigned app	2026-11-24T20:08:37.8091850Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/sys_types-NI707NVG23E196TPZ06AB3XQ.pcm
+build	Build unsigned app	2026-11-24T20:08:37.8641700Z 
+build	Build unsigned app	2026-11-24T20:08:37.8718510Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_DarwinFoundation3-E34PN1K7SCOVIKKFMP37TSZZX.pcm
+build	Build unsigned app	2026-11-24T20:08:37.9089050Z 
+build	Build unsigned app	2026-11-24T20:08:37.9092460Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_stdatomic-4V8NDR8FKW9VJUY8I8Z48F82U.pcm
+build	Build unsigned app	2026-11-24T20:08:37.9093370Z 
+build	Build unsigned app	2026-11-24T20:08:37.9094020Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_intrinsics-5BA3QYAM41TL844FSWNFECZRU.pcm
+build	Build unsigned app	2026-11-24T20:08:38.1333300Z 
+build	Build unsigned app	2026-11-24T20:08:38.1348620Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_Builtin_inttypes-LLKK0D0M9TFT8MIS9ANI84CH.pcm
+build	Build unsigned app	2026-11-24T20:08:38.1352600Z 
+build	Build unsigned app	2026-11-24T20:08:38.1360190Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Darwin-DRGZBLGZ300QREF5UHC86WW5K.pcm
+build	Build unsigned app	2026-11-24T20:08:38.3913680Z 
+build	Build unsigned app	2026-11-24T20:08:38.4016820Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/simd-AW0W054DZFSY1VD70QZEYAFGK.pcm
+build	Build unsigned app	2026-11-24T20:08:38.7323870Z 
+build	Build unsigned app	2026-11-24T20:08:38.7329960Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/ObjectiveC-G3JH6PRL3VHZOQYXHN5OOA84.pcm
+build	Build unsigned app	2026-11-24T20:08:38.7332110Z 
+build	Build unsigned app	2026-11-24T20:08:38.7334030Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/MachO-89MOOVDT3TBP865QX0NZN2ZE.pcm
+build	Build unsigned app	2026-11-24T20:08:38.7336420Z 
+build	Build unsigned app	2026-11-24T20:08:38.7338280Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/os_object-4OG4Y2382560O15EH4VWJY0HQ.pcm
+build	Build unsigned app	2026-11-24T20:08:38.7340740Z 
+build	Build unsigned app	2026-11-24T20:08:38.7356230Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/os_workgroup-4BOYOVYYNI4PYVXOZBN8I4HJK.pcm
+build	Build unsigned app	2026-11-24T20:08:38.7358630Z 
+build	Build unsigned app	2026-11-24T20:08:38.7361520Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Dispatch-EVAZG6ONUGAAR1LKR5U69DR3O.pcm
+build	Build unsigned app	2026-11-24T20:08:38.7544250Z 
+build	Build unsigned app	2026-11-24T20:08:38.7550260Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Spatial-DQFY0ZU7E1TOJNYQSZ2TJEN55.pcm
+build	Build unsigned app	2026-11-24T20:08:38.9910100Z 
+build	Build unsigned app	2026-11-24T20:08:39.0014070Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/XPC-8NHAYPIDZCVMMVZW7D66LLQ8H.pcm
+build	Build unsigned app	2026-11-24T20:08:39.0014980Z 
+build	Build unsigned app	2026-11-24T20:08:39.0116460Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreFoundation-ARATABHTS5NEM01SU6TC09PJV.pcm
+build	Build unsigned app	2026-11-24T20:08:39.0218700Z 
+build	Build unsigned app	2026-11-24T20:08:39.0337050Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/dnssd-545VYCG4T5N107QTGQ3LXIJBE.pcm
+build	Build unsigned app	2026-11-24T20:08:39.0445710Z 
+build	Build unsigned app	2026-11-24T20:08:39.0548730Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/os-56JQ7KHFARHW4M254RU1ADPXA.pcm
+build	Build unsigned app	2026-11-24T20:08:39.0672160Z 
+build	Build unsigned app	2026-11-24T20:08:39.0774030Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreAudioTypes-1NFIPEJNFH5DXGKGC375LZDPR.pcm
+build	Build unsigned app	2026-11-24T20:08:39.0903960Z 
+build	Build unsigned app	2026-11-24T20:08:39.1030260Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreGraphics-2QPJVUWVPATWGX95ODTS5599R.pcm
+build	Build unsigned app	2026-11-24T20:08:39.1173400Z 
+build	Build unsigned app	2026-11-24T20:08:39.1274940Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CFNetwork-AQ6CCCIHPSS2HLQ5F6XO5ZLWE.pcm
+build	Build unsigned app	2026-11-24T20:08:39.1383970Z 
+build	Build unsigned app	2026-11-24T20:08:39.1496190Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Security-LGE9615QV03292X9T6RFP956.pcm
+build	Build unsigned app	2026-11-24T20:08:39.1621000Z 
+build	Build unsigned app	2026-11-24T20:08:39.1738190Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreAudio-217ZHEI0YGQ64VUSI15ACGBL9.pcm
+build	Build unsigned app	2026-11-24T20:08:39.1928870Z 
+build	Build unsigned app	2026-11-24T20:08:39.2031580Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreText-RVUL283ZMKSQYIIC7SUK996H.pcm
+build	Build unsigned app	2026-11-24T20:08:39.2651890Z 
+build	Build unsigned app	2026-11-24T20:08:39.2658350Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/ImageIO-2MPY4PQHNNW07MCYQMQSSIU8Y.pcm
+build	Build unsigned app	2026-11-24T20:08:39.2659150Z 
+build	Build unsigned app	2026-11-24T20:08:39.2659930Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Foundation-E49OOBMVKHO0RASNWBB45JK69.pcm
+build	Build unsigned app	2026-11-24T20:08:39.6928120Z 
+build	Build unsigned app	2026-11-24T20:08:39.7029770Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Accessibility-6K8WKK6INH8EUNL981WXDUDJX.pcm
+build	Build unsigned app	2026-11-24T20:08:39.7801430Z 
+build	Build unsigned app	2026-11-24T20:08:39.7903420Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreMIDI-4EVC914T0PN361X1SMY0EE320.pcm
+build	Build unsigned app	2026-11-24T20:08:39.8420030Z 
+build	Build unsigned app	2026-11-24T20:08:39.8549010Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreTransferable-9891XJX6AN0DXX31764EKC707.pcm
+build	Build unsigned app	2026-11-24T20:08:39.8666010Z 
+build	Build unsigned app	2026-11-24T20:08:39.8801970Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/DataDetection-EZE3FYOHMQ3WXBLI09J6SFRA.pcm
+build	Build unsigned app	2026-11-24T20:08:39.8808980Z 
+build	Build unsigned app	2026-11-24T20:08:39.8922650Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/LocalAuthentication-E33BWHJV7HVEGO5CTJT6IGU96.pcm
+build	Build unsigned app	2026-11-24T20:08:39.9025670Z 
+build	Build unsigned app	2026-11-24T20:08:39.9145950Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Symbols-EIR9MYS0ZBQYJ9RXH4LH035WA.pcm
+build	Build unsigned app	2026-11-24T20:08:39.9439840Z 
+build	Build unsigned app	2026-11-24T20:08:39.9543650Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Network-BALJX5DYHOKPNE0XF0DPHDHN.pcm
+build	Build unsigned app	2026-11-24T20:08:40.0250090Z 
+build	Build unsigned app	2026-11-24T20:08:40.0357910Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/FileProvider-3IFGU1Y5A6XTJH4IFH3Y95HD8.pcm
+build	Build unsigned app	2026-11-24T20:08:40.0459420Z 
+build	Build unsigned app	2026-11-24T20:08:40.0562660Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/UserNotifications-72JL3RCHKGD4O8HRTB2SBADK9.pcm
+build	Build unsigned app	2026-11-24T20:08:40.0797180Z 
+build	Build unsigned app	2026-11-24T20:08:40.0912930Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/OSLog-5H80ZPMFZRPZMGPW45XOJUSEK.pcm
+build	Build unsigned app	2026-11-24T20:08:40.1428960Z 
+build	Build unsigned app	2026-11-24T20:08:40.1530450Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/AVRouting-67JGX7DH15JZPF9B8LUI9IVRH.pcm
+build	Build unsigned app	2026-11-24T20:08:40.1632350Z 
+build	Build unsigned app	2026-11-24T20:08:40.1734700Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/IOSurface-8NWBMIFG6NM1BSY77BW93UMA2.pcm
+build	Build unsigned app	2026-11-24T20:08:40.1836320Z 
+build	Build unsigned app	2026-11-24T20:08:40.1940700Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreData-3AS7YLEOAQHQV19EIGMTPMZ2P.pcm
+build	Build unsigned app	2026-11-24T20:08:40.2501170Z 
+build	Build unsigned app	2026-11-24T20:08:40.2604120Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/UniformTypeIdentifiers-3Y4DSFTYRNMYN75GKP2TSWUXK.pcm
+build	Build unsigned app	2026-11-24T20:08:40.2705740Z 
+build	Build unsigned app	2026-11-24T20:08:40.2808310Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/AudioToolbox-9TWWVGIRTRCDYKFYZ8YXC1X6H.pcm
+build	Build unsigned app	2026-11-24T20:08:40.3722850Z 
+build	Build unsigned app	2026-11-24T20:08:40.3825850Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/OpenGLES-7PVMLTZ6VOI2S1KVOWEK735WA.pcm
+build	Build unsigned app	2026-11-24T20:08:40.3928980Z 
+build	Build unsigned app	2026-11-24T20:08:40.4030320Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/Metal-9939BN2NME4OWJ82E12G7G244.pcm
+build	Build unsigned app	2026-11-24T20:08:40.5604760Z 
+build	Build unsigned app	2026-11-24T20:08:40.5714510Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/_LocationEssentials-6Z0QGFUDJZPZWY77Q95O93U94.pcm
+build	Build unsigned app	2026-11-24T20:08:40.5819210Z 
+build	Build unsigned app	2026-11-24T20:08:40.5830700Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/UIUtilities-C1LSU4BQIG5AENIER03A9MSYD.pcm
+build	Build unsigned app	2026-11-24T20:08:40.5831980Z 
+build	Build unsigned app	2026-11-24T20:08:40.5832680Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreLocation-DK2HOA5K091DXPI1J4NS0USZ7.pcm
+build	Build unsigned app	2026-11-24T20:08:40.7182090Z 
+build	Build unsigned app	2026-11-24T20:08:40.7373020Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreVideo-DVX6QWF6IAG328SV2BC59LHGE.pcm
+build	Build unsigned app	2026-11-24T20:08:40.8423060Z 
+build	Build unsigned app	2026-11-24T20:08:40.8530200Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreMotion-2K3D7A8P7W66DYB51UMH90HLK.pcm
+build	Build unsigned app	2026-11-24T20:08:40.9148070Z 
+build	Build unsigned app	2026-11-24T20:08:40.9260820Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/QuartzCore-9UK3M46MODPUDF4LJN95RXGYF.pcm
+build	Build unsigned app	2026-11-24T20:08:41.2130630Z 
+build	Build unsigned app	2026-11-24T20:08:41.2241410Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreMedia-9JVPINC7849DCKZFEBKJYLYW.pcm
+build	Build unsigned app	2026-11-24T20:08:41.2485960Z 
+build	Build unsigned app	2026-11-24T20:08:41.2597230Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/CoreImage-11T0V5C830IUXN086ZVX1OWNG.pcm
+build	Build unsigned app	2026-11-24T20:08:41.3088280Z 
+build	Build unsigned app	2026-11-24T20:08:41.3218070Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/SwiftUICore-DM6QZFYCP118K7KLKGLIUAHTK.pcm
+build	Build unsigned app	2026-11-24T20:08:41.5149720Z 
+build	Build unsigned app	2026-11-24T20:08:41.5253020Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/AVFAudio-BG0EB0EDXV9SSK1DJQCMA2AUA.pcm
+build	Build unsigned app	2026-11-24T20:08:41.9607610Z 
+build	Build unsigned app	2026-11-24T20:08:41.9645480Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/VideoToolbox-CHQ54MOX5ORFTI1IEI6C6OTB6.pcm
+build	Build unsigned app	2026-11-24T20:08:41.9785680Z 
+build	Build unsigned app	2026-11-24T20:08:41.9826330Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/MediaToolbox-1LJ3HOTAQCADIKLXLMAXP56QN.pcm
+build	Build unsigned app	2026-11-24T20:08:41.9829070Z 
+build	Build unsigned app	2026-11-24T20:08:41.9829840Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/UIKit-2I436B36I1TPSEQEJCQHE2HQY.pcm
+build	Build unsigned app	2026-11-24T20:08:43.7869240Z 
+build	Build unsigned app	2026-11-24T20:08:43.7975660Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/AVFoundation-96KAZ2C4UJPFFU8BGDEG9PYDP.pcm
+build	Build unsigned app	2026-11-24T20:08:43.8080100Z 
+build	Build unsigned app	2026-11-24T20:08:43.8219070Z SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules/SwiftUI-8FROKHUKQ97BO0V9MFMOK82A3.pcm
+build	Build unsigned app	2026-11-24T20:08:44.3632100Z 
+build	Build unsigned app	2026-11-24T20:08:44.3643680Z SwiftCompile normal arm64 Compiling\ AiPipelineModules.swift,\ AiRecognizer.swift,\ MediaMindAIApp.swift,\ AppSettings.swift,\ BackgroundAndCrash.swift,\ DefaultPolicies.swift,\ KeychainStore.swift,\ NetLog.swift,\ HistoryStore.swift,\ UpdateChecker.swift,\ CertPinning.swift,\ CloudDrive.swift,\ GuangyaDrive.swift,\ Pan123Drive.swift,\ ScanFrequency.swift,\ WebDavDrive.swift,\ AdaptiveAndConflictEngine.swift,\ ArtworkFetcher.swift,\ DuplicateAndRetentionEngine.swift,\ ExecutionEngine.swift,\ OperationJournalAndUndo.swift,\ PlanModels.swift,\ Scanner.swift,\ SeriesMergerAndRetention.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiPipelineModules.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiRecognizer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/App/MediaMindAIApp.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/BackgroundAndCrash.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/DefaultPolicies.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/KeychainStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/NetLog.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/UpdateChecker.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CertPinning.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CloudDrive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/GuangyaDrive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/Pan123Drive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/ScanFrequency.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/WebDavDrive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/AdaptiveAndConflictEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ArtworkFetcher.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/DuplicateAndRetentionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ExecutionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/PlanModels.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/Scanner.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/SeriesMergerAndRetention.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:56.7849030Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift:247:29: error: call to main actor-isolated instance method 'setEnabled' in a synchronous nonisolated context [#ActorIsolatedCall]
+build	Build unsigned app	2026-11-24T20:08:56.7952280Z 245 |         }
+build	Build unsigned app	2026-11-24T20:08:56.8062560Z 246 |         self.rememberHistory = defaults.object(forKey: "history_enabled") as? Bool ?? true
+build	Build unsigned app	2026-11-24T20:08:56.8166820Z 247 |         HistoryStore.shared.setEnabled(self.rememberHistory)
+build	Build unsigned app	2026-11-24T20:08:56.8280780Z     |                             `- error: call to main actor-isolated instance method 'setEnabled' in a synchronous nonisolated context [#ActorIsolatedCall]
+build	Build unsigned app	2026-11-24T20:08:56.8383990Z 248 |         self.tmdbApiBase = defaults.string(forKey: "tmdb_api_base") ?? TmdbNetConfig.altApi
+build	Build unsigned app	2026-11-24T20:08:56.8466910Z 249 |         self.tmdbImageBase = defaults.string(forKey: "tmdb_img_base") ?? TmdbNetConfig.defaultImage
+build	Build unsigned app	2026-11-24T20:08:56.8573950Z 
+build	Build unsigned app	2026-11-24T20:08:56.8707690Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift:164:17: note: calls to instance method 'setEnabled' from outside of its actor context are implicitly asynchronous
+build	Build unsigned app	2026-11-24T20:08:56.8851170Z 162 |     }
+build	Build unsigned app	2026-11-24T20:08:56.8975280Z 163 | 
+build	Build unsigned app	2026-11-24T20:08:56.9076950Z 164 |     public func setEnabled(_ on: Bool) {
+build	Build unsigned app	2026-11-24T20:08:56.9208680Z     |                 `- note: calls to instance method 'setEnabled' from outside of its actor context are implicitly asynchronous
+build	Build unsigned app	2026-11-24T20:08:56.9308500Z 165 |         enabled = on
+build	Build unsigned app	2026-11-24T20:08:56.9409750Z 166 |         persist()
+build	Build unsigned app	2026-11-24T20:08:56.9518420Z 
+build	Build unsigned app	2026-11-24T20:08:56.9701680Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift:247:22: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Build unsigned app	2026-11-24T20:08:56.9804480Z 245 |         }
+build	Build unsigned app	2026-11-24T20:08:57.0009430Z ** BUILD FAILED **
+build	Build unsigned app	2026-11-24T20:08:57.0011510Z 246 |         self.rememberHistory = defaults.object(forKey: "history_enabled") as? Bool ?? true
+build	Build unsigned app	2026-11-24T20:08:57.0112810Z 
+build	Build unsigned app	2026-11-24T20:08:57.0116350Z 247 |         HistoryStore.shared.setEnabled(self.rememberHistory)
+build	Build unsigned app	2026-11-24T20:08:57.0218030Z 
+build	Build unsigned app	2026-11-24T20:08:57.0218870Z     |                      `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Build unsigned app	2026-11-24T20:08:57.0219820Z 248 |         self.tmdbApiBase = defaults.string(forKey: "tmdb_api_base") ?? TmdbNetConfig.altApi
+build	Build unsigned app	2026-11-24T20:08:57.0320590Z The following build commands failed:
+build	Build unsigned app	2026-11-24T20:08:57.0321370Z 249 |         self.tmdbImageBase = defaults.string(forKey: "tmdb_img_base") ?? TmdbNetConfig.defaultImage
+build	Build unsigned app	2026-11-24T20:08:57.0423510Z 	SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.0424270Z 
+build	Build unsigned app	2026-11-24T20:08:57.0533580Z 	SwiftCompile normal arm64 Compiling\ AiPipelineModules.swift,\ AiRecognizer.swift,\ MediaMindAIApp.swift,\ AppSettings.swift,\ BackgroundAndCrash.swift,\ DefaultPolicies.swift,\ KeychainStore.swift,\ NetLog.swift,\ HistoryStore.swift,\ UpdateChecker.swift,\ CertPinning.swift,\ CloudDrive.swift,\ GuangyaDrive.swift,\ Pan123Drive.swift,\ ScanFrequency.swift,\ WebDavDrive.swift,\ AdaptiveAndConflictEngine.swift,\ ArtworkFetcher.swift,\ DuplicateAndRetentionEngine.swift,\ ExecutionEngine.swift,\ OperationJournalAndUndo.swift,\ PlanModels.swift,\ Scanner.swift,\ SeriesMergerAndRetention.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiPipelineModules.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiRecognizer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/App/MediaMindAIApp.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/BackgroundAndCrash.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/DefaultPolicies.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/KeychainStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/NetLog.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/UpdateChecker.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CertPinning.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CloudDrive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/GuangyaDrive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/Pan123Drive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/ScanFrequency.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/WebDavDrive.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/AdaptiveAndConflictEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ArtworkFetcher.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/DuplicateAndRetentionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ExecutionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/PlanModels.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/Scanner.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/SeriesMergerAndRetention.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.0565280Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift:129:23: note: static property declared here
+build	Build unsigned app	2026-11-24T20:08:57.0626740Z 	Building project MediaMindAI with scheme MediaMindAI and configuration Release
+build	Build unsigned app	2026-11-24T20:08:57.0627410Z 127 | @Observable
+build	Build unsigned app	2026-11-24T20:08:57.0730390Z (3 failures)
+build	Build unsigned app	2026-11-24T20:08:57.0731080Z 128 | public final class HistoryStore {
+build	Build unsigned app	2026-11-24T20:08:57.0906330Z 129 |     public static let shared = HistoryStore()
+build	Build unsigned app	2026-11-24T20:08:57.1007910Z     |                       `- note: static property declared here
+build	Build unsigned app	2026-11-24T20:08:57.1109560Z 130 |     private static let maxRuns = 300
+build	Build unsigned app	2026-11-24T20:08:57.1210770Z 131 |     private static let maxRecords = 1000
+build	Build unsigned app	2026-11-24T20:08:57.1250770Z 
+build	Build unsigned app	2026-11-24T20:08:57.1271340Z [#ActorIsolatedCall]: <https://docs.swift.org/compiler/documentation/diagnostics/actor-isolated-call>
+build	Build unsigned app	2026-11-24T20:08:57.1273150Z Failed frontend command:
+build	Build unsigned app	2026-11-24T20:08:57.1274030Z 
+build	Build unsigned app	2026-11-24T20:08:57.1276500Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiPipelineModules.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1277720Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1278420Z     builtin-SwiftPerFileCompile AiPipelineModules.swift
+build	Build unsigned app	2026-11-24T20:08:57.1303360Z 
+build	Build unsigned app	2026-11-24T20:08:57.1304520Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiRecognizer.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1308170Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1309690Z     builtin-SwiftPerFileCompile AiRecognizer.swift
+build	Build unsigned app	2026-11-24T20:08:57.1410710Z 
+build	Build unsigned app	2026-11-24T20:08:57.1439720Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/App/MediaMindAIApp.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1441300Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1442040Z     builtin-SwiftPerFileCompile MediaMindAIApp.swift
+build	Build unsigned app	2026-11-24T20:08:57.1442450Z 
+build	Build unsigned app	2026-11-24T20:08:57.1443190Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1444170Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1445290Z     builtin-SwiftPerFileCompile AppSettings.swift
+build	Build unsigned app	2026-11-24T20:08:57.1446200Z 
+build	Build unsigned app	2026-11-24T20:08:57.1446820Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/BackgroundAndCrash.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1447790Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1448520Z     builtin-SwiftPerFileCompile BackgroundAndCrash.swift
+build	Build unsigned app	2026-11-24T20:08:57.1448900Z 
+build	Build unsigned app	2026-11-24T20:08:57.1449950Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/DefaultPolicies.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1451060Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1451600Z     builtin-SwiftPerFileCompile DefaultPolicies.swift
+build	Build unsigned app	2026-11-24T20:08:57.1451980Z 
+build	Build unsigned app	2026-11-24T20:08:57.1452670Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/KeychainStore.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1488350Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1500750Z     builtin-SwiftPerFileCompile KeychainStore.swift
+build	Build unsigned app	2026-11-24T20:08:57.1501540Z 
+build	Build unsigned app	2026-11-24T20:08:57.1502300Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/NetLog.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1505850Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1507390Z     builtin-SwiftPerFileCompile NetLog.swift
+build	Build unsigned app	2026-11-24T20:08:57.1508160Z 
+build	Build unsigned app	2026-11-24T20:08:57.1510500Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1515350Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1519890Z     builtin-SwiftPerFileCompile HistoryStore.swift
+build	Build unsigned app	2026-11-24T20:08:57.1521150Z 
+build	Build unsigned app	2026-11-24T20:08:57.1523840Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/UpdateChecker.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1526780Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1530600Z     builtin-SwiftPerFileCompile UpdateChecker.swift
+build	Build unsigned app	2026-11-24T20:08:57.1531760Z 
+build	Build unsigned app	2026-11-24T20:08:57.1533250Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CertPinning.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1536510Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1538080Z     builtin-SwiftPerFileCompile CertPinning.swift
+build	Build unsigned app	2026-11-24T20:08:57.1539540Z 
+build	Build unsigned app	2026-11-24T20:08:57.1541940Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CloudDrive.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1546090Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1547880Z     builtin-SwiftPerFileCompile CloudDrive.swift
+build	Build unsigned app	2026-11-24T20:08:57.1548440Z 
+build	Build unsigned app	2026-11-24T20:08:57.1549370Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/GuangyaDrive.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1550330Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1551380Z     builtin-SwiftPerFileCompile GuangyaDrive.swift
+build	Build unsigned app	2026-11-24T20:08:57.1551840Z 
+build	Build unsigned app	2026-11-24T20:08:57.1553010Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/Pan123Drive.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1554480Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1584710Z     builtin-SwiftPerFileCompile Pan123Drive.swift
+build	Build unsigned app	2026-11-24T20:08:57.1586010Z 
+build	Build unsigned app	2026-11-24T20:08:57.1587680Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/ScanFrequency.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1590960Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1593490Z     builtin-SwiftPerFileCompile ScanFrequency.swift
+build	Build unsigned app	2026-11-24T20:08:57.1594350Z 
+build	Build unsigned app	2026-11-24T20:08:57.1596240Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/WebDavDrive.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1599140Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1607210Z     builtin-SwiftPerFileCompile WebDavDrive.swift
+build	Build unsigned app	2026-11-24T20:08:57.1608310Z 
+build	Build unsigned app	2026-11-24T20:08:57.1609300Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/AdaptiveAndConflictEngine.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1610680Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1611270Z     builtin-SwiftPerFileCompile AdaptiveAndConflictEngine.swift
+build	Build unsigned app	2026-11-24T20:08:57.1611770Z 
+build	Build unsigned app	2026-11-24T20:08:57.1612460Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ArtworkFetcher.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1638360Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1639630Z     builtin-SwiftPerFileCompile ArtworkFetcher.swift
+build	Build unsigned app	2026-11-24T20:08:57.1640560Z 
+build	Build unsigned app	2026-11-24T20:08:57.1642390Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/DuplicateAndRetentionEngine.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1645180Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1646560Z     builtin-SwiftPerFileCompile DuplicateAndRetentionEngine.swift
+build	Build unsigned app	2026-11-24T20:08:57.1647530Z 
+build	Build unsigned app	2026-11-24T20:08:57.1649940Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ExecutionEngine.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1652490Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1654570Z     builtin-SwiftPerFileCompile ExecutionEngine.swift
+build	Build unsigned app	2026-11-24T20:08:57.1655540Z 
+build	Build unsigned app	2026-11-24T20:08:57.1657290Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1659910Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1661610Z     builtin-SwiftPerFileCompile OperationJournalAndUndo.swift
+build	Build unsigned app	2026-11-24T20:08:57.1662660Z 
+build	Build unsigned app	2026-11-24T20:08:57.1664320Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/PlanModels.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1666660Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1668650Z     builtin-SwiftPerFileCompile PlanModels.swift
+build	Build unsigned app	2026-11-24T20:08:57.1669970Z 
+build	Build unsigned app	2026-11-24T20:08:57.1671480Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/Scanner.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1710020Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1710790Z     builtin-SwiftPerFileCompile Scanner.swift
+build	Build unsigned app	2026-11-24T20:08:57.1711130Z 
+build	Build unsigned app	2026-11-24T20:08:57.1712180Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/SeriesMergerAndRetention.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1713700Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1714270Z     builtin-SwiftPerFileCompile SeriesMergerAndRetention.swift
+build	Build unsigned app	2026-11-24T20:08:57.1716500Z 
+build	Build unsigned app	2026-11-24T20:08:57.1840370Z /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/RetentionZoneEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ReversibleTransactionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerMovieLooseAndArtwork.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTvAndBdmv.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerReplan.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTypesAndTree.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiResponseParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/IdRemap.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/NfoXml.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/AnimeEpisodeParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeRangeParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ExternalIdExtractor.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ReleaseTokenizer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleScorer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/DuplicateRetentionPlanner.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/EpisodeStrategy.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/LibraryDestinationAndTargets.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ManualConfirmation.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanSelection.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PreviewFilterFull.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerHeuristics.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiPipelineModules.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiRecognizer.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/App/MediaMindAIApp.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/AppSettings.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/BackgroundAndCrash.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/DefaultPolicies.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/KeychainStore.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/NetLog.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/HistoryStore.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Core/UpdateChecker.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CertPinning.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/CloudDrive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/GuangyaDrive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/Pan123Drive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/ScanFrequency.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/WebDavDrive.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/AdaptiveAndConflictEngine.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ArtworkFetcher.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/DuplicateAndRetentionEngine.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ExecutionEngine.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/PlanModels.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/Scanner.swift -primary-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/SeriesMergerAndRetention.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeMapping.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/MediaParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/SequelAndFolderResolver.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/StandardNaming.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleDeobfuscator.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbClient.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/AppRootView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/AuxiliarySheets.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/CloudTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/LoginViews.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/MediaDetailView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/PreviewInboxAndLibraryViews.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/PreviewTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/ManualMatchSheet.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/DefaultPolicyScreen.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/CompletedTaskDetailScreen.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SettingsMoreScreens.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SettingsTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SplashView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/TaskItemsView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/TasksTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/Theme.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.swift -supplementary-output-file-map /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/supplementaryOutputs-2 -emit-localized-strings -emit-localized-strings-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64 -target arm64-apple-ios17.0 -module-can-import-version DeveloperToolsSupport 24.0.24 24.0.24 -module-can-import-version UIKit 9127.0.85.32 9127.0.85 -disable-cross-import-overlay-search -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#FoundationMacros -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libObservationMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#ObservationMacros -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libPreviewsMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#PreviewsMacros -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftMacros -load-resolved-plugin /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib\#/Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftUIMacros -disable-implicit-swift-modules -Xcc -fno-implicit-modules -Xcc -fno-implicit-module-maps -explicit-swift-module-map-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI-dependencies-1.json -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Applications/Xcode_27.1.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.1.sdk -I /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos -F /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos -module-cache-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -no-color-diagnostics -Xcc -fno-color-diagnostics -g -debug-info-format\=dwarf -dwarf-version\=4 -swift-version 5 -O -serialize-debugging-options -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -empty-abi-descriptor -validate-clang-modules-once -clang-build-session-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS -file-compilation-dir /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS -Xcc -ivfsstatcache -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKStatCaches.noindex/iphoneos27.1-24A94232-e829b21a6f8c9b70876ba0858053c0442866d66f27be705873c55a4609c58824.sdkstatcache -Xcc -fmodules-prune-interval\=86400 -Xcc -fmodules-prune-after\=345600 -Xcc -iquote -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-generated-files.hmap -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-own-target-headers.hmap -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/MediaMindAI-project-headers.hmap -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Products/Release-iphoneos/include -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources -no-auto-bridging-header-chaining -module-name MediaMindAI -const-gather-protocols-file /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI_const_extract_protocols.json -disable-clang-spi -clang-target arm64-apple-ios27.1 -target-sdk-version 27.1 -target-sdk-name iphoneos27.1 -in-process-plugin-server-path /Applications/Xcode_27.1.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AiPipelineModules.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AiRecognizer.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAIApp.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AppSettings.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/BackgroundAndCrash.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/DefaultPolicies.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/KeychainStore.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/NetLog.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/HistoryStore.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/UpdateChecker.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/CertPinning.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/CloudDrive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/GuangyaDrive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/Pan123Drive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/ScanFrequency.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/WebDavDrive.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AdaptiveAndConflictEngine.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/ArtworkFetcher.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/DuplicateAndRetentionEngine.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/ExecutionEngine.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/OperationJournalAndUndo.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/PlanModels.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/Scanner.o -o /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/SeriesMergerAndRetention.o -debug-module-path /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAI.swiftmodule -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AiPipelineModules.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AiRecognizer.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/MediaMindAIApp.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AppSettings.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/BackgroundAndCrash.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/DefaultPolicies.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/KeychainStore.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/NetLog.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/HistoryStore.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/UpdateChecker.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/CertPinning.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/CloudDrive.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/GuangyaDrive.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/Pan123Drive.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/ScanFrequency.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/WebDavDrive.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/AdaptiveAndConflictEngine.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/ArtworkFetcher.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/DuplicateAndRetentionEngine.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/ExecutionEngine.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/OperationJournalAndUndo.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/PlanModels.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/Scanner.o -index-unit-output-path /MediaMindAI.build/Release-iphoneos/MediaMindAI.build/Objects-normal/arm64/SeriesMergerAndRetention.o
+build	Build unsigned app	2026-11-24T20:08:57.1980940Z SwiftCompile normal arm64 Compiling\ EpisodeMapping.swift,\ MediaParser.swift,\ SequelAndFolderResolver.swift,\ StandardNaming.swift,\ TitleDeobfuscator.swift,\ TmdbClient.swift,\ TmdbNet.swift,\ AppRootView.swift,\ AuxiliarySheets.swift,\ CloudTabView.swift,\ LoginViews.swift,\ MediaDetailView.swift,\ PreviewInboxAndLibraryViews.swift,\ PreviewTabView.swift,\ ManualMatchSheet.swift,\ DefaultPolicyScreen.swift,\ CompletedTaskDetailScreen.swift,\ SettingsMoreScreens.swift,\ SettingsTabView.swift,\ SplashView.swift,\ TaskItemsView.swift,\ TasksTabView.swift,\ Theme.swift,\ GeneratedAssetSymbols.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeMapping.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/MediaParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/SequelAndFolderResolver.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/StandardNaming.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleDeobfuscator.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbClient.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/AppRootView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/AuxiliarySheets.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/CloudTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/LoginViews.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/MediaDetailView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/PreviewInboxAndLibraryViews.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/PreviewTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/ManualMatchSheet.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/DefaultPolicyScreen.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/CompletedTaskDetailScreen.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SettingsMoreScreens.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SettingsTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SplashView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/TaskItemsView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/TasksTabView.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/Theme.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1996030Z 
+build	Build unsigned app	2026-11-24T20:08:57.1996570Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeMapping.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1997400Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1997810Z     builtin-SwiftPerFileCompile EpisodeMapping.swift
+build	Build unsigned app	2026-11-24T20:08:57.1998090Z 
+build	Build unsigned app	2026-11-24T20:08:57.1998670Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/MediaParser.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.1999430Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.1999890Z     builtin-SwiftPerFileCompile MediaParser.swift
+build	Build unsigned app	2026-11-24T20:08:57.2000670Z 
+build	Build unsigned app	2026-11-24T20:08:57.2001240Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/SequelAndFolderResolver.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2002140Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2002560Z     builtin-SwiftPerFileCompile SequelAndFolderResolver.swift
+build	Build unsigned app	2026-11-24T20:08:57.2002870Z 
+build	Build unsigned app	2026-11-24T20:08:57.2003460Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/StandardNaming.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2004400Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2004800Z     builtin-SwiftPerFileCompile StandardNaming.swift
+build	Build unsigned app	2026-11-24T20:08:57.2005050Z 
+build	Build unsigned app	2026-11-24T20:08:57.2005700Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleDeobfuscator.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2006600Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2007100Z     builtin-SwiftPerFileCompile TitleDeobfuscator.swift
+build	Build unsigned app	2026-11-24T20:08:57.2007360Z 
+build	Build unsigned app	2026-11-24T20:08:57.2007900Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbClient.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2008640Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2009110Z     builtin-SwiftPerFileCompile TmdbClient.swift
+build	Build unsigned app	2026-11-24T20:08:57.2009370Z 
+build	Build unsigned app	2026-11-24T20:08:57.2009910Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/TMDB/TmdbNet.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2010680Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2011140Z     builtin-SwiftPerFileCompile TmdbNet.swift
+build	Build unsigned app	2026-11-24T20:08:57.2011350Z 
+build	Build unsigned app	2026-11-24T20:08:57.2011850Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/AppRootView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2012730Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2013160Z     builtin-SwiftPerFileCompile AppRootView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2013340Z 
+build	Build unsigned app	2026-11-24T20:08:57.2014380Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/AuxiliarySheets.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2015720Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2016390Z     builtin-SwiftPerFileCompile AuxiliarySheets.swift
+build	Build unsigned app	2026-11-24T20:08:57.2016630Z 
+build	Build unsigned app	2026-11-24T20:08:57.2017380Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/CloudTabView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2018460Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2019020Z     builtin-SwiftPerFileCompile CloudTabView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2019280Z 
+build	Build unsigned app	2026-11-24T20:08:57.2019810Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/LoginViews.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2020710Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2021240Z     builtin-SwiftPerFileCompile LoginViews.swift
+build	Build unsigned app	2026-11-24T20:08:57.2021510Z 
+build	Build unsigned app	2026-11-24T20:08:57.2022080Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/MediaDetailView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2022900Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2023810Z     builtin-SwiftPerFileCompile MediaDetailView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2024100Z 
+build	Build unsigned app	2026-11-24T20:08:57.2024660Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/PreviewInboxAndLibraryViews.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2025570Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2026070Z     builtin-SwiftPerFileCompile PreviewInboxAndLibraryViews.swift
+build	Build unsigned app	2026-11-24T20:08:57.2026400Z 
+build	Build unsigned app	2026-11-24T20:08:57.2026960Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/PreviewTabView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2027860Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2028320Z     builtin-SwiftPerFileCompile PreviewTabView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2028620Z 
+build	Build unsigned app	2026-11-24T20:08:57.2029170Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/ManualMatchSheet.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2029980Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2030520Z     builtin-SwiftPerFileCompile ManualMatchSheet.swift
+build	Build unsigned app	2026-11-24T20:08:57.2030780Z 
+build	Build unsigned app	2026-11-24T20:08:57.2031350Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/DefaultPolicyScreen.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2032350Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2032880Z     builtin-SwiftPerFileCompile DefaultPolicyScreen.swift
+build	Build unsigned app	2026-11-24T20:08:57.2033090Z 
+build	Build unsigned app	2026-11-24T20:08:57.2033720Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/CompletedTaskDetailScreen.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2034580Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2035060Z     builtin-SwiftPerFileCompile CompletedTaskDetailScreen.swift
+build	Build unsigned app	2026-11-24T20:08:57.2035390Z 
+build	Build unsigned app	2026-11-24T20:08:57.2035970Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SettingsMoreScreens.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2036760Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2038170Z     builtin-SwiftPerFileCompile SettingsMoreScreens.swift
+build	Build unsigned app	2026-11-24T20:08:57.2038500Z 
+build	Build unsigned app	2026-11-24T20:08:57.2039120Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SettingsTabView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2040220Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2040760Z     builtin-SwiftPerFileCompile SettingsTabView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2041070Z 
+build	Build unsigned app	2026-11-24T20:08:57.2041570Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/SplashView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2042460Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2042960Z     builtin-SwiftPerFileCompile SplashView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2043130Z 
+build	Build unsigned app	2026-11-24T20:08:57.2043690Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/TaskItemsView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2044610Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2045040Z     builtin-SwiftPerFileCompile TaskItemsView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2045290Z 
+build	Build unsigned app	2026-11-24T20:08:57.2045860Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/TasksTabView.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2047030Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2047440Z     builtin-SwiftPerFileCompile TasksTabView.swift
+build	Build unsigned app	2026-11-24T20:08:57.2047680Z 
+build	Build unsigned app	2026-11-24T20:08:57.2048180Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/UI/Theme.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2048940Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2049350Z     builtin-SwiftPerFileCompile Theme.swift
+build	Build unsigned app	2026-11-24T20:08:57.2049570Z 
+build	Build unsigned app	2026-11-24T20:08:57.2050330Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/MediaMindAI.build/Release-iphoneos/MediaMindAI.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2051580Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2052000Z     builtin-SwiftPerFileCompile GeneratedAssetSymbols.swift
+build	Build unsigned app	2026-11-24T20:08:57.2052200Z 
+build	Build unsigned app	2026-11-24T20:08:57.2052560Z SwiftEmitModule normal arm64 Emitting\ module\ for\ MediaMindAI (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2053470Z 
+build	Build unsigned app	2026-11-24T20:08:57.2053650Z SwiftCompile normal arm64 (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2054080Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2054490Z     
+build	Build unsigned app	2026-11-24T20:08:57.2054630Z 
+build	Build unsigned app	2026-11-24T20:08:57.2055390Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift:41:82: warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Build unsigned app	2026-11-24T20:08:57.2056620Z  39 | 
+build	Build unsigned app	2026-11-24T20:08:57.2056890Z  40 |     @MainActor
+build	Build unsigned app	2026-11-24T20:08:57.2057350Z  41 |     public static func uncertainRows(runId: String, journal: OperationJournal = .shared) -> [JournalRow] {
+build	Build unsigned app	2026-11-24T20:08:57.2058370Z     |                                                                                  `- warning: main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
+build	Build unsigned app	2026-11-24T20:08:57.2059180Z  42 |         guard !runId.isEmpty else { return [] }
+build	Build unsigned app	2026-11-24T20:08:57.2061810Z  43 |         return journal.rows(forRunId: runId).filter {
+build	Build unsigned app	2026-11-24T20:08:57.2062530Z 
+build	Build unsigned app	2026-11-24T20:08:57.2063880Z /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/OperationJournalAndUndo.swift:79:23: note: static property declared here
+build	Build unsigned app	2026-11-24T20:08:57.2065620Z  77 | @Observable
+build	Build unsigned app	2026-11-24T20:08:57.2066740Z  78 | public final class OperationJournal {
+build	Build unsigned app	2026-11-24T20:08:57.2068220Z  79 |     public static let shared = OperationJournal()
+build	Build unsigned app	2026-11-24T20:08:57.2068740Z     |                       `- note: static property declared here
+build	Build unsigned app	2026-11-24T20:08:57.2069110Z  80 | 
+build	Build unsigned app	2026-11-24T20:08:57.2069420Z  81 |     public private(set) var rows: [JournalRow] = []
+build	Build unsigned app	2026-11-24T20:08:57.2069700Z 
+build	Build unsigned app	2026-11-24T20:08:57.2081020Z SwiftCompile normal arm64 Compiling\ RetentionZoneEngine.swift,\ ReversibleTransactionEngine.swift,\ ScannerMovieLooseAndArtwork.swift,\ ScannerTvAndBdmv.swift,\ ScannerReplan.swift,\ ScannerTypesAndTree.swift,\ PlanStore.swift,\ AiResponseParser.swift,\ IdRemap.swift,\ JournalReconciler.swift,\ NfoXml.swift,\ TaskCancellation.swift,\ AnimeEpisodeParser.swift,\ EpisodeRangeParser.swift,\ ExternalIdExtractor.swift,\ ReleaseTokenizer.swift,\ TitleScorer.swift,\ DuplicateRetentionPlanner.swift,\ EpisodeStrategy.swift,\ LibraryDestinationAndTargets.swift,\ ManualConfirmation.swift,\ PlanSelection.swift,\ PreviewFilterFull.swift,\ ScannerHeuristics.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/RetentionZoneEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ReversibleTransactionEngine.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerMovieLooseAndArtwork.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTvAndBdmv.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerReplan.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTypesAndTree.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanStore.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiResponseParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/IdRemap.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/NfoXml.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/AnimeEpisodeParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeRangeParser.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ExternalIdExtractor.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ReleaseTokenizer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleScorer.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/DuplicateRetentionPlanner.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/EpisodeStrategy.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/LibraryDestinationAndTargets.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ManualConfirmation.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanSelection.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PreviewFilterFull.swift /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerHeuristics.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2103380Z 
+build	Build unsigned app	2026-11-24T20:08:57.2104790Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/RetentionZoneEngine.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2107690Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2108810Z     builtin-SwiftPerFileCompile RetentionZoneEngine.swift
+build	Build unsigned app	2026-11-24T20:08:57.2109880Z 
+build	Build unsigned app	2026-11-24T20:08:57.2112490Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/ReversibleTransactionEngine.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2113730Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2114160Z     builtin-SwiftPerFileCompile ReversibleTransactionEngine.swift
+build	Build unsigned app	2026-11-24T20:08:57.2114410Z 
+build	Build unsigned app	2026-11-24T20:08:57.2115340Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerMovieLooseAndArtwork.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2116590Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2117000Z     builtin-SwiftPerFileCompile ScannerMovieLooseAndArtwork.swift
+build	Build unsigned app	2026-11-24T20:08:57.2117250Z 
+build	Build unsigned app	2026-11-24T20:08:57.2117790Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTvAndBdmv.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2119110Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2120130Z     builtin-SwiftPerFileCompile ScannerTvAndBdmv.swift
+build	Build unsigned app	2026-11-24T20:08:57.2120330Z 
+build	Build unsigned app	2026-11-24T20:08:57.2120900Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerReplan.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2121680Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2122060Z     builtin-SwiftPerFileCompile ScannerReplan.swift
+build	Build unsigned app	2026-11-24T20:08:57.2122260Z 
+build	Build unsigned app	2026-11-24T20:08:57.2122810Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerTypesAndTree.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2123610Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2124000Z     builtin-SwiftPerFileCompile ScannerTypesAndTree.swift
+build	Build unsigned app	2026-11-24T20:08:57.2124210Z 
+build	Build unsigned app	2026-11-24T20:08:57.2124790Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanStore.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2125660Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2126090Z     builtin-SwiftPerFileCompile PlanStore.swift
+build	Build unsigned app	2026-11-24T20:08:57.2126490Z 
+build	Build unsigned app	2026-11-24T20:08:57.2127130Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/AI/AiResponseParser.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2128060Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2128560Z     builtin-SwiftPerFileCompile AiResponseParser.swift
+build	Build unsigned app	2026-11-24T20:08:57.2128760Z 
+build	Build unsigned app	2026-11-24T20:08:57.2129280Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Drives/IdRemap.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2130080Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2130440Z     builtin-SwiftPerFileCompile IdRemap.swift
+build	Build unsigned app	2026-11-24T20:08:57.2130630Z 
+build	Build unsigned app	2026-11-24T20:08:57.2131270Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/JournalReconciler.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2134100Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2134640Z     builtin-SwiftPerFileCompile JournalReconciler.swift
+build	Build unsigned app	2026-11-24T20:08:57.2134880Z 
+build	Build unsigned app	2026-11-24T20:08:57.2135510Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/NfoXml.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2136400Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2136940Z     builtin-SwiftPerFileCompile NfoXml.swift
+build	Build unsigned app	2026-11-24T20:08:57.2137150Z 
+build	Build unsigned app	2026-11-24T20:08:57.2138030Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Engine/TaskCancellation.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2138930Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2139360Z     builtin-SwiftPerFileCompile TaskCancellation.swift
+build	Build unsigned app	2026-11-24T20:08:57.2139630Z 
+build	Build unsigned app	2026-11-24T20:08:57.2140220Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/AnimeEpisodeParser.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2141070Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2141540Z     builtin-SwiftPerFileCompile AnimeEpisodeParser.swift
+build	Build unsigned app	2026-11-24T20:08:57.2142010Z 
+build	Build unsigned app	2026-11-24T20:08:57.2142590Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/EpisodeRangeParser.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2143520Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2144000Z     builtin-SwiftPerFileCompile EpisodeRangeParser.swift
+build	Build unsigned app	2026-11-24T20:08:57.2144280Z 
+build	Build unsigned app	2026-11-24T20:08:57.2144900Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ExternalIdExtractor.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2145890Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2146320Z     builtin-SwiftPerFileCompile ExternalIdExtractor.swift
+build	Build unsigned app	2026-11-24T20:08:57.2146580Z 
+build	Build unsigned app	2026-11-24T20:08:57.2147210Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/ReleaseTokenizer.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2148180Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2148620Z     builtin-SwiftPerFileCompile ReleaseTokenizer.swift
+build	Build unsigned app	2026-11-24T20:08:57.2148830Z 
+build	Build unsigned app	2026-11-24T20:08:57.2149480Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Recognition/TitleScorer.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2150370Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2150740Z     builtin-SwiftPerFileCompile TitleScorer.swift
+build	Build unsigned app	2026-11-24T20:08:57.2150950Z 
+build	Build unsigned app	2026-11-24T20:08:57.2151640Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/DuplicateRetentionPlanner.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2152570Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2152980Z     builtin-SwiftPerFileCompile DuplicateRetentionPlanner.swift
+build	Build unsigned app	2026-11-24T20:08:57.2153240Z 
+build	Build unsigned app	2026-11-24T20:08:57.2153870Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/EpisodeStrategy.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2154760Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2155210Z     builtin-SwiftPerFileCompile EpisodeStrategy.swift
+build	Build unsigned app	2026-11-24T20:08:57.2155750Z 
+build	Build unsigned app	2026-11-24T20:08:57.2156470Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/LibraryDestinationAndTargets.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2157390Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2157820Z     builtin-SwiftPerFileCompile LibraryDestinationAndTargets.swift
+build	Build unsigned app	2026-11-24T20:08:57.2158070Z 
+build	Build unsigned app	2026-11-24T20:08:57.2158660Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ManualConfirmation.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2159860Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2160280Z     builtin-SwiftPerFileCompile ManualConfirmation.swift
+build	Build unsigned app	2026-11-24T20:08:57.2160500Z 
+build	Build unsigned app	2026-11-24T20:08:57.2161180Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PlanSelection.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2162010Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2162380Z     builtin-SwiftPerFileCompile PlanSelection.swift
+build	Build unsigned app	2026-11-24T20:08:57.2162580Z 
+build	Build unsigned app	2026-11-24T20:08:57.2163230Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/PreviewFilterFull.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2164270Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2164730Z     builtin-SwiftPerFileCompile PreviewFilterFull.swift
+build	Build unsigned app	2026-11-24T20:08:57.2164960Z 
+build	Build unsigned app	2026-11-24T20:08:57.2165640Z SwiftCompile normal arm64 /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/Sources/Scrape/ScannerHeuristics.swift (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2166460Z     cd /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS
+build	Build unsigned app	2026-11-24T20:08:57.2166980Z     builtin-SwiftPerFileCompile ScannerHeuristics.swift
+build	Build unsigned app	2026-11-24T20:08:57.2167280Z 
+build	Build unsigned app	2026-11-24T20:08:57.2167880Z PruneExplicitPrecompiledModules /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/ExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:57.2168530Z 
+build	Build unsigned app	2026-11-24T20:08:57.2168930Z PruneExplicitPrecompiledModules /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/SDKExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:57.2169560Z 
+build	Build unsigned app	2026-11-24T20:08:57.2177350Z PruneExplicitPrecompiledModules /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS/MediaMindAI-iOS/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+build	Build unsigned app	2026-11-24T20:08:57.2178010Z 
+build	Build unsigned app	2026-11-24T20:08:57.2178590Z warning: Traditional headermap style is no longer supported; please migrate to using separate headermaps and set 'ALWAYS_SEARCH_USER_PATHS' to NO. (in target 'MediaMindAI' from project 'MediaMindAI')
+build	Build unsigned app	2026-11-24T20:08:57.2186480Z ##[error]Process completed with exit code 65.
+build	Package unsigned IPA	﻿2026-11-24T20:08:57.2356680Z ##[group]Run mkdir Payload
+build	Package unsigned IPA	2026-11-24T20:08:57.2356960Z ^[[36;1mmkdir Payload^[[0m
+build	Package unsigned IPA	2026-11-24T20:08:57.2357220Z ^[[36;1mcp -r build/Build/Products/Release-iphoneos/*.app Payload/^[[0m
+build	Package unsigned IPA	2026-11-24T20:08:57.2357620Z ^[[36;1mzip -r MediaMindAI-unsigned.ipa Payload^[[0m
+build	Package unsigned IPA	2026-11-24T20:08:57.4482400Z shell: /bin/bash -e {0}
+build	Package unsigned IPA	2026-11-24T20:08:57.4482650Z ##[endgroup]
+build	Package unsigned IPA	2026-11-24T20:08:57.5813270Z   adding: Payload/ (stored 0%)
+build	Package unsigned IPA	2026-11-24T20:08:57.5814550Z   adding: Payload/MediaMindAI.app/ (stored 0%)
+build	Package unsigned IPA	2026-11-24T20:08:57.5814930Z   adding: Payload/MediaMindAI.app/licenses/ (stored 0%)
+build	Package unsigned IPA	2026-11-24T20:08:57.5837580Z   adding: Payload/MediaMindAI.app/licenses/gpl-3.0-app.txt (deflated 66%)
+build	Package unsigned IPA	2026-11-24T20:08:57.5839150Z   adding: Payload/MediaMindAI.app/licenses/runtime-components.json (deflated 95%)
+build	Package unsigned IPA	2026-11-24T20:08:57.5846750Z   adding: Payload/MediaMindAI.app/licenses/third-party-notices.txt (deflated 79%)
+build	Package unsigned IPA	2026-11-24T20:08:57.5859010Z   adding: Payload/MediaMindAI.app/licenses/apache-2.0.txt (deflated 65%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6184200Z   adding: Payload/MediaMindAI.app/splash_light.mp4 (deflated 2%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6208490Z   adding: Payload/MediaMindAI.app/AppIcon60x60@2x.png (deflated 1%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6663860Z   adding: Payload/MediaMindAI.app/splash_dark.mp4 (deflated 1%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6882260Z   adding: Payload/MediaMindAI.app/Assets.car (deflated 4%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6887610Z   adding: Payload/MediaMindAI.app/AppIcon76x76@2x~ipad.png (deflated 1%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6902900Z   adding: Payload/MediaMindAI.app/Info.plist (deflated 33%)
+build	Package unsigned IPA	2026-11-24T20:08:57.6906700Z   adding: Payload/MediaMindAI.app/PkgInfo (stored 0%)
+build	Run actions/upload-artifact@v4	﻿2026-11-24T20:08:57.7071100Z ##[group]Run actions/upload-artifact@v4
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7071400Z with:
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7071590Z   name: unsigned-ipa
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7071820Z   path: MediaMindAI-iOS/MediaMindAI-unsigned.ipa
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7072110Z   if-no-files-found: warn
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7072340Z   compression-level: 6
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7072540Z   overwrite: false
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7072720Z   include-hidden-files: false
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:57.7072960Z ##[endgroup]
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:58.8317910Z (node:3178) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:58.8428520Z (Use `node --trace-deprecation ...` to show where the warning was created)
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:58.8694010Z With the provided path, there will be 1 file uploaded
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:58.8696210Z Artifact name is valid!
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:58.8698470Z Root directory input is valid!
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:59.2704080Z Beginning upload of artifact content to blob storage
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:59.4848430Z (node:3178) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:59.9158840Z Uploaded bytes 2373962
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:59.9718990Z Finished uploading artifact content to blob storage!
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:59.9734970Z SHA256 digest of uploaded artifact zip is afe74f841bb5caa274f3696b0d490a46cfe3c3214f7bbeba0e19e74138685182
+build	Run actions/upload-artifact@v4	2026-11-24T20:08:59.9736600Z Finalizing artifact upload
+build	Run actions/upload-artifact@v4	2026-11-24T20:09:00.3737530Z Artifact unsigned-ipa.zip successfully finalized. Artifact ID 14961555044
+build	Run actions/upload-artifact@v4	2026-11-24T20:09:00.3839630Z Artifact unsigned-ipa has been successfully uploaded! Final size is 2373962 bytes. Artifact ID is 14961555044
+build	Run actions/upload-artifact@v4	2026-11-24T20:09:00.3943290Z Artifact download URL: https://github.com/ALing-lab/MediaMindAI-iOS/actions/runs/45475815245/artifacts/14961555044
+build	Post Run actions/checkout@v4	﻿2026-11-24T20:09:00.4345660Z Post job cleanup.
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.6726040Z [command]/opt/homebrew/bin/git version
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7121010Z git version 2.56.0
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7188620Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/b079a0f1-404a-4b24-8a21-ad515b326c0c/.gitconfig'
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7204150Z Temporarily overriding HOME='/Users/runner/work/_temp/b079a0f1-404a-4b24-8a21-ad515b326c0c' before making global git config changes
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7256160Z Adding repository directory to the temporary git global config as a safe directory
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7257550Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/MediaMindAI-iOS/MediaMindAI-iOS
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7407160Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+build	Post Run actions/checkout@v4	2026-11-24T20:09:00.7544490Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+build	Post Run actions/checkout@v4	2026-11-24T20:09:01.0159980Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+build	Post Run actions/checkout@v4	2026-11-24T20:09:01.0332070Z http.https://github.com/.extraheader
+build	Post Run actions/checkout@v4	2026-11-24T20:09:01.0342290Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+build	Post Run actions/checkout@v4	2026-11-24T20:09:01.0463830Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+build	Post Run actions/checkout@v4	2026-11-24T20:09:01.2954190Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+build	Post Run actions/checkout@v4	2026-11-24T20:09:01.3385520Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+build	Complete job	﻿2026-11-24T20:09:01.6243390Z Cleaning up orphan processes
+build	Complete job	2026-11-24T20:09:02.3701810Z Terminate orphan process: pid (2462) (ibtoold)
+build	Complete job	2026-11-24T20:09:02.4657260Z Terminate orphan process: pid (2436) (ibtoold)
+build	Complete job	2026-11-24T20:09:10.9294130Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

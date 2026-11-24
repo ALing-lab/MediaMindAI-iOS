@@ -243,8 +243,9 @@ public final class AppSettings: @unchecked Sendable {
         } else {
             self.nfoFields = NfoFieldSelection()
         }
-        self.rememberHistory = defaults.object(forKey: "history_enabled") as? Bool ?? true
-        HistoryStore.shared.setEnabled(self.rememberHistory)
+        let initRememberHistory = defaults.object(forKey: "history_enabled") as? Bool ?? true
+        self.rememberHistory = initRememberHistory
+        Task { @MainActor in HistoryStore.shared.setEnabled(initRememberHistory) }
         self.tmdbApiBase = defaults.string(forKey: "tmdb_api_base") ?? TmdbNetConfig.altApi
         self.tmdbImageBase = defaults.string(forKey: "tmdb_img_base") ?? TmdbNetConfig.defaultImage
         self.tmdbImageFallback = defaults.string(forKey: "tmdb_img_fallback") ?? ""
