@@ -41,7 +41,7 @@ public struct MediaDetailView: View {
 
     private var plan: ScrapePlan? { planStore.plans.first(where: { $0.id == planId }) }
     private var group: PlanGroup? { plan?.groups.first(where: { $0.id == groupId }) }
-    private var allGroupActions: [PlanAction] { plan?.actions.filter { $0.groupId == groupId } ?? [] }
+    private var allGroupActions: [PlanAction] { plan?.actions.filter { $0.groupId == groupId && !(plan?.submittedActionIds ?? []).contains($0.id) } ?? [] }
 
     private func effectivePolicy(for g: PlanGroup) -> EffectivePolicy {
         PolicyResolver.resolve(
@@ -937,7 +937,7 @@ public struct MediaDetailView: View {
         guard var p = plan, let idx = p.groups.firstIndex(where: { $0.id == groupId }) else { return }
         p.groups[idx].policyOverride = enabled ? (p.groups[idx].policyOverride ?? PolicyOverride()) : nil
         p = PolicyResolver.applyOverrides(to: p, global: settings.policies)
-        PlanAndTaskStore.shared.savePlan(p)
+        PlanAndTaskStore.shared.savePendingPlan(p)
     }
 }
 

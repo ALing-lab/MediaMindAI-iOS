@@ -32,6 +32,15 @@ public struct AppRootView: View {
             .overlay(alignment: .bottom) {
                 floatingScanBanner.padding(.bottom, sizeClass == .regular ? 24 : 100)
             }
+            .confirmationDialog("待执行计划的任务策略不同，请选择合并后的策略", isPresented: Binding(
+                get: { !scanManager.policyOptions.isEmpty },
+                set: { if !$0 { scanManager.dismissPolicyOptions() } }
+            ), titleVisibility: .visible) {
+                ForEach(scanManager.policyOptions) { option in
+                    Button(option.title) { scanManager.choosePolicy(option.id) }
+                }
+                Button("取消更新", role: .cancel) { scanManager.cancelPolicyChoice() }
+            } message: { Text("仅影响待执行计划，历史任务和云盘文件不会修改。影片级策略保留。") }
             .animation(.easeInOut(duration: 0.22), value: scanManager.isScanning)
             .onChange(of: scanManager.finishedSummary) { _, summary in
                 if summary != nil { selectedTab = .tasks }
@@ -108,7 +117,7 @@ public struct AppRootView: View {
                     .foregroundStyle(MMTheme.greenOk)
                 Text(summary)
                     .font(.caption.weight(.medium))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Spacer(minLength: 6)
                 Button("查看任务") {
                     scanManager.dismissBanner()

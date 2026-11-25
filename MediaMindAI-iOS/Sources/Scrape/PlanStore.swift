@@ -181,6 +181,12 @@ public final class PlanStore: @unchecked Sendable {
         var stable = plan
         stable.taskPolicy = nil
         stable.reviewDisposition = nil
+        stable.scanListings = nil
+        stable.scanParents = nil
+        stable.scanBinding = nil
+        stable.submittedActionIds = nil
+        stable.executionRunIds = nil
+        stable.scanPriorRunIds = nil
         stable.actions = plan.actions.map { act in
             var copy = act
             copy.done = false

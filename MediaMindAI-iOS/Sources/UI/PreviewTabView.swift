@@ -37,7 +37,7 @@ public struct PreviewTabView: View {
     @State private var errorMsg: String?
 
     private var activePlan: ScrapePlan? {
-        planStore.plans.first { $0.id == planId }
+        planStore.plans.first { $0.id == planId }.map { planStore.pendingProjection($0) }
     }
 
     public var body: some View {
@@ -260,10 +260,10 @@ public struct PreviewTabView: View {
         guard filterKind == kind else { filterKind = kind; categoryToggleSelected = false; return }
         let groups = PreviewFilter.apply(groups: plan.groups.filter { $0.kind != "unmatched" }, kind: kind, query: searchQuery, plan: plan)
         let groupIds = Set(groups.map(\.id))
-        let actions = plan.actions.filter { groupIds.contains($0.groupId) && PlanSelection.executable($0) }
+        let actions = plan.actions.filter { groupIds.contains($0.groupId) && !(plan.submittedActionIds ?? []).contains($0.id) && PlanSelection.executable($0) }
         guard !actions.isEmpty else { return }
         categoryToggleSelected.toggle()
-        planStore.savePlan(PlanSelection.set(plan: plan, ids: actions.map(\.id), on: categoryToggleSelected))
+        planStore.savePendingPlan(PlanSelection.set(plan: plan, ids: actions.map(\.id), on: categoryToggleSelected))
     }
 
     private func resultCards(plan: ScrapePlan, sections: [PreviewSectionGrouping.Section]) -> some View {
@@ -276,7 +276,7 @@ public struct PreviewTabView: View {
                         .padding(.horizontal, 4)
 
                     ForEach(sec.groups) { group in
-                        let groupActions = plan.actions.filter { $0.groupId == group.id && $0.enabled }
+                        let groupActions = plan.actions.filter { $0.groupId == group.id && $0.enabled && !(plan.submittedActionIds ?? []).contains($0.id) }
                         VStack(alignment: .leading, spacing: 8) {
                             if group.confirmRequired {
                                 Label("需人工确认：\(group.confirmReasons.joined(separator: "、"))", systemImage: "exclamationmark.shield.fill")
@@ -430,14 +430,14 @@ public struct PreviewTabView: View {
         let mergeTv = plan.taskPolicy?.mergeTvSeries ?? global.mergeTvSeries
         let appendTag = (plan.taskPolicy?.movieNaming ?? global.movieNaming).folderTmdbEnabled
         plan = SeriesMerger.mergeIfEnabled(plan, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
-        PlanAndTaskStore.shared.savePlan(plan)
+        PlanAndTaskStore.shared.savePendingPlan(plan)
     }
 
     private func applyFilmPolicy(groupId: String, override: PolicyOverride?) {
         guard var plan = activePlan, let idx = plan.groups.firstIndex(where: { $0.id == groupId }) else { return }
         plan.groups[idx].policyOverride = override
         plan = PolicyResolver.applyOverrides(to: plan, global: AppSettings.shared.policies)
-        PlanAndTaskStore.shared.savePlan(plan)
+        PlanAndTaskStore.shared.savePendingPlan(plan)
     }
 
     private func execute(plan: ScrapePlan) {
@@ -487,7 +487,7 @@ public struct PreviewTabView: View {
             if !movedIds.isEmpty {
                 await MainActor.run {
                     let latest = PlanAndTaskStore.shared.plans.first(where: { $0.id == plan.id }) ?? plan
-                    PlanAndTaskStore.shared.savePlan(PlanSelection.set(plan: latest, ids: movedIds, on: false))
+                    PlanAndTaskStore.shared.savePendingPlan(PlanSelection.set(plan: latest, ids: movedIds, on: false))
                 }
             }
         }
@@ -496,8 +496,8 @@ public struct PreviewTabView: View {
 
     private func toggleGroup(groupId: String, selected: Bool) {
         guard let plan = activePlan else { return }
-        let ids = PlanSelection.groupIds(plan: plan, groupId: groupId)
-        PlanAndTaskStore.shared.savePlan(PlanSelection.set(plan: plan, ids: ids, on: selected))
+        let ids = PlanSelection.groupIds(plan: plan, groupId: groupId).filter { !(plan.submittedActionIds ?? []).contains($0) }
+        PlanAndTaskStore.shared.savePendingPlan(PlanSelection.set(plan: plan, ids: ids, on: selected))
     }
 
     private func buildMatchTargetGroups(for groups: [PlanGroup], plan: ScrapePlan?, seasonFilter: Int? = nil) -> [MatchTargetGroup] {
@@ -555,7 +555,8 @@ public struct PreviewTabView: View {
                     }
                     let newFailFlag = cur.flags.first(where: { !beforeFlags.contains($0) && $0.contains("批量识别未完成") })
                     await MainActor.run {
-                        PlanAndTaskStore.shared.savePlan(cur)
+                        do { try PlanAndTaskStore.shared.saveEditedPlan(cur, original: plan) }
+                        catch { rematchApplying = false; rematchError = error.localizedDescription; return }
                         batchSelectedManualIds.removeAll()
                         rematchApplying = false
                         if let failMsg = newFailFlag {
@@ -619,7 +620,8 @@ public struct PreviewTabView: View {
                     episodeGroupName: pickedGroupName
                 )
                 await MainActor.run {
-                    PlanAndTaskStore.shared.savePlan(replanned)
+                    do { try PlanAndTaskStore.shared.saveEditedPlan(replanned, original: targetPlan) }
+                    catch { strategyApplying = false; strategyError = error.localizedDescription; return }
                     strategyApplying = false
                     if editingStrategyGroup?.id == group.id, let updated = replanned.groups.first(where: { $0.id == group.id }) {
                         editingStrategyGroup = updated
@@ -730,7 +732,7 @@ public struct PreviewTabView: View {
                 await AiRuleDistiller.shared.distill(pattern: cleanPat, targetTitle: match.title, mediaType: match.kind, tmdbId: match.id)
             }
         }
-        PlanAndTaskStore.shared.savePlan(plan)
+        PlanAndTaskStore.shared.savePendingPlan(plan)
     }
 }
 

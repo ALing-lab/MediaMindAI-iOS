@@ -14,11 +14,22 @@ public final class BackgroundScanManager {
     public var errorMessage: String? = nil
     private var scanTask: Task<Void, Never>? = nil
     private var scanEpoch: Int = 0
+    public private(set) var policyOptions: [ScanPolicyOption] = []
+    private var policyRequest: (DriveAccount, [PlanRoot])?
+    public func choosePolicy(_ id: String) {
+        guard let request = policyRequest else { return }
+        policyOptions = []; policyRequest = nil
+        startScan(account: request.0, roots: request.1, policyChoice: id)
+    }
+    public func dismissPolicyOptions() { policyOptions = [] }
+    public func cancelPolicyChoice() { policyOptions = []; policyRequest = nil }
+
 
     private init() {}
 
-    public func startScan(account: DriveAccount, roots: [PlanRoot]) {
+    public func startScan(account: DriveAccount, roots: [PlanRoot], policyChoice: String? = nil) {
         guard !isScanning else { return }
+        cancelPolicyChoice()
         scanEpoch += 1
         let epoch = scanEpoch
         isScanning = true
@@ -29,20 +40,13 @@ public final class BackgroundScanManager {
         scanTask = Task {
             do {
                 let drive = try AccountStore.shared.buildDrive(for: account)
-                var plan = try await Scanner.scan(
-                    roots: roots,
-                    drive: drive,
-                    fullDrive: false,
-                    preflightTmdb: true
-                ) { msg, count in
+                let plan = try await ScanPlanUpdater.scan(roots: roots, drive: drive, policyChoice: policyChoice) { msg, count in
                     Task { @MainActor in
                         guard BackgroundScanManager.shared.scanEpoch == epoch else { return }
                         BackgroundScanManager.shared.progressText = "\(msg)（已发现 \(count) 个视频）"
                     }
                 }
                 guard !Task.isCancelled, self.scanEpoch == epoch else { return }
-                plan.reviewDisposition = "pending"
-                PlanAndTaskStore.shared.savePlan(plan)
                 isScanning = false
                 scanTask = nil
                 let matchedCount = plan.groups.filter { $0.kind != "unmatched" }.count
@@ -52,11 +56,16 @@ public final class BackgroundScanManager {
                 } else {
                     finishedSummary = "扫描完成：已识别 \(matchedCount) 组作品"
                 }
+                if let update = plan.flags.last(where: { $0.hasPrefix("扫描更新：") }) { finishedSummary = update }
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(4))
                     guard BackgroundScanManager.shared.scanEpoch == epoch else { return }
                     BackgroundScanManager.shared.finishedSummary = nil
                 }
+            } catch let conflict as ScanPolicyConflict {
+                guard self.scanEpoch == epoch else { return }
+                isScanning = false; scanTask = nil
+                policyRequest = (account, roots); policyOptions = conflict.options
             } catch is CancellationError {
                 guard self.scanEpoch == epoch else { return }
                 isScanning = false

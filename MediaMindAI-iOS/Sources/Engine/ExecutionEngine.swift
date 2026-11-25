@@ -140,6 +140,7 @@ public final class ExecutionEngine {
 
     public private(set) var currentRun: TaskRun?
     public private(set) var isRunning = false
+    public private(set) var currentPhase: Int? = nil
     public var isPaused = false
     public private(set) var isRollingBack = false
     public private(set) var rollbackMessage: String?
@@ -184,7 +185,7 @@ public final class ExecutionEngine {
     public nonisolated static func executableActionIds(plan: ScrapePlan, requested: [String]? = nil) -> [String] {
         let byId = Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         var seen = Set<String>()
-        return (requested ?? plan.actions.filter(\.selected).map(\.id)).filter { id in
+        return (requested ?? plan.actions.filter { $0.selected && !(plan.submittedActionIds ?? []).contains($0.id) }.map(\.id)).filter { id in
             guard seen.insert(id).inserted, let action = byId[id] else { return false }
             return PlanSelection.executable(action) && execOps.contains(action.op)
         }
@@ -192,6 +193,10 @@ public final class ExecutionEngine {
 
     @discardableResult
     public func enqueueOrStart(plan: ScrapePlan, drive: any CloudDrive, actionIds: [String]? = nil) -> Bool {
+        if let binding = plan.scanBinding, !binding.isEmpty && binding != drive.approvalBinding {
+            lastStartError = "账号凭据或端点已变化，请重新扫描确认后执行"
+            return false
+        }
         guard !Self.executableActionIds(plan: plan, requested: actionIds).isEmpty else {
             lastStartError = "没有可执行的操作，请在预览中检查勾选、策略和待手动识别项"
             return false
@@ -342,21 +347,24 @@ public final class ExecutionEngine {
         skipDelaysForTest: Bool = false
     ) -> Bool {
         guard !isRunning else { return false }
+        if let binding = plan.scanBinding, !binding.isEmpty && binding != drive.approvalBinding {
+            lastStartError = "账号凭据或端点已变化，请重新扫描确认后执行"
+            return false
+        }
         let requestedIds = Self.executableActionIds(plan: plan, requested: actionIds)
         guard !requestedIds.isEmpty else {
             lastStartError = "没有可执行的操作，请在预览中检查勾选、策略和待手动识别项"
             return false
         }
         lastStartError = nil
-        var plan = plan
-        plan.reviewDisposition = "started"
-        PlanAndTaskStore.shared.savePlan(plan)
+        let runId = String(UUID().uuidString.prefix(8).lowercased())
+        let plan = PlanAndTaskStore.shared.markExecutionStarted(plan, requested: requestedIds, runId: runId)
         isRunning = true
+        currentPhase = nil
         isPaused = false
         stopRequested = false
         BackgroundTaskManager.shared.begin()
 
-        let runId = String(UUID().uuidString.prefix(8).lowercased())
         var run = TaskRun(
             id: runId,
             planId: plan.id,
@@ -447,12 +455,13 @@ public final class ExecutionEngine {
             }
             var mkdirRefs: [String: String] = [:]
             let idRemap = IdRemap(pathMode: drive.kind.idsArePaths)
-            let planTaskIds = Set(PlanAndTaskStore.shared.tasks.filter { $0.planId == plan.id }.map(\.id))
+            let planTaskIds = Set(PlanAndTaskStore.shared.tasks.filter { $0.planId == plan.id }.map(\.id)).union(plan.executionRunIds ?? [])
+            let scannedHistory = Set(plan.scanPriorRunIds ?? [])
             let priorApplied = ReversibleWalStore.shared.appliedRecords(
                 accountId: plan.accountId,
                 actionIds: Set(planActions.keys),
                 taskIds: planTaskIds.isEmpty ? nil : planTaskIds
-            )
+            ).filter { !scannedHistory.contains($0.taskId) || $0.operation == "mkdir" || $0.actionId.hasSuffix(":finalize") }
             // 第 1 遍先建 idRemap（含 :finalize 重命名），第 2 遍再用 remap 解析重建 mkdirRefs（含 parent:label 键）
             for rec in priorApplied where rec.operation == "rename" || rec.operation == "move" || rec.operation == "quarantine" || rec.operation == "backup" {
                 if let oldId = rec.before?.id, let newId = rec.after?.id, !oldId.isEmpty, !newId.isEmpty {
@@ -842,6 +851,7 @@ public final class ExecutionEngine {
                 let id = ordered[cursor]
                 if batchConsumed.contains(id) { cursor += 1; continue }
                 let action = planActions[id]
+                currentPhase = action.map { ExecPhases.of($0.op) }
 
                 // 上传阶段前统一等待一次网盘后台落盘
                 if action?.op == "artwork" && !settled {

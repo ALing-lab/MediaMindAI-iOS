@@ -309,6 +309,13 @@ public struct ScrapePlan: Identifiable, Codable, Sendable {
     public var taskPolicy: PolicyOverride?
     /// nil 为旧版计划；新扫描明确记为 pending，执行/取消后分别为 started/cancelled。
     public var reviewDisposition: String? = nil
+    /// 完整只读扫描的目录快照；旧版本缺少快照时不可静默继承人工设置。
+    public var scanListings: [String: [CloudEntry]]? = nil
+    public var scanParents: [String: String]? = nil
+    public var scanBinding: String? = nil
+    public var submittedActionIds: [String]? = nil
+    public var executionRunIds: [String]? = nil
+    public var scanPriorRunIds: [String]? = nil
 
     public var uniqueMediaCount: Int {
         var keys = Set<String>()
@@ -447,6 +454,12 @@ public final class PlanAndTaskStore {
     }
 
     public func savePlan(_ plan: ScrapePlan) {
+        var plan = plan
+        if let previous = plans.first(where: { $0.id == plan.id }) {
+            let visible = Set(plan.groups.map(\.id))
+            let stillReferenced = Set(plan.actions.map(\.groupId))
+            plan.groups += previous.groups.filter { !visible.contains($0.id) && stillReferenced.contains($0.id) }
+        }
         if let idx = plans.firstIndex(where: { $0.id == plan.id }) {
             plans[idx] = plan
         } else {
@@ -461,11 +474,78 @@ public final class PlanAndTaskStore {
         if let d = try? JSONEncoder().encode(plans) { try? d.write(to: plansFile, options: .atomic) }
     }
 
+    public func reservedActionIds(planId: String) -> Set<String> {
+        Set(tasks.filter { $0.planId == planId }.flatMap { $0.executionSnapshot?.actions.map(\.id) ?? [] })
+            .union(plans.first(where: { $0.id == planId })?.submittedActionIds ?? [])
+    }
+
+    public func pendingProjection(_ plan: ScrapePlan) -> ScrapePlan {
+        var copy = plan
+        let reserved = reservedActionIds(planId: plan.id)
+        let pending = Set(plan.actions.filter { !$0.done && !reserved.contains($0.id) && ExecutionEngine.execOps.contains($0.op) }.map(\.groupId))
+        copy.groups = plan.groups.filter { pending.contains($0.id) || $0.kind == "unmatched" }
+        for index in copy.actions.indices where reserved.contains(copy.actions[index].id) { copy.actions[index].selected = false }
+        return copy
+    }
+
+    public func saveEditedPlan(_ edited: ScrapePlan, original: ScrapePlan) throws {
+        guard let current = plans.first(where: { $0.id == original.id }),
+              pendingPlans.contains(where: { $0.id == original.id }) else { throw DriveError.invalidInput("计划已被合并或开始执行，请重新打开预览") }
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        guard try encoder.encode(pendingProjection(current)) == encoder.encode(original) else { throw DriveError.invalidInput("计划已更新，本次旧识别结果未覆盖新计划，请重新打开预览") }
+        savePendingPlan(edited)
+    }
+
+    public func savePendingPlan(_ edited: ScrapePlan) {
+        guard let current = plans.first(where: { $0.id == edited.id }), pendingPlans.contains(where: { $0.id == edited.id }) else { return }
+        let reserved = reservedActionIds(planId: edited.id)
+        var next = edited
+        next.actions = edited.actions.filter { !reserved.contains($0.id) } + current.actions.filter { reserved.contains($0.id) }
+        next.submittedActionIds = current.submittedActionIds
+        next.executionRunIds = current.executionRunIds
+        next.scanPriorRunIds = current.scanPriorRunIds
+        next.scanListings = current.scanListings; next.scanParents = current.scanParents; next.scanBinding = current.scanBinding
+        savePlan(next)
+    }
+
     public var pendingPlans: [ScrapePlan] {
-        plans.filter { plan in
-            guard plan.reviewDisposition != "cancelled" && plan.reviewDisposition != "started" else { return false }
-            return !tasks.contains { $0.planId == plan.id && !$0.hasNoEffectiveOperations } && !TaskQueue.shared.items.contains { $0.planId == plan.id }
+        plans.compactMap { plan in
+            guard plan.reviewDisposition != "cancelled" && plan.reviewDisposition != "started" else { return nil }
+            guard !tasks.contains(where: { $0.planId == plan.id && ($0.status == "running" || $0.status == "paused") }),
+                  !TaskQueue.shared.items.contains(where: { $0.planId == plan.id }) else { return nil }
+            if plan.reviewDisposition == nil && tasks.contains(where: { $0.planId == plan.id && !$0.hasNoEffectiveOperations }) { return nil }
+            let projected = pendingProjection(plan)
+            return projected.groups.isEmpty ? nil : projected
         }
+    }
+
+    public func markExecutionStarted(_ plan: ScrapePlan, requested: [String], runId: String) -> ScrapePlan {
+        var copy = plan
+        let reserved = reservedActionIds(planId: plan.id).union(requested)
+        let remaining = plan.actions.contains { !$0.done && !reserved.contains($0.id) && ExecutionEngine.execOps.contains($0.op) }
+            || plan.groups.contains { $0.kind == "unmatched" }
+        copy.reviewDisposition = remaining ? "pending" : "started"
+        copy.submittedActionIds = reserved.sorted()
+        copy.executionRunIds = Array(Set(plan.executionRunIds ?? []).union([runId])).sorted()
+        savePlan(copy)
+        return copy
+    }
+
+    /// 持久化成功后才发布一次合并结果，失败时不丢失旧卡片。
+    public func commitScan(_ plan: ScrapePlan, replacing ids: Set<String>) throws {
+        guard !plans.contains(where: { ($0.id == plan.id || ids.contains($0.id)) && $0.accountId != plan.accountId }) else {
+            throw DriveError.invalidInput("计划标识或替换范围与其他账号冲突，旧数据未更新")
+        }
+        var next = plans.filter { !ids.contains($0.id) && $0.id != plan.id }
+        next.insert(plan, at: 0)
+        try JSONEncoder().encode(next).write(to: plansFile, options: .atomic)
+        plans = next
+    }
+
+    public func scanRevision(accountId: String) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(plans.filter { $0.accountId == accountId })
     }
 
     public func cancelPendingPlan(id: String) {
@@ -585,5 +665,15 @@ public enum FailedRetry {
             if seen.insert(id).inserted { ordered.append(id) }
         }
         return ordered
+    }
+}
+
+public extension PlanAction {
+    func withId(_ id: String) -> PlanAction {
+        PlanAction(id: id, op: op, groupId: groupId, fileId: fileId, parentId: parentId, oldName: oldName,
+            newName: newName, destParentId: destParentId, destRef: destRef, destLabel: destLabel, kind: kind,
+            mediaKind: mediaKind, tmdbId: tmdbId, season: season, episode: episode, artworkUrl: artworkUrl,
+            selected: selected, enabled: enabled, blocked: blocked, done: done, error: error, note: note,
+            metadataSeason: metadataSeason, metadataEpisode: metadataEpisode, replaceExisting: replaceExisting, folderPath: folderPath)
     }
 }

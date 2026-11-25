@@ -120,6 +120,7 @@ public enum Scanner {
         globalPolicies: DefaultPolicies? = nil,
         fullDrive: Bool = false,
         preflightTmdb: Bool = false,
+        persistResult: Bool = true,
         onProgress: ProgressHandler? = nil
     ) async throws -> ScrapePlan {
         HybridRecognitionOrchestrator.resetScanBudget()
@@ -435,7 +436,7 @@ public enum Scanner {
         }
 
         // 原子持久化至独立 PlanStore
-        _ = try? PlanStore.shared.save(plan)
+        if persistResult { _ = try? PlanStore.shared.save(plan) }
         return plan
             }
         }
@@ -527,5 +528,363 @@ public enum Scanner {
                 return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
             }
         }
+    }
+}
+
+// MARK: - 待执行扫描的范围更新（仅本地提交）
+public struct ScanPolicyOption: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let policy: PolicyOverride?
+}
+public struct ScanPolicyConflict: Error, Sendable {
+    public let options: [ScanPolicyOption]
+}
+
+/// 先完整读取源目录，再让规划器在固定快照上工作，绝不通过此代理执行写请求。
+public actor ScanSnapshotDrive: CloudDrive {
+    public nonisolated let kind: ProviderKind
+    public nonisolated let accountId: String
+    public nonisolated let rootId: String
+    public nonisolated let approvalBinding: String
+    public nonisolated let isLanEndpoint: Bool
+    public nonisolated let trashSupport: TrashSupport
+    private let base: any CloudDrive
+    private var listings: [String: [CloudEntry]] = [:]
+    private var parents: [String: String] = [:]
+    public init(_ base: any CloudDrive) {
+        self.base = base; kind = base.kind; accountId = base.accountId; rootId = base.rootId
+        approvalBinding = base.approvalBinding; isLanEndpoint = base.isLanEndpoint; trashSupport = base.trashSupport
+    }
+    public func list(folderId: String) async throws -> [CloudEntry] {
+        if let cached = listings[folderId] { return cached }
+        let entries = try await base.list(folderId: folderId)
+        listings[folderId] = entries
+        for entry in entries { parents[entry.fileId] = folderId }
+        return entries
+    }
+    public func parentIdOf(fileId: String) async throws -> String? {
+        if let parent = parents[fileId] { return parent }
+        return try await base.parentIdOf(fileId: fileId)
+    }
+    public func read(roots: [PlanRoot]) async throws {
+        var visited = Set<String>(), queue = roots.map { ($0.folderId, 0) }, count = 0
+        for root in roots {
+            if let parent = root.parentId { parents[root.folderId] = parent }
+            var current = root.folderId, seen = Set<String>()
+            while current != rootId && seen.insert(current).inserted {
+                guard seen.count <= 128 else { throw DriveError.invalidInput("目录祖先链异常，旧计划未更新") }
+                guard let parent = try await parentIdOf(fileId: current), parent != current else { break }
+                parents[current] = parent; current = parent
+            }
+        }
+        while !queue.isEmpty {
+            try Task.checkCancellation()
+            let (folder, depth) = queue.removeFirst()
+            guard visited.insert(folder).inserted else { continue }
+            guard visited.count <= 2000 && depth <= 64 else { throw DriveError.invalidInput("扫描范围过大，请拆分目录；旧计划未更新") }
+            let entries = try await list(folderId: folder)
+            count += entries.count
+            guard count <= 200_000 else { throw DriveError.invalidInput("扫描文件过多，请拆分目录；旧计划未更新") }
+            queue += entries.filter { $0.isDir && !ScannerTreeEngine.ignoredDir($0.fileName) && !["BDMV", "CERTIFICATE"].contains($0.fileName.uppercased()) }.map { ($0.fileId, depth + 1) }
+        }
+    }
+    public func captured() -> (listings: [String: [CloudEntry]], parents: [String: String]) { (listings, parents) }
+    public func overlay(_ historical: [String: [CloudEntry]], outside roots: [PlanRoot], graph: [String: String]) {
+        let observedParents = parents
+        for (folder, entries) in historical where !roots.contains(where: { ScanPlanUpdater.contains(folder, root: $0.folderId, parents: graph, paths: kind.idsArePaths) }) {
+            // 不在本次读取范围内的子树保留旧快照，避免子目录扫描覆盖其他部分。
+            if listings[folder] == nil {
+                listings[folder] = entries.filter { entry in observedParents[entry.fileId].map { $0 == folder } ?? true }
+            }
+        }
+        for (folder, entries) in listings { for entry in entries { parents[entry.fileId] = folder } }
+        parents.merge(observedParents, uniquingKeysWith: { _, observed in observed })
+    }
+    public func rename(fileId: String, newName: String) async throws -> String { throw DriveError.unsupported("扫描快照禁止写入") }
+    public func mkdir(parentId: String, name: String) async throws -> String { throw DriveError.unsupported("扫描快照禁止写入") }
+    public func move(fileId: String, destParentId: String) async throws -> String { throw DriveError.unsupported("扫描快照禁止写入") }
+    public func upload(parentId: String, name: String, data: Data) async throws -> String { throw DriveError.unsupported("扫描快照禁止写入") }
+}
+
+public enum ScanPlanUpdater {
+    public static func contains(_ id: String, root: String, parents: [String: String], paths: Bool) -> Bool {
+        if id == root { return true }
+        if paths {
+            let prefix = root == "/" ? "/" : root.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if root == "/" { return id.hasPrefix("/") }
+            return id.hasPrefix("/" + prefix + "/") || id.hasPrefix(prefix + "/")
+        }
+        var current = id, seen = Set<String>()
+        while seen.insert(current).inserted, let parent = parents[current], parent != current {
+            if parent == root { return true }; current = parent
+        }
+        return false
+    }
+    public static func overlap(_ a: [PlanRoot], _ b: [PlanRoot], parents: [String: String], paths: Bool) -> Bool {
+        a.contains { left in b.contains { right in
+            contains(left.folderId, root: right.folderId, parents: parents, paths: paths)
+                || contains(right.folderId, root: left.folderId, parents: parents, paths: paths)
+        } }
+    }
+    private static func files(_ listings: [String: [CloudEntry]]) -> [String: CloudEntry] {
+        Dictionary(listings.values.flatMap { $0 }.filter { !$0.isDir && ScannerTreeEngine.isVideo($0) }.map { ($0.fileId, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+    private static func fileIds(_ group: PlanGroup, plan: ScrapePlan) -> Set<String> {
+        Set(plan.actions.filter { $0.groupId == group.id && $0.kind == "file" }.compactMap(\.fileId))
+    }
+    public static func sameSource(_ old: CloudEntry, _ new: CloudEntry, paths: Bool) -> Bool {
+        guard old.isDir == new.isDir && old.size == new.size else { return false }
+        if paths {
+            let strong = old.etag.map { !$0.isEmpty && !$0.lowercased().hasPrefix("w/") && $0 == new.etag } ?? false
+            let hash = old.contentHash.map { !$0.isEmpty && $0 == new.contentHash && old.hashAlgorithm == new.hashAlgorithm } ?? false
+            if !strong && !hash { return false }
+        }
+        if let etag = old.etag, let other = new.etag, etag != other { return false }
+        if let hash = old.contentHash, let other = new.contentHash, hash != other { return false }
+        return true
+    }
+    @MainActor private static func activePlans(_ account: String, store: PlanAndTaskStore) -> [ScrapePlan] {
+        let active = store.tasks.filter { $0.accountId == account && ["running", "paused"].contains($0.status) }
+        let taskPlans = active.compactMap { run in run.executionSnapshot ?? store.plans.first(where: { $0.id == run.planId }) }
+        let queueIds = Set(TaskQueue.shared.items.filter { $0.accountId == account }.map(\.planId))
+        return taskPlans + store.plans.filter { queueIds.contains($0.id) }
+    }
+    /// 返回前完成一次原子本地提交；任意取消、读取失败、修订冲突均不会替换旧卡片。
+    @MainActor public static func scan(roots: [PlanRoot], drive: any CloudDrive, policyChoice: String? = nil,
+                                      onProgress: Scanner.ProgressHandler? = nil, store injectedStore: PlanAndTaskStore? = nil,
+                                      tmdbProvider: (any ScannerTmdbProvider)? = nil, preflightTmdb: Bool = true) async throws -> ScrapePlan {
+        let store = injectedStore ?? PlanAndTaskStore.shared
+        let roots = roots.isEmpty ? [PlanRoot(folderId: drive.rootId, name: "根目录")] : roots
+        let revision = try store.scanRevision(accountId: drive.accountId)
+        let oldPlans = store.pendingPlans.filter { $0.accountId == drive.accountId }
+        let snapshot = ScanSnapshotDrive(drive)
+        onProgress?("核对目录与文件变化…", 0)
+        try await snapshot.read(roots: roots)
+        let fresh = await snapshot.captured()
+        var parents = fresh.parents
+        for plan in oldPlans + activePlans(drive.accountId, store: store) {
+            parents.merge(plan.scanParents ?? [:], uniquingKeysWith: { current, _ in current })
+            for root in plan.roots { if let parent = root.parentId, parents[root.folderId] == nil { parents[root.folderId] = parent } }
+        }
+        func overlaps(_ plan: ScrapePlan) -> Bool {
+            if overlap(roots, plan.roots, parents: parents, paths: drive.kind.idsArePaths) { return true }
+            let newIds = Set(files(fresh.listings).keys)
+            return plan.actions.contains { $0.fileId.map { newIds.contains($0) } ?? false }
+        }
+        guard !activePlans(drive.accountId, store: store).contains(where: overlaps) else { throw DriveError.invalidInput("扫描目录与正在执行、暂停或排队的任务重叠，请结束或取消该任务后重新扫描") }
+        let affected = oldPlans.filter(overlaps)
+        for plan in affected {
+            if let binding = plan.scanBinding, !binding.isEmpty && binding != drive.approvalBinding {
+                throw DriveError.invalidInput("原计划的账号绑定已变化，请取消旧计划后重新扫描")
+            }
+        }
+        for old in affected {
+            for root in roots {
+                if let before = old.scanParents?[root.folderId], let after = fresh.parents[root.folderId], before != after {
+                    throw DriveError.invalidInput("源目录位置已变化，请扫描新旧位置的共同父目录；旧计划未覆盖")
+                }
+            }
+        }
+        let policies = Set(affected.map(\.taskPolicy))
+        let selectedPolicy: PolicyOverride?
+        if policies.count > 1 {
+            let options = affected.map { ScanPolicyOption(id: $0.id, title: "采用任务 \($0.id) 的策略", policy: $0.taskPolicy) }
+                + [ScanPolicyOption(id: "defaults", title: "采用当前全局默认策略", policy: nil)]
+            guard let choice = options.first(where: { $0.id == policyChoice }) else { throw ScanPolicyConflict(options: options) }
+            selectedPolicy = choice.policy
+        } else { selectedPolicy = affected.first?.taskPolicy }
+        var union = roots + affected.flatMap(\.roots)
+        var seen = Set<String>()
+        union = union.filter { seen.insert($0.folderId).inserted }
+        let allRoots = union
+        union = union.filter { candidate in !allRoots.contains { other in other.folderId != candidate.folderId && contains(candidate.folderId, root: other.folderId, parents: parents, paths: drive.kind.idsArePaths) } }
+        guard !activePlans(drive.accountId, store: store).contains(where: { overlap(union, $0.roots, parents: parents, paths: drive.kind.idsArePaths) }) else {
+            throw DriveError.invalidInput("合并后的范围与执行或排队任务重叠，旧计划未更新")
+        }
+        for old in affected {
+            if !(old.executionRunIds ?? []).isEmpty && !old.roots.allSatisfy({ oldRoot in roots.contains { contains(oldRoot.folderId, root: $0.folderId, parents: parents, paths: drive.kind.idsArePaths) } }) {
+                throw DriveError.invalidInput("此计划曾部分执行，请完整重扫原根目录以核实位置；旧卡片未变更")
+            }
+            guard let listing = old.scanListings else {
+                // 对旧版没有目录快照的父计划，无法安全保留未扫描子树。
+                if !old.roots.allSatisfy({ oldRoot in roots.contains { contains(oldRoot.folderId, root: $0.folderId, parents: parents, paths: drive.kind.idsArePaths) } }) {
+                    throw DriveError.invalidInput("旧计划没有完整文件快照，请重新扫描其根目录后再更新子目录；旧卡片未变更")
+                }
+                continue
+            }
+            await snapshot.overlay(listing, outside: roots, graph: parents)
+        }
+        try await snapshot.read(roots: union)
+        var plan = try await Scanner.scan(roots: union, drive: snapshot, tmdbProvider: tmdbProvider, taskPolicy: selectedPolicy, preflightTmdb: preflightTmdb, persistResult: false, onProgress: onProgress)
+        guard !plan.flags.contains(where: { $0.contains("只扫描了前") || $0.contains("目录层级太深") }) else {
+            throw DriveError.invalidInput("本次扫描未覆盖完整目录，请拆分目录；旧计划未更新")
+        }
+        let inventory = await snapshot.captured()
+        let sourceListings = inventory.listings.filter { folder, _ in
+            union.contains { contains(folder, root: $0.folderId, parents: inventory.parents, paths: drive.kind.idsArePaths) }
+        }
+        let newFiles = files(sourceListings)
+        let plannedSources = Set(plan.actions.compactMap(\.fileId))
+        guard Set(newFiles.keys).isSubset(of: plannedSources) else {
+            throw DriveError.invalidInput("部分源视频未进入识别计划，不能安全判断删除或合并；请拆分目录重新扫描，旧计划未更新")
+        }
+        let allOldFiles = files(affected.reduce(into: [String: [CloudEntry]]()) { result, old in
+            result.merge(old.scanListings ?? [:], uniquingKeysWith: { first, _ in first })
+        })
+        func digestKey(_ file: CloudEntry) -> String? {
+            guard file.size > 0, let etag = file.etag, !etag.isEmpty, !etag.lowercased().hasPrefix("w/") else { return nil }
+            return "\(file.size)|\(etag)"
+        }
+        let oldByDigest = Dictionary(grouping: allOldFiles.values.compactMap { file in digestKey(file).map { ($0, file.fileId) } }, by: { $0.0 })
+        let newByDigest = Dictionary(grouping: newFiles.values.compactMap { file in digestKey(file).map { ($0, file.fileId) } }, by: { $0.0 })
+        var originalIds: [String: String] = [:]
+        for (key, old) in oldByDigest where old.count == 1 && newByDigest[key]?.count == 1 {
+            if let new = newByDigest[key]?.first?.1 { originalIds[new] = old[0].1 }
+        }
+        func original(_ id: String) -> String { allOldFiles[id] != nil ? id : (originalIds[id] ?? id) }
+        for freshGroup in plan.groups {
+            let ids = fileIds(freshGroup, plan: plan)
+            let matches = affected.flatMap { old in old.groups.map { (old, $0) } }.filter { old, group in
+                !fileIds(group, plan: old).intersection(Set(ids.map(original))).isEmpty || (group.folderId != nil && group.folderId == freshGroup.folderId)
+            }
+            guard let (_, oldGroup) = matches.first else {
+                let ambiguous = ids.contains { id in
+                    guard allOldFiles[id] == nil, let file = newFiles[id], let key = digestKey(file) else { return false }
+                    return oldByDigest[key] != nil && originalIds[id] == nil
+                }
+                if ambiguous, let index = plan.groups.firstIndex(where: { $0.id == freshGroup.id }) {
+                    plan.groups[index].confirmRequired = true
+                    plan.groups[index].confirmReasons.append("同内容文件存在多个副本，不能可靠继承旧匹配，请确认")
+                    for index in plan.actions.indices where plan.actions[index].groupId == freshGroup.id { plan.actions[index].selected = false }
+                }
+                continue
+            }
+            guard matches.allSatisfy({ _, group in
+                group.kind == oldGroup.kind && group.tmdbId == oldGroup.tmdbId && group.policyOverride == oldGroup.policyOverride
+                    && group.episodeStrategy == oldGroup.episodeStrategy && group.episodeGroupId == oldGroup.episodeGroupId
+            }) else { throw DriveError.invalidInput("多份旧作品的匹配或策略不同，需先在原任务中确认后重新扫描") }
+            let common = ids.filter { allOldFiles[original($0)] != nil }
+            let verified = !common.isEmpty && common.allSatisfy { id in
+                guard let before = allOldFiles[original(id)], let after = newFiles[id] else { return false }
+                return sameSource(before, after, paths: drive.kind.idsArePaths)
+            }
+            guard verified else {
+                if let index = plan.groups.firstIndex(where: { $0.id == freshGroup.id }) {
+                    plan.groups[index].confirmRequired = true
+                    plan.groups[index].confirmReasons.append("源文件变化或旧快照不足，请重新确认识别与编号；原匹配：《\(oldGroup.title)》TMDB \(oldGroup.tmdbId.map(String.init) ?? "未知")，原策略：\(oldGroup.episodeStrategy)")
+                    for index in plan.actions.indices where plan.actions[index].groupId == freshGroup.id { plan.actions[index].selected = false }
+                }
+                continue
+            }
+            let manual = oldGroup.confidence == "手动"
+            if manual || (oldGroup.tmdbId == freshGroup.tmdbId && oldGroup.kind == freshGroup.kind) {
+                if let index = plan.groups.firstIndex(where: { $0.id == freshGroup.id }) { plan.groups[index].policyOverride = oldGroup.policyOverride }
+                if let id = oldGroup.tmdbId, ["movie", "tv"].contains(oldGroup.kind),
+                   manual || oldGroup.policyOverride != nil || oldGroup.episodeStrategy != "original" || oldGroup.episodeGroupId != nil {
+                    let info = MatchInfo(kind: oldGroup.kind, id: id, title: oldGroup.title, year: oldGroup.year,
+                        posterPath: oldGroup.posterPath, originalTitle: oldGroup.originalTitle, rating: oldGroup.rating, genreIds: oldGroup.genreIds)
+                    plan = try await Scanner.replanGroup(plan: plan, groupId: freshGroup.id, info: info, drive: snapshot,
+                        strategy: EpisodeStrategy.fromId(oldGroup.episodeStrategy), episodeGroupId: oldGroup.episodeGroupId,
+                        episodeGroupName: oldGroup.episodeGroupName, policyOverride: oldGroup.policyOverride, tmdbProvider: tmdbProvider)
+                }
+                let oldActions = matches.flatMap { old, group in old.actions.filter { $0.groupId == group.id && ExecutionEngine.execOps.contains($0.op) && !$0.done } }
+                var numberedFiles = Set<String>()
+                let numbering = plan.actions.compactMap { action -> GroupMatchOverride? in
+                    guard let file = action.fileId, ids.contains(file), action.kind == "file", ["rename", "skip"].contains(action.op),
+                          let old = oldActions.first(where: { $0.fileId == original(file) && $0.kind == "file" && ["rename", "skip"].contains($0.op) }),
+                          let season = old.season, let episode = old.episode,
+                          (old.season != action.season || old.episode != action.episode), numberedFiles.insert(file).inserted else { return nil }
+                    return GroupMatchOverride(key: file, actionIds: [action.id], season: season, episode: episode, year: oldGroup.year)
+                }
+                if !numbering.isEmpty, let id = oldGroup.tmdbId, oldGroup.kind == "tv" {
+                    let info = MatchInfo(kind: "tv", id: id, title: oldGroup.title, year: oldGroup.year, posterPath: oldGroup.posterPath, genreIds: oldGroup.genreIds)
+                    plan = try await Scanner.replanTargetGroups(plan: plan, targets: numbering, info: info, drive: snapshot, tmdbProvider: tmdbProvider)
+                    if plan.flags.contains(where: { $0.contains("批量识别未完成") }) { throw DriveError.invalidInput("原手动编号无法完整继承，旧任务未覆盖，请在原预览中核实") }
+                }
+                let wholeDeselected = !oldActions.isEmpty && oldActions.allSatisfy { !$0.selected }
+                for index in plan.actions.indices {
+                    let action = plan.actions[index]
+                    guard let file = action.fileId, ids.contains(file) else { continue }
+                    if wholeDeselected || oldActions.contains(where: { $0.fileId == original(file) && $0.op == action.op && !$0.selected }) { plan.actions[index].selected = false }
+                }
+                if wholeDeselected {
+                    let groupIds = Set(plan.actions.filter { $0.fileId.map { ids.contains($0) } ?? false }.map(\.groupId))
+                    for index in plan.actions.indices where groupIds.contains(plan.actions[index].groupId) { plan.actions[index].selected = false }
+                }
+            } else if let index = plan.groups.firstIndex(where: { $0.id == freshGroup.id }) {
+                plan.groups[index].confirmRequired = true
+                plan.groups[index].confirmReasons.append("新旧作品身份不同，请重新确认")
+                for index in plan.actions.indices where plan.actions[index].groupId == freshGroup.id { plan.actions[index].selected = false }
+            }
+        }
+        let unselected = Set(plan.actions.filter { !$0.selected }.map(\.id))
+        plan = PolicyResolver.applyOverrides(to: plan, global: AppSettings.shared.policies)
+        let requireConfirmation = Set(plan.groups.filter(\.confirmRequired).map(\.id))
+        for index in plan.actions.indices where unselected.contains(plan.actions[index].id) || requireConfirmation.contains(plan.actions[index].groupId) {
+            plan.actions[index].selected = false
+        }
+        try Task.checkCancellation()
+        guard try store.scanRevision(accountId: drive.accountId) == revision,
+              !activePlans(drive.accountId, store: store).contains(where: { overlap(union, $0.roots, parents: parents, paths: drive.kind.idsArePaths) }) else {
+            throw DriveError.invalidInput("扫描期间计划或执行状态已变化，旧计划未覆盖，请重新扫描")
+        }
+        let primary = affected.first
+        var committed = ScrapePlan(id: primary?.id ?? plan.id, accountId: plan.accountId, provider: plan.provider,
+            createdAt: primary?.createdAt ?? plan.createdAt, roots: plan.roots, groups: plan.groups, actions: plan.actions,
+            flags: plan.flags, taskPolicy: plan.taskPolicy)
+        committed.reviewDisposition = "pending"
+        committed.scanListings = sourceListings; committed.scanParents = inventory.parents; committed.scanBinding = drive.approvalBinding
+        let oldFileIds = Set(affected.flatMap { files($0.scanListings ?? [:]).keys })
+        committed.flags.append("扫描更新：新增 \(Set(newFiles.keys).subtracting(oldFileIds).count) 个视频，移除 \(oldFileIds.subtracting(newFiles.keys).count) 个视频，合并 \(affected.count) 个计划")
+        // 依据源文件与操作角色迁移提交范围，不能依赖重新规划生成的随机动作 ID。
+        func operationKey(_ action: PlanAction, oldSource: Bool, context: ScrapePlan) -> String {
+            let source = action.fileId.map { oldSource ? $0 : original($0) } ?? "parent:\(action.parentId ?? "")|tmdb:\(action.tmdbId ?? 0)"
+            let destination = action.destParentId ?? action.destLabel
+                ?? action.destRef.flatMap { ref in context.actions.first(where: { $0.id == ref }).map { "\($0.parentId ?? "")/\($0.newName)" } } ?? ""
+            return "\(source)|\(action.op)|\(action.kind)|\(action.newName)|\(destination)"
+        }
+        var prior: [String: PlanAction] = [:]
+        for old in affected {
+            let reserved = store.reservedActionIds(planId: old.id)
+            for action in old.actions where reserved.contains(action.id) { prior[operationKey(action, oldSource: true, context: old)] = action }
+        }
+        let reservedFileRoles = Set(prior.values.filter { $0.kind == "file" }.compactMap { action in action.fileId.map { "\($0)|\(action.op)|\(action.kind)" } })
+        let unmodifiedPlan = committed
+        var remapped: [String: String] = [:]
+        var changedIntentGroups = Set<String>()
+        for index in committed.actions.indices {
+            if let old = prior[operationKey(committed.actions[index], oldSource: false, context: unmodifiedPlan)] {
+                remapped[committed.actions[index].id] = old.id
+                committed.actions[index] = committed.actions[index].withId(old.id)
+                committed.actions[index].done = old.done
+                committed.actions[index].selected = false
+            } else if let file = committed.actions[index].fileId,
+                      reservedFileRoles.contains("\(original(file))|\(committed.actions[index].op)|\(committed.actions[index].kind)") {
+                changedIntentGroups.insert(committed.actions[index].groupId)
+            }
+        }
+        for index in committed.groups.indices where changedIntentGroups.contains(committed.groups[index].id) {
+            committed.groups[index].confirmRequired = true
+            committed.groups[index].confirmReasons.append("原执行步骤的名称或目标已变化，请确认本次新操作；旧历史不会改写")
+        }
+        for index in committed.actions.indices where changedIntentGroups.contains(committed.actions[index].groupId) { committed.actions[index].selected = false }
+        for index in committed.actions.indices {
+            if let ref = committed.actions[index].destRef { committed.actions[index].destRef = remapped[ref] ?? ref }
+        }
+        for index in committed.groups.indices { committed.groups[index].actionIds = committed.groups[index].actionIds.map { remapped[$0] ?? $0 } }
+        committed.submittedActionIds = Array(Set(prior.values.map(\.id)))
+        committed.executionRunIds = Array(Set(affected.flatMap { $0.executionRunIds ?? [] }))
+        committed.scanPriorRunIds = committed.executionRunIds
+        let owners = Dictionary(grouping: committed.actions.filter { $0.kind == "file" && $0.fileId != nil }, by: { $0.fileId! })
+        guard owners.values.allSatisfy({ Set($0.map(\.groupId)).count <= 1 }) else {
+            throw DriveError.invalidInput("同一源视频被归入多个作品，请核实目录或匹配冲突；旧计划未覆盖")
+        }
+        guard Set(committed.actions.map(\.id)).count == committed.actions.count else {
+            throw DriveError.invalidInput("合并后存在重复操作身份，请先处理原计划的目录冲突；旧卡片未覆盖")
+        }
+        try store.commitScan(committed, replacing: Set(affected.map(\.id)))
+        if injectedStore == nil { _ = try? PlanStore.shared.save(committed) }
+        return committed
     }
 }
