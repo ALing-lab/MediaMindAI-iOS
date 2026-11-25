@@ -32,8 +32,16 @@ public enum SeriesMerger {
                 for aIdx in out.actions.indices {
                     let a = out.actions[aIdx]
                     if a.groupId == dup.id && a.op == "mkdir" && a.kind == "folder" && a.parentId == dupFolderId && a.season != nil {
-                        out.actions[aIdx].parentId = primaryFolderId
-                        out.actions[aIdx].destParentId = primaryFolderId
+                        out.actions[aIdx] = PlanAction(
+                            id: a.id, op: a.op, groupId: a.groupId, fileId: a.fileId, parentId: primaryFolderId,
+                            oldName: a.oldName, newName: a.newName, destParentId: primaryFolderId, destRef: a.destRef,
+                            destLabel: a.destLabel, kind: a.kind, mediaKind: a.mediaKind, tmdbId: a.tmdbId,
+                            season: a.season, episode: a.episode, artworkUrl: a.artworkUrl,
+                            selected: a.selected, enabled: a.enabled, blocked: a.blocked,
+                            done: a.done, error: a.error, note: a.note,
+                            metadataSeason: a.metadataSeason, metadataEpisode: a.metadataEpisode,
+                            replaceExisting: a.replaceExisting, folderPath: a.folderPath
+                        )
                         redirectedSeasonMkdir = true
                     }
                 }
