@@ -35,3 +35,9 @@ MediaMind AI 的原生 SwiftUI / Swift Concurrency iOS & iPadOS 移植版（与 
 同时拦截空执行、统一有效动作筛选、收紧成功条件，并在新执行记录中保存动作与作品快照。旧无快照记录仅显示原始计数与日志，不关联后来修改的预览计划。待执行卡不是成功执行记录，点击执行之前不会向网盘发送整理写请求；待执行卡取消只影响本地计划。
 
 新增 11 项回归测试（总计 107 个测试方法），尚未执行。未新增依赖，版本号与 Build 保持原值；project.pbxproj 仅调整重命名引用。环境没有 Swift / Xcode，已进行差异、工程引用、语法解析诊断对比及压缩包完整性检查，仍需 Mac 完成编译、全部 XCTest 和 iOS 布局 / 交互验收。
+
+## ui-v56-fix4 测试目标编译修复
+
+根据构建端提供的 CI 反馈（run 45690106605），fix3 的 App 已编译并产出未签名 IPA，但测试目标因新增测试直接给只读 PlanAction.op 赋值而编译失败，未产生测试结果。
+
+本补丁仅修改 ScrapeAndScannerSuiteTests.swift：测试夹具增加可选 fileOperation 参数来构建 skip 动作，并用重新构建的 rename 动作替换数组元素。生产代码及 PlanAction.op 的 let 设计保持不变，测试方法总数仍为 107。本地仅完成静态检查；fix4 的 Xcode 编译和 XCTest 结果需由构建端重跑确认。

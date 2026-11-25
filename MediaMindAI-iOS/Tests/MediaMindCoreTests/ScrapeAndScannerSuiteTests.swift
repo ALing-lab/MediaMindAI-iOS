@@ -32,11 +32,11 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
     }
 
     func testExecutionSelectionRejectsSkipDisabledBlockedAndStaleIds() {
-        var plan = makeSamplePlan()
-        plan.actions[0].op = "skip"
+        var plan = makeSamplePlan(fileOperation: "skip")
         plan.actions[1].enabled = false
         XCTAssertTrue(ExecutionEngine.executableActionIds(plan: plan).isEmpty)
-        plan.actions[0].op = "rename"
+        // op 是只读字段：用原始 rename 动作副本恢复，不修改生产模型。
+        plan.actions[0] = makeSamplePlan().actions[0]
         plan.actions[0].blocked = "待核实"
         XCTAssertTrue(ExecutionEngine.executableActionIds(plan: plan).isEmpty)
         plan.actions[0].blocked = nil
@@ -477,7 +477,7 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeSamplePlan() -> ScrapePlan {
+    private func makeSamplePlan(fileOperation: String = "rename") -> ScrapePlan {
         let g1 = PlanGroup(
             id: "g1",
             kind: "movie",
@@ -496,7 +496,7 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         )
         let a1 = PlanAction(
             id: "a1",
-            op: "rename",
+            op: fileOperation,
             groupId: "g1",
             fileId: "vid1",
             parentId: "f1",
