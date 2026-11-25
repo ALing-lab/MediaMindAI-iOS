@@ -338,6 +338,9 @@ public final class TaskQueue {
 
     @discardableResult
     public func enqueue(plan: ScrapePlan, actionIds: [String]? = nil) -> QueuedTaskItem {
+        // 固定排队时确认的动作 ID，避免消费队列时执行后来新增的识别结果。
+        let acceptedIds = ExecutionEngine.executableActionIds(plan: plan, requested: actionIds)
+        let actionIds: [String]? = acceptedIds
         if let existing = items.first(where: { item in
             guard item.planId == plan.id else { return false }
             switch (item.actionIds, actionIds) {
@@ -346,7 +349,7 @@ public final class TaskQueue {
             default: return false
             }
         }) { return existing }
-        let count = actionIds?.count ?? plan.actions.filter { $0.selected && $0.enabled && $0.blocked == nil && !$0.done && $0.op != "unmatched" && $0.op != "skip" }.count
+        let count = acceptedIds.count
         let item = QueuedTaskItem(
             planId: plan.id,
             accountId: plan.accountId,

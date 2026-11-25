@@ -24,7 +24,7 @@ public struct TaskItemsView: View {
     }
 
     private var linkedPlan: ScrapePlan? {
-        store.plans.first(where: { $0.id == run.planId })
+        store.tasks.first(where: { $0.id == run.id })?.executionSnapshot ?? run.executionSnapshot
     }
 
     public var body: some View {
@@ -88,7 +88,8 @@ public struct TaskItemsView: View {
             }
 
             if filtered.isEmpty {
-                ContentUnavailableView("无匹配的操作项", systemImage: "checklist", description: Text("切换筛选条件或关键词查看其他记录。"))
+                ContentUnavailableView(linkedPlan == nil ? "旧版记录无执行快照" : "无匹配的操作项", systemImage: "checklist",
+                    description: Text(linkedPlan == nil ? "请返回任务详情查看原始执行日志；当前预览计划不会作为历史执行明细。" : "切换筛选条件或关键词查看其他记录。"))
             } else {
                 List(filtered) { act in
                     let isFailed = !act.done && act.error != nil
@@ -168,12 +169,19 @@ public struct TaskItemsView: View {
         let orderedSelected = plan.actions.map(\.id).filter { selectedIds.contains($0) }
         let idsToRun = FailedRetry.retryIds(selected: orderedSelected, plan: plan)
         let idSet = Set(idsToRun)
-        var retryPlan = plan
+        guard var retryPlan = store.plans.first(where: { $0.id == plan.id }),
+              idSet.isSubset(of: Set(retryPlan.actions.map(\.id))) else {
+            retryHint = "原计划已变更，请从任务中心重新预览确认"
+            return
+        }
         for i in retryPlan.actions.indices where idSet.contains(retryPlan.actions[i].id) {
             retryPlan.actions[i].selected = true
         }
         PlanAndTaskStore.shared.savePlan(retryPlan)
-        ExecutionEngine.shared.enqueueOrStart(plan: retryPlan, drive: drive, actionIds: idsToRun)
+        guard ExecutionEngine.shared.enqueueOrStart(plan: retryPlan, drive: drive, actionIds: idsToRun) else {
+            retryHint = ExecutionEngine.shared.lastStartError
+            return
+        }
         let extraDeps = max(0, idsToRun.count - selectedIds.count)
         retryHint = extraDeps > 0
             ? "已提交重试 \(selectedIds.count) 项（自动连带 \(extraDeps) 项前置目录依赖）"

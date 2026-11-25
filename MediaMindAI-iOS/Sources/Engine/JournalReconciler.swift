@@ -177,6 +177,13 @@ public enum JournalReconciler {
                 entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "读取远端目录失败，维持待核实状态"))
                 continue
             }
+            // 上传后发现同名但大小不同的文件时，不得把它核实为成功或未写入。
+            if row.operation == "upload", let after = row.after,
+               afterList?.contains(where: { !$0.isDir && $0.fileName.caseInsensitiveCompare(after.name) == .orderedSame && $0.size != after.size }) == true {
+                still += 1
+                entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "上传文件大小与日志不符，请人工核实"))
+                continue
+            }
             func matchesSnapshot(_ entry: CloudEntry, _ snap: RemoteSnapshot) -> Bool {
                 guard entry.fileName.caseInsensitiveCompare(snap.name) == .orderedSame && entry.isDir == snap.directory else {
                     return false
@@ -202,39 +209,44 @@ public enum JournalReconciler {
                 continue
             }
 
-            if row.state == "undo_prepared" {
-                if let before = row.before, beforeMatches.count == 1, afterMatches.isEmpty {
-                    wal.reverted(row, undoResult: RemoteSnapshot.from(beforeMatches[0], parent: before.parent))
-                    if row.operation == "retention_move" {
-                        RetentionZoneEngine.shared.markRestored(taskId: row.taskId, actionId: row.actionId)
+            do {
+                if row.state == "undo_prepared" {
+                    if let before = row.before, beforeMatches.count == 1, afterMatches.isEmpty {
+                        try wal.reverted(row, undoResult: RemoteSnapshot.from(beforeMatches[0], parent: before.parent))
+                        if row.operation == "retention_move" {
+                            RetentionZoneEngine.shared.markRestored(taskId: row.taskId, actionId: row.actionId)
+                        }
+                        reverted += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认撤销已生效"))
+                    } else if row.before == nil, afterMatches.isEmpty {
+                        try wal.reverted(row, undoResult: nil)
+                        reverted += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认新建对象已撤销移除"))
+                    } else if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
+                        try wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
+                        applied += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "撤销尚未落地，已恢复为可重试撤销状态"))
+                    } else {
+                        still += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "撤销状态仍待人工核实"))
                     }
-                    reverted += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认撤销已生效"))
-                } else if row.before == nil, afterMatches.isEmpty {
-                    wal.reverted(row, undoResult: nil)
-                    reverted += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认新建对象已撤销移除"))
-                } else if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
-                    wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
-                    applied += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "撤销尚未落地，已恢复为可重试撤销状态"))
                 } else {
-                    still += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "撤销状态仍待人工核实"))
+                    if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
+                        try wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
+                        applied += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "核实确认远端操作已生效"))
+                    } else if afterMatches.isEmpty && (row.before == nil || beforeMatches.count == 1) {
+                        try wal.change(row, state: "not_applied", error: "核实确认远端未发生变化")
+                        notApplied += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "not_applied", detail: "核实确认远端未发生变化"))
+                    } else {
+                        still += 1
+                        entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "无法自动确认远端状态"))
+                    }
                 }
-            } else {
-                if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
-                    wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
-                    applied += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "核实确认远端操作已生效"))
-                } else if afterMatches.isEmpty && (row.before == nil || beforeMatches.count == 1) {
-                    wal.change(row, state: "not_applied", error: "核实确认远端未发生变化")
-                    notApplied += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "not_applied", detail: "核实确认远端未发生变化"))
-                } else {
-                    still += 1
-                    entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "无法自动确认远端状态"))
-                }
+            } catch {
+                still += 1
+                entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "核实结果写盘失败：\(error.localizedDescription)"))
             }
         }
         return ReconcileReport(confirmedApplied: applied, confirmedNotApplied: notApplied, confirmedReverted: reverted, stillUncertain: still, entries: entries)

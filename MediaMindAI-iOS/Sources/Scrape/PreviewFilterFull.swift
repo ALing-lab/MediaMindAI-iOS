@@ -247,6 +247,9 @@ public enum PreviewSectionGrouping {
     }
 
     public static func category(plan: ScrapePlan, group: PlanGroup) -> String {
+        if group.kind == "collection" { return "合集" }
+        let sourceName = source(plan: plan, group: group)?.name ?? ""
+        if PreviewFilter.isVariety(group, sourceName: sourceName) { return "综艺" }
         if !["movie", "tv", "collection"].contains(group.kind) || group.confirmRequired {
             return "待手动确认"
         }
@@ -267,7 +270,7 @@ public enum PreviewSectionGrouping {
             return cmp != .orderedSame ? (cmp == .orderedAscending) : (a.id < b.id)
         }
         if !bySource {
-            let order = ["电影", "剧集", "综艺", "纪录片", "演唱会", "待手动确认"]
+            let order = ["电影", "剧集", "综艺", "合集", "纪录片", "演唱会", "待手动确认"]
             return order.compactMap { type in
                 let list = sorted.filter { category(plan: plan, group: $0) == type }
                 return list.isEmpty ? nil : Section(key: "type:\(type)", title: type, groups: list)
@@ -293,26 +296,39 @@ public enum PreviewFilterKind: String, CaseIterable, Identifiable, Sendable {
     case all = "全部"
     case movie = "电影"
     case tv = "剧集"
+    case variety = "综艺"
     case collection = "合集"
     case warning = "需确认"
     case customPolicy = "自定义策略"
 
     public var id: String { rawValue }
+    public static let visibleCases: [PreviewFilterKind] = [.all, .movie, .tv, .variety, .collection]
 }
 
 public enum PreviewFilter {
+    public static func isVariety(_ group: PlanGroup, sourceName: String = "") -> Bool {
+        guard group.kind == "tv" else { return false }
+        let name = "\(group.title) \(group.folderName) \(sourceName)"
+        return group.genreIds.contains(10764) || group.genreIds.contains(10767)
+            || name.contains("综艺") || name.localizedCaseInsensitiveContains("variety")
+    }
+
     public static func apply(
         groups: [PlanGroup],
         kind: PreviewFilterKind,
-        query: String
+        query: String,
+        plan: ScrapePlan? = nil
     ) -> [PlanGroup] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return groups.filter { g in
+            let sourceName = plan.flatMap { PreviewSectionGrouping.source(plan: $0, group: g)?.name } ?? ""
+            let variety = isVariety(g, sourceName: sourceName)
             let kindOk: Bool
             switch kind {
             case .all: kindOk = true
             case .movie: kindOk = g.kind == "movie"
-            case .tv: kindOk = g.kind == "tv"
+            case .tv: kindOk = g.kind == "tv" && !variety
+            case .variety: kindOk = variety
             case .collection: kindOk = g.kind == "collection"
             case .warning: kindOk = (g.warn != nil && !(g.warn ?? "").isEmpty) || g.kind == "unmatched"
             case .customPolicy: kindOk = g.policyOverride != nil

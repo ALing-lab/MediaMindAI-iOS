@@ -180,6 +180,7 @@ public final class PlanStore: @unchecked Sendable {
     public func key(_ plan: ScrapePlan) -> String {
         var stable = plan
         stable.taskPolicy = nil
+        stable.reviewDisposition = nil
         stable.actions = plan.actions.map { act in
             var copy = act
             copy.done = false

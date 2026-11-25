@@ -11,6 +11,230 @@ import XCTest
 /// Scanner.scan & Scanner.replanGroup 模拟云盘端到端集成测试
 final class ScrapeAndScannerSuiteTests: XCTestCase {
 
+    @MainActor
+    func testEmptyExecutionDoesNotCreateRecordsOrStartEngine() throws {
+        let engine = ExecutionEngine.shared
+        guard !engine.isRunning else { throw XCTSkip("另一执行测试仍在运行") }
+        var plan = makeSamplePlan()
+        plan.actions = []
+        let taskIds = PlanAndTaskStore.shared.tasks.map(\.id)
+        let planIds = PlanAndTaskStore.shared.plans.map(\.id)
+        let queueIds = TaskQueue.shared.items.map(\.id)
+        let previousRun = engine.currentRun?.id
+        XCTAssertFalse(engine.start(plan: plan, drive: MockScrapeDrive(tree: [:]), skipDelaysForTest: true))
+        XCTAssertFalse(engine.enqueueOrStart(plan: plan, drive: MockScrapeDrive(tree: [:])))
+        XCTAssertEqual(PlanAndTaskStore.shared.tasks.map(\.id), taskIds)
+        XCTAssertEqual(PlanAndTaskStore.shared.plans.map(\.id), planIds)
+        XCTAssertEqual(TaskQueue.shared.items.map(\.id), queueIds)
+        XCTAssertEqual(engine.currentRun?.id, previousRun)
+        XCTAssertFalse(engine.isRunning)
+        XCTAssertNotNil(engine.lastStartError)
+    }
+
+    func testExecutionSelectionRejectsSkipDisabledBlockedAndStaleIds() {
+        var plan = makeSamplePlan()
+        plan.actions[0].op = "skip"
+        plan.actions[1].enabled = false
+        XCTAssertTrue(ExecutionEngine.executableActionIds(plan: plan).isEmpty)
+        plan.actions[0].op = "rename"
+        plan.actions[0].blocked = "待核实"
+        XCTAssertTrue(ExecutionEngine.executableActionIds(plan: plan).isEmpty)
+        plan.actions[0].blocked = nil
+        plan.actions[0].selected = false
+        XCTAssertTrue(ExecutionEngine.executableActionIds(plan: plan).isEmpty)
+        XCTAssertEqual(ExecutionEngine.executableActionIds(plan: plan, requested: ["missing", "a1", "a1", "a2"]), ["a1"])
+    }
+
+    func testExecutionSnapshotDoesNotFollowLaterPlanChanges() throws {
+        var plan = makeSamplePlan()
+        plan.actions[0].selected = false
+        let snapshot = plan.executionSnapshot(actionIds: ["a1"])
+        plan.actions[0].newName = "重新识别后的文件名.mkv"
+        plan.actions[0].selected = false
+        plan.actions[0].done = true
+        plan.groups[0].title = "另一部电影"
+        XCTAssertEqual(snapshot.actions.map(\.id), ["a1"])
+        XCTAssertTrue(snapshot.actions[0].selected, "实际提交的依赖项也属于当次执行范围")
+        XCTAssertEqual(snapshot.groups[0].actionIds, ["a1"])
+        XCTAssertEqual(snapshot.groups[0].title, "盗梦空间")
+        XCTAssertFalse(snapshot.actions[0].done)
+        var run = sampleRun(total: 1, completed: 1, succeeded: 1)
+        run.executionSnapshot = snapshot
+        let loaded = try JSONDecoder().decode(TaskRun.self, from: JSONEncoder().encode(run))
+        XCTAssertEqual(loaded.executionSnapshot?.actions[0].newName, snapshot.actions[0].newName)
+        XCTAssertEqual(loaded.executionSnapshot?.groups[0].title, "盗梦空间")
+    }
+
+    func testLegacyZeroRunDecodesWithoutSnapshotAndIsNotSuccess() throws {
+        let run = sampleRun(total: 0, completed: 0, succeeded: 0)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(run)) as? [String: Any])
+        json.removeValue(forKey: "executionSnapshot")
+        let loaded = try JSONDecoder().decode(TaskRun.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(loaded.executionSnapshot)
+        XCTAssertFalse(loaded.isSuccessful)
+        XCTAssertTrue(loaded.hasNoEffectiveOperations)
+    }
+
+    func testSuccessRequiresNonEmptyFullyProcessedRun() {
+        XCTAssertFalse(sampleRun(total: 0, completed: 0, succeeded: 0).isSuccessful)
+        XCTAssertFalse(sampleRun(total: 2, completed: 1, succeeded: 1).isSuccessful)
+        XCTAssertFalse(sampleRun(total: 2, completed: 2, succeeded: 0).isSuccessful)
+        XCTAssertTrue(sampleRun(total: 2, completed: 2, succeeded: 2).isSuccessful)
+        var failed = sampleRun(total: 2, completed: 2, succeeded: 1)
+        failed.failed = 1
+        XCTAssertFalse(failed.isSuccessful)
+    }
+
+    @MainActor
+    func testScanPlansPersistAsPendingWithoutFakeTaskRuns() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pending-plans-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        for index in 0..<25 {
+            let source = makeSamplePlan()
+            var plan = ScrapePlan(id: "pending-\(UUID().uuidString)-\(index)", accountId: source.accountId, provider: source.provider,
+                createdAt: Date(), roots: source.roots, groups: source.groups, actions: source.actions, flags: [])
+            plan.reviewDisposition = "pending"
+            store.savePlan(plan)
+        }
+        XCTAssertEqual(store.pendingPlans.count, 25)
+        XCTAssertTrue(store.tasks.isEmpty)
+        let cancelled = try XCTUnwrap(store.pendingPlans.first)
+        store.cancelPendingPlan(id: cancelled.id)
+        let reloaded = PlanAndTaskStore(storageURL: dir)
+        XCTAssertEqual(reloaded.pendingPlans.count, 24)
+        XCTAssertFalse(reloaded.pendingPlans.contains { $0.id == cancelled.id })
+        XCTAssertTrue(reloaded.tasks.isEmpty)
+    }
+
+    func testMovieVarietyAndCollectionFiltersAreExclusive() {
+        let movie = makeSamplePlan().groups[0]
+        var variety = movie
+        variety.kind = "tv"
+        variety.genreIds = [10764]
+        var tv = movie
+        tv.kind = "tv"
+        var collection = movie
+        collection.kind = "collection"
+        let groups = [movie, variety, tv, collection]
+        XCTAssertEqual(PreviewFilter.apply(groups: groups, kind: .movie, query: "").count, 1)
+        XCTAssertEqual(PreviewFilter.apply(groups: groups, kind: .tv, query: "").count, 1)
+        XCTAssertEqual(PreviewFilter.apply(groups: groups, kind: .variety, query: "").count, 1)
+        XCTAssertEqual(PreviewFilter.apply(groups: groups, kind: .collection, query: "").count, 1)
+        XCTAssertEqual(PreviewSectionGrouping.category(plan: makeSamplePlan(), group: collection), "合集")
+        XCTAssertEqual(PreviewFilterKind.visibleCases.map(\.rawValue), ["全部", "电影", "剧集", "综艺", "合集"])
+    }
+
+    func testMediaCountDeduplicatesVersionsAndCollectionMembership() {
+        var plan = makeSamplePlan()
+        var sameMovieAnotherVersion = plan.groups[0]
+        sameMovieAnotherVersion.folderId = "another-version"
+        plan.groups.append(sameMovieAnotherVersion)
+        XCTAssertEqual(plan.uniqueMediaCount, 1)
+        plan.groups[0].kind = "collection"
+        // 同一电影既单独存在又出现在合集里，仍只计一部。
+        XCTAssertEqual(plan.uniqueMediaCount, 1)
+    }
+
+    func testReviewDispositionDoesNotChangePlanIdentity() {
+        var plan = makeSamplePlan()
+        let original = PlanStore.shared.key(plan)
+        plan.reviewDisposition = "started"
+        XCTAssertEqual(PlanStore.shared.key(plan), original)
+    }
+
+    @MainActor
+    func testQueueFreezesAcceptedIdsInsteadOfExecutingFutureRecognitionResults() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("queue-scope-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let queue = TaskQueue(storageURL: url)
+        var plan = makeSamplePlan()
+        let accepted = ExecutionEngine.executableActionIds(plan: plan)
+        let queued = queue.enqueue(plan: plan)
+        plan.actions.removeFirst()
+        XCTAssertEqual(queued.actionIds, accepted)
+        XCTAssertEqual(queued.actionCount, accepted.count)
+        let reloaded = TaskQueue(storageURL: url)
+        XCTAssertEqual(reloaded.items.first?.actionIds, accepted)
+        XCTAssertEqual(ExecutionEngine.executableActionIds(plan: plan, requested: queued.actionIds), ["a2"])
+    }
+
+    func testLegacyPlanAndMetadataDecodeWithOptionalWorkflowFields() throws {
+        let plan = makeSamplePlan()
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as? [String: Any])
+        json.removeValue(forKey: "reviewDisposition")
+        let loaded = try JSONDecoder().decode(ScrapePlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(loaded.reviewDisposition)
+        XCTAssertEqual(loaded.actions.count, plan.actions.count)
+        let oldMovie = Data("{\"kind\":\"movie\",\"id\":1,\"title\":\"Title\",\"year\":\"2020\",\"overview\":\"\"}".utf8)
+        XCTAssertNil(try JSONDecoder().decode(MatchInfo.self, from: oldMovie).genreIds)
+    }
+
+    private func sampleRun(total: Int, completed: Int, succeeded: Int) -> TaskRun {
+        TaskRun(id: "history", planId: "plan_1", accountId: "acct_1", provider: "p123", sourceLabel: "测试",
+            status: "done", total: total, completed: completed, succeeded: succeeded, failed: 0, message: "",
+            startedAt: Date(), finishedAt: Date(), errors: [])
+    }
+
+    func testTvFolderRangePreservedOrHeldForManualStrategyReview() async throws {
+        let show = MatchInfo(kind: "tv", id: 1396, title: "绝命毒师", year: "2008", posterPath: nil)
+        let folder = CloudEntry(fileId: "show", fileName: "Breaking Bad", isDir: true, parentFileId: "0")
+        let item = CloudEntry(fileId: "range", fileName: "Breaking.Bad.S01E01-E03.mkv", isDir: false, parentFileId: "show")
+        let node = ScanTreeNode(entry: folder, items: [item], parent: nil, depth: 0)
+        let drive = MockScrapeDrive(tree: ["show": [item]])
+        let tmdb = MockScannerTmdb(movies: [:], shows: ["breaking": show], seasonCounts: [1396: [1: 7]])
+        let hooks = ScannerTvAndBdmvHooks(
+            planMovieFolder: { _, _, _, _, _, _, _, _, _, _ in 0 },
+            planExtraMovie: { _, _, _, _, _, _, _, _ in },
+            planArtwork: { _, _, _, _, _, _, _, _ in })
+        for strategy in [EpisodeStrategy.original, .merge] {
+            var actions: [PlanAction] = []
+            var groups: [PlanGroup] = []
+            var flags: [String] = []
+            var taken: Set<String> = []
+            _ = try await ScannerTvAndBdmv.planTvFolder(folder: folder, tree: [node], allVideos: [item], drive: drive, tmdb: tmdb,
+                actions: &actions, groups: &groups, flags: &flags, rootTaken: &taken,
+                forced: show, remembered: nil, doneId: nil, startIdx: 0, strategy: strategy, hooks: hooks)
+            let action = try XCTUnwrap(actions.first(where: { $0.fileId == item.fileId }))
+            if strategy == .original {
+                XCTAssertTrue(action.newName.contains("S01E01-E03"))
+            } else {
+                XCTAssertEqual(action.op, "unmatched")
+                XCTAssertFalse(action.selected)
+                XCTAssertFalse(flags.isEmpty)
+            }
+        }
+    }
+
+    func testLoosePlannerPreservesEpisodeRange() async {
+        let show = MatchInfo(kind: "tv", id: 1396, title: "绝命毒师", year: "2008", posterPath: nil)
+        let item = CloudEntry(fileId: "range", fileName: "Show.S01E01-E03.mkv", isDir: false, parentFileId: "root")
+        let tmdb = MockScannerTmdb(movies: [:], shows: ["show": show], seasonCounts: [:])
+        var actions: [PlanAction] = []
+        var groups: [PlanGroup] = []
+        var flags: [String] = []
+        var taken: Set<String> = [item.fileName.lowercased()]
+        _ = await ScannerMovieLooseAndArtwork.planLooseFiles(
+            dir: CloudEntry(fileId: "root", fileName: "电视剧", isDir: true), items: [item], tmdb: tmdb, fullScrape: false,
+            actions: &actions, groups: &groups, flags: &flags, taken: &taken, forced: (item.fileId, show))
+        XCTAssertTrue(actions.first(where: { $0.fileId == item.fileId })?.newName.contains("S01E01-E03") == true)
+    }
+
+    func testSeasonDirectoryPlannerPreservesEpisodeRangeAndSingleEpisode() {
+        let items = [
+            CloudEntry(fileId: "range", fileName: "Show.S01E01-E03.mkv", isDir: false, parentFileId: "season"),
+            CloudEntry(fileId: "single", fileName: "Show.S01E04.mkv", isDir: false, parentFileId: "season")
+        ]
+        var actions: [PlanAction] = []
+        var flags: [String] = []
+        _ = ScannerMovieLooseAndArtwork.planDir(items: items,
+            show: MatchInfo(kind: "tv", id: 1396, title: "绝命毒师", year: "2008", posterPath: nil),
+            defaultSeason: 1, gid: "g", actions: &actions, flags: &flags)
+        XCTAssertTrue(actions.first(where: { $0.fileId == "range" })?.newName.contains("S01E01-E03") == true)
+        XCTAssertTrue(actions.first(where: { $0.fileId == "single" })?.newName.contains("S01E04") == true)
+        XCTAssertTrue(flags.isEmpty)
+    }
+
     // MARK: - Mock CloudDrive & Mock ScannerTmdbProvider
 
     private final class MockScrapeDrive: CloudDrive, @unchecked Sendable {

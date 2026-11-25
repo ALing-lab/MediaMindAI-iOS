@@ -3,65 +3,6 @@ import SwiftUI
 import UIKit
 #endif
 
-/// 1:1 复刻自 Android `PreviewInboxScreen.kt`：多扫描计划收件箱（查看全部计划统计、切换活跃计划、左滑删除）。
-public struct PreviewInboxView: View {
-    public let onSelectPlan: (String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var store = PlanAndTaskStore.shared
-
-    public init(onSelectPlan: @escaping (String) -> Void) {
-        self.onSelectPlan = onSelectPlan
-    }
-
-    public var body: some View {
-        NavigationStack {
-            List {
-                if store.plans.isEmpty {
-                    ContentUnavailableView("收件箱为空", systemImage: "tray", description: Text("在「云盘」扫描目录后会在此保留最近 20 个计划。"))
-                } else {
-                    ForEach(store.plans) { plan in
-                        let readyCount = plan.groups.filter { $0.kind != "unmatched" }.count
-                        let manualCount = plan.groups.filter { $0.kind == "unmatched" }.count
-                        Button {
-                            onSelectPlan(plan.id)
-                            dismiss()
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(plan.roots.map(\.name).joined(separator: "、"))
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Text(plan.provider)
-                                        .font(.caption2.bold())
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(MMTheme.accentTint, in: Capsule())
-                                        .foregroundStyle(MMTheme.accent)
-                                }
-                                Text("可整理 \(readyCount) 组 · 待确认 \(manualCount) 组 · 共 \(plan.actions.count) 项操作")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-                    .onDelete { idxs in
-                        let ids = idxs.compactMap { store.plans.indices.contains($0) ? store.plans[$0].id : nil }
-                        for id in ids { store.deletePlan(id: id) }
-                    }
-                }
-            }
-            .navigationTitle("扫描计划收件箱")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
-            }
-        }
-    }
-}
-
 /// 影视库总览：只读展示已整理/刮削成功的作品记录卡片（不可点击跳转）。
 public struct FilmLibraryView: View {
     private enum LibraryKindFilter: String, CaseIterable {
@@ -97,7 +38,7 @@ public struct FilmLibraryView: View {
 
         for plan in store.plans {
             let planRuns = runsByPlan[plan.id] ?? []
-            let latestSuccessRun = planRuns.first(where: { $0.status == "done" || $0.succeeded > 0 })
+            let latestSuccessRun = planRuns.first(where: { $0.isSuccessful || $0.succeeded > 0 })
             let completedDate = latestSuccessRun?.finishedAt ?? latestSuccessRun?.startedAt ?? plan.createdAt
 
             for grp in plan.groups where grp.kind != "unmatched" {

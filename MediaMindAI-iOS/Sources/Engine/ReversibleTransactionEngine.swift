@@ -199,7 +199,9 @@ public final class ReversibleWalStore: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: storageURL.path) else { return }
         do {
             let data = try Data(contentsOf: storageURL)
-            guard !data.isEmpty else { return }
+            guard !data.isEmpty else {
+                throw DriveError.invalidInput("可逆日志文件为空，需核实后恢复")
+            }
             records = try JSONDecoder().decode([ReversibleWalRecord].self, from: data)
             _lastStorageError = nil
             _isCorrupt = false
@@ -214,7 +216,7 @@ public final class ReversibleWalStore: @unchecked Sendable {
     }
 
     private func persistLocked() {
-        guard !_isCorrupt else { return }
+        guard !_isCorrupt && _lastStorageError == nil else { return }
         do {
             let data = try JSONEncoder().encode(records)
             try data.write(to: storageURL, options: .atomic)
@@ -277,9 +279,7 @@ public final class ReversibleWalStore: @unchecked Sendable {
         after: RemoteSnapshot?
     ) throws -> ReversibleWalRecord {
         lock.lock(); defer { lock.unlock() }
-        if _isCorrupt {
-            throw DriveError.invalidInput(_lastStorageError ?? "可逆日志已损坏，已阻止写入以防数据丢失")
-        }
+        if let error = _lastStorageError { throw DriveError.invalidInput(error) }
         // 若存在已核实未生效的旧行，先删除再写入新行
         records.removeAll { $0.taskId == taskId && $0.actionId == actionId && $0.state == "not_applied" }
         // 严禁对同一 (taskId, actionId) 并发重入或覆盖任何非 not_applied 活跃/终态行（1:1 对标 Android UNIQUE(taskId, actionId)）
@@ -306,28 +306,41 @@ public final class ReversibleWalStore: @unchecked Sendable {
         return rec
     }
 
-    public func change(_ rec: ReversibleWalRecord, state: String, after: RemoteSnapshot? = nil, error: String? = nil) {
+    /// 提交失败时保留原内存状态；调用方必须停止，不得把未落盘状态当作成功。
+    private func update(_ rec: ReversibleWalRecord, mutate: (inout ReversibleWalRecord) -> Void) throws {
         lock.lock(); defer { lock.unlock() }
-        if let idx = records.lastIndex(where: { $0.id == rec.id }) {
-            records[idx].state = state
-            if let after { records[idx].after = after }
-            records[idx].error = error
-            persistLocked()
+        if let error = _lastStorageError { throw DriveError.invalidInput(error) }
+        guard let idx = records.lastIndex(where: { $0.id == rec.id }) else {
+            throw DriveError.invalidInput("可逆日志记录不存在")
+        }
+        let previous = records[idx]
+        mutate(&records[idx])
+        persistLocked()
+        if let error = _lastStorageError {
+            records[idx] = previous
+            throw DriveError.invalidInput(error)
         }
     }
 
-    public func reverted(_ rec: ReversibleWalRecord, undoResult: RemoteSnapshot?, substituted: Bool = false) {
-        lock.lock(); defer { lock.unlock() }
-        if let idx = records.lastIndex(where: { $0.id == rec.id }) {
-            records[idx].state = substituted ? "substituted" : "reverted"
-            records[idx].undoResult = undoResult
-            records[idx].error = nil
-            persistLocked()
+    public func change(_ rec: ReversibleWalRecord, state: String, after: RemoteSnapshot? = nil, error: String? = nil) throws {
+        try update(rec) {
+            $0.state = state
+            if let after { $0.after = after }
+            $0.error = error
+        }
+    }
+
+    public func reverted(_ rec: ReversibleWalRecord, undoResult: RemoteSnapshot?, substituted: Bool = false) throws {
+        try update(rec) {
+            $0.state = substituted ? "substituted" : "reverted"
+            $0.undoResult = undoResult
+            $0.error = nil
         }
     }
 
     public func clear(taskId: String? = nil) {
         lock.lock(); defer { lock.unlock() }
+        guard _lastStorageError == nil else { return }
         if let taskId {
             records.removeAll { $0.taskId == taskId }
         } else {
@@ -435,24 +448,25 @@ public final class ReversibleTransaction: @unchecked Sendable {
 
     private func write(_ row: ReversibleWalRecord, block: () async throws -> String) async throws -> String {
         if cancellationCheck() {
-            wal.change(row, state: "not_applied", error: "任务已取消，未发送写请求")
+            try wal.change(row, state: "not_applied", error: "任务已取消，未发送写请求")
             throw DriveError.invalidInput("任务已取消，未发送写请求")
         }
         do {
             let id = try await block()
             guard let intended = row.after else { throw DriveError.invalidInput("日志缺少预期状态") }
             let after = try await snapshot(id: id, parent: intended.parent).with(workLabel: intended.workLabel)
-            guard after.name == intended.name && after.directory == intended.directory else {
+            guard after.name == intended.name && after.directory == intended.directory
+                && (row.operation != "upload" || after.size == intended.size) else {
                 throw DriveError.invalidInput("网盘操作尚未生效，请稍后核实")
             }
-            wal.change(row, state: "applied", after: after)
+            try wal.change(row, state: "applied", after: after)
             return id
         } catch is CancellationError {
-            wal.change(row, state: "uncertain", error: "请求中断，需核实远端状态")
+            try? wal.change(row, state: "uncertain", error: "请求中断，需核实远端状态")
             throw CancellationError()
         } catch {
             let state = RateLimitDetector.isRateLimitError(error) ? "not_applied" : "uncertain"
-            wal.change(row, state: state, error: error.localizedDescription)
+            try? wal.change(row, state: state, error: error.localizedDescription)
             throw error
         }
     }
@@ -536,13 +550,13 @@ public final class ReversibleTransaction: @unchecked Sendable {
         } catch {
             // 任一项落盘失败时回滚本批次已写 prepared 行，保证未发请求时不留孤儿 WAL
             for (_, row) in prepared {
-                wal.change(row, state: "not_applied", error: "批次准备失败，未发送写请求")
+                try? wal.change(row, state: "not_applied", error: "批次准备失败，未发送写请求")
             }
             throw error
         }
 
         if cancellationCheck() {
-            for (_, row) in prepared { wal.change(row, state: "not_applied", error: "任务已取消，未发送写请求") }
+            for (_, row) in prepared { try wal.change(row, state: "not_applied", error: "任务已取消，未发送写请求") }
             throw DriveError.invalidInput("任务已取消，未发送写请求")
         }
 
@@ -558,7 +572,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
                 guard after.name == intended.name && after.directory == intended.directory else {
                     throw DriveError.invalidInput("网盘操作尚未生效，请稍后核实")
                 }
-                wal.change(row, state: "applied", after: after)
+                try wal.change(row, state: "applied", after: after)
                 out[item.action] = newId
             }
             return out
@@ -576,14 +590,14 @@ public final class ReversibleTransaction: @unchecked Sendable {
             let destNow = Dictionary(try await drive.list(folderId: dest).map { ($0.fileId, $0) }, uniquingKeysWith: { first, _ in first })
             for (item, row) in prepared {
                 if let intended = row.after, let inDest = destNow[item.id], inDest.fileName == intended.name {
-                    wal.change(row, state: "applied", after: RemoteSnapshot.from(inDest, parent: dest, workLabel: intended.workLabel))
+                    try? wal.change(row, state: "applied", after: RemoteSnapshot.from(inDest, parent: dest, workLabel: intended.workLabel))
                 } else {
-                    wal.change(row, state: "uncertain", error: errorMsg)
+                    try? wal.change(row, state: "uncertain", error: errorMsg)
                 }
             }
         } catch {
             for (_, row) in prepared {
-                wal.change(row, state: "uncertain", error: errorMsg)
+                try? wal.change(row, state: "uncertain", error: errorMsg)
             }
         }
     }
@@ -603,7 +617,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
             guard operation != "undo_stash" else { throw DriveError.invalidInput("撤销暂存位置已被占用") }
             let s = RemoteSnapshot.from(found, parent: parent)
             let row = try wal.prepare(taskId: taskId, accountId: drive.accountId, actionId: action, operation: operation, before: s, after: s)
-            wal.change(row, state: "skipped", after: s)
+            try wal.change(row, state: "skipped", after: s)
             return found.fileId
         }
         let temporary = ".PanScraper.New-\(UUID().uuidString.lowercased())"
@@ -640,7 +654,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
         if let found, !replaceExisting {
             let s = RemoteSnapshot.from(found, parent: parent)
             let row = try wal.prepare(taskId: taskId, accountId: drive.accountId, actionId: action, operation: "upload", before: s, after: s)
-            wal.change(row, state: "skipped", after: s)
+            try wal.change(row, state: "skipped", after: s)
             return false
         }
         let approved = found.map { RemoteSnapshot.from($0, parent: parent) }
@@ -714,18 +728,18 @@ public final class ReversibleTransaction: @unchecked Sendable {
             guard !origSiblings.contains(where: { $0.fileId != after.id && $0.fileName.caseInsensitiveCompare(before.name) == .orderedSame }) else {
                 throw DriveError.invalidInput("原位置已被其他对象占用")
             }
-            wal.change(row, state: "undo_prepared")
+            try wal.change(row, state: "undo_prepared")
             if let err = wal.lastStorageError { throw DriveError.invalidInput(err) }
             let restored = try await drive.move(fileId: after.id, destParentId: before.parent)
             RetentionZoneEngine.shared.markRestored(taskId: taskId, actionId: row.actionId)
-            wal.reverted(row, undoResult: after.with(id: restored, parent: before.parent, name: before.name))
+            try wal.reverted(row, undoResult: after.with(id: restored, parent: before.parent, name: before.name))
             return restored
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             let current = wal.find(taskId: taskId, actionId: row.actionId) ?? row
             if current.state != "undo_prepared" {
-                wal.change(current, state: "conflict", error: error.localizedDescription)
+                try? wal.change(current, state: "conflict", error: error.localizedDescription)
             }
             throw error
         }
@@ -759,7 +773,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
             let strong = isStrongEtag(saved.etag)
             let recovered = entries.filter { !$0.isDir && $0.fileName == saved.name && $0.size == saved.size && strong && $0.etag == saved.etag }
             if recovered.count == 1 && (row.state == "applied" || row.state == "conflict") {
-                wal.change(row, state: "applied", after: RemoteSnapshot.from(recovered[0], parent: saved.parent, workLabel: label), error: "已核验找回的原备份")
+                try wal.change(row, state: "applied", after: RemoteSnapshot.from(recovered[0], parent: saved.parent, workLabel: label), error: "已核验找回的原备份")
                 continue
             }
 
@@ -772,7 +786,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
                     (drive.kind == .webdav || $0.fileId == original.id)
                 }
                 if restored.count == 1 {
-                    wal.reverted(row, undoResult: RemoteSnapshot.from(restored[0], parent: original.parent, workLabel: label))
+                    try wal.reverted(row, undoResult: RemoteSnapshot.from(restored[0], parent: original.parent, workLabel: label))
                     continue
                 }
             }
@@ -829,16 +843,16 @@ public final class ReversibleTransaction: @unchecked Sendable {
             replacement = try await snapshot(id: renamed, parent: original.parent).with(workLabel: original.workLabel)
         }
         if let adj = wal.find(taskId: taskId, actionId: adjustmentId) {
-            wal.change(adj, state: "substitution_output", after: replacement, error: "补齐文件采用原文件名")
+            try wal.change(adj, state: "substitution_output", after: replacement, error: "补齐文件采用原文件名")
         }
         if let gen = wal.find(taskId: taskId, actionId: outputId) {
             guard gen.state == "applied" || gen.state == "substitution_output" else {
                 throw DriveError.invalidInput("补齐结果待核实")
             }
-            wal.change(gen, state: "substitution_output", after: replacement, error: "用户确认以新文件补齐，非原备份")
+            try wal.change(gen, state: "substitution_output", after: replacement, error: "用户确认以新文件补齐，非原备份")
         }
-        if let primary { wal.reverted(primary, undoResult: replacement, substituted: true) }
-        wal.reverted(row, undoResult: replacement, substituted: true)
+        if let primary { try wal.reverted(primary, undoResult: replacement, substituted: true) }
+        try wal.reverted(row, undoResult: replacement, substituted: true)
     }
 
     /// 严格逆序安全回滚：绝不覆盖或永久删除用户数据，新建目录/上传文件均移入 `.PanScraper.Undo-<task>/<seq>` 暂存。
@@ -907,7 +921,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
                     }
                 }
 
-                wal.change(row, state: "undo_prepared")
+                try wal.change(row, state: "undo_prepared")
             if let err = wal.lastStorageError { throw DriveError.invalidInput(err) }
                 let restored: String
                 switch row.operation {
@@ -941,13 +955,13 @@ public final class ReversibleTransaction: @unchecked Sendable {
                 if row.operation == "retention_move" {
                     RetentionZoneEngine.shared.markRestored(taskId: taskId, actionId: row.actionId)
                 }
-                wal.reverted(row, undoResult: after.with(id: restored, parent: before?.parent ?? after.parent, name: before?.name ?? after.name))
+                try wal.reverted(row, undoResult: after.with(id: restored, parent: before?.parent ?? after.parent, name: before?.name ?? after.name))
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 let current = wal.find(taskId: taskId, actionId: row.actionId) ?? row
                 if current.state != "undo_prepared" {
-                    wal.change(current, state: "conflict", error: error.localizedDescription)
+                    try? wal.change(current, state: "conflict", error: error.localizedDescription)
                 }
                 throw error
             }

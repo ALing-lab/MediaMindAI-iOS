@@ -37,23 +37,20 @@ public struct CompletedTaskDetailScreen: View {
     }
 
     private var matchingPlan: ScrapePlan? {
-        PlanAndTaskStore.shared.plans.first(where: { $0.id == run.planId })
+        run.executionSnapshot
     }
 
     private var matchedGroups: [PlanGroup] {
         (matchingPlan?.groups ?? []).filter { $0.kind != "unmatched" }
     }
 
-    private var totalFileCount: Int {
-        if let plan = matchingPlan {
-            let files = Set(plan.actions.filter { $0.kind == "file" }.map { $0.fileId ?? $0.id }).count
-            if files > 0 { return files }
-        }
-        return run.total
+    private var countSummary: String {
+        if let snapshot = matchingPlan { return "共 \(snapshot.uniqueMediaCount) 部影片" }
+        return "共 \(run.total) 项操作"
     }
 
     private var isAllSucceeded: Bool {
-        run.status == "done" && run.failed == 0
+        run.isSuccessful
     }
 
     public var body: some View {
@@ -78,7 +75,7 @@ public struct CompletedTaskDetailScreen: View {
                 VStack(alignment: .leading, spacing: 16) {
                     // 顶部任务 ID 与文件数
                     HStack(spacing: 6) {
-                        Text("任务 ID：\(run.id)，共 \(totalFileCount) 个文件")
+                        Text("任务 ID：\(run.id)，\(countSummary)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -101,6 +98,10 @@ public struct CompletedTaskDetailScreen: View {
                             }
                         }
                     } else {
+                        if run.executionSnapshot == nil {
+                            Text("旧版记录未保存当次执行快照，仅展示原始计数和日志，不关联当前预览计划。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         fallbackSummaryCard
                     }
 
@@ -203,10 +204,12 @@ public struct CompletedTaskDetailScreen: View {
 
     private var heroTitle: String {
         if isAllSucceeded { return "全部成功" }
+        if run.hasNoEffectiveOperations { return "无有效操作" }
         return "任务未完成"
     }
 
     private var heroSubtitle: String {
+        if run.hasNoEffectiveOperations { return "本条记录没有成功执行的操作，不能作为整理完成的依据。" }
         if isAllSucceeded {
             return "智能整理和刮削影视库，帮助你轻松管理媒体库，秒出海报墙"
         }
@@ -495,7 +498,15 @@ public struct CompletedTaskDetailScreen: View {
             retryHint = "所有已勾选操作均已完成，无需重试"
             return
         }
-        ExecutionEngine.shared.enqueueOrStart(plan: plan, drive: drive, actionIds: targetIds)
+        guard let livePlan = PlanAndTaskStore.shared.plans.first(where: { $0.id == run.planId }),
+              Set(targetIds).isSubset(of: Set(livePlan.actions.map(\.id))) else {
+            retryHint = "原计划已重新识别或变更，请从任务中心重新预览确认"
+            return
+        }
+        guard ExecutionEngine.shared.enqueueOrStart(plan: livePlan, drive: drive, actionIds: targetIds) else {
+            retryHint = ExecutionEngine.shared.lastStartError
+            return
+        }
         retryHint = "已将 \(targetIds.count) 项失败/未完成操作重新提交执行队列"
     }
 

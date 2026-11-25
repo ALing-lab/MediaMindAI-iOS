@@ -307,6 +307,41 @@ public struct ScrapePlan: Identifiable, Codable, Sendable {
     public var actions: [PlanAction]
     public var flags: [String]
     public var taskPolicy: PolicyOverride?
+    /// nil 为旧版计划；新扫描明确记为 pending，执行/取消后分别为 started/cancelled。
+    public var reviewDisposition: String? = nil
+
+    public var uniqueMediaCount: Int {
+        var keys = Set<String>()
+        for group in groups {
+            if group.kind == "collection" {
+                let members = actions.filter { $0.groupId == group.id && $0.kind == "file" && $0.tmdbId != nil }
+                if !members.isEmpty {
+                    for member in members { keys.insert("movie-\(member.tmdbId!)") }
+                    continue
+                }
+            }
+            keys.insert(group.tmdbId.map { "\(group.kind)-\($0)" } ?? "folder-\(group.folderId ?? group.id)")
+        }
+        return keys.count
+    }
+
+    /// 固定当次执行范围；后续重新识别或勾选不会改变历史记录。
+    public func executionSnapshot(actionIds: [String]) -> ScrapePlan {
+        let ids = Set(actionIds)
+        var copy = self
+        copy.actions = actions.filter { ids.contains($0.id) }.map {
+            var action = $0
+            action.selected = true
+            return action
+        }
+        let groupIds = Set(copy.actions.map(\.groupId))
+        copy.groups = groups.filter { groupIds.contains($0.id) }.map {
+            var group = $0
+            group.actionIds = group.actionIds.filter { ids.contains($0) }
+            return group
+        }
+        return copy
+    }
 
     public init(
         id: String,
@@ -346,6 +381,15 @@ public struct TaskRun: Identifiable, Codable, Sendable {
     public let startedAt: Date
     public var finishedAt: Date?
     public var errors: [String]
+    public var executionSnapshot: ScrapePlan? = nil
+
+    public var isSuccessful: Bool {
+        status == "done" && total > 0 && completed == total && succeeded > 0 && failed == 0
+    }
+
+    public var hasNoEffectiveOperations: Bool {
+        (status == "done" || status == "no_changes") && failed == 0 && succeeded == 0
+    }
 
     public init(id: String, planId: String, accountId: String, provider: String, sourceLabel: String, status: String, total: Int, completed: Int, succeeded: Int, failed: Int, message: String, startedAt: Date, finishedAt: Date?, errors: [String]) {
         self.id = id
@@ -377,10 +421,10 @@ public final class PlanAndTaskStore {
 
     private let baseDir: URL
 
-    private init() {
+    init(storageURL: URL? = nil) {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        self.baseDir = appSupport.appendingPathComponent("MediaMindAI", isDirectory: true)
+        self.baseDir = storageURL ?? appSupport.appendingPathComponent("MediaMindAI", isDirectory: true)
         try? FileManager.default.createDirectory(at: baseDir, withIntermediateDirectories: true)
         load()
     }
@@ -408,13 +452,26 @@ public final class PlanAndTaskStore {
         } else {
             plans.insert(plan, at: 0)
         }
-        if plans.count > 20 { plans = Array(plans.prefix(20)) }
+
         if let d = try? JSONEncoder().encode(plans) { try? d.write(to: plansFile, options: .atomic) }
     }
 
     public func deletePlan(id: String) {
         plans.removeAll { $0.id == id }
         if let d = try? JSONEncoder().encode(plans) { try? d.write(to: plansFile, options: .atomic) }
+    }
+
+    public var pendingPlans: [ScrapePlan] {
+        plans.filter { plan in
+            guard plan.reviewDisposition != "cancelled" && plan.reviewDisposition != "started" else { return false }
+            return !tasks.contains { $0.planId == plan.id && !$0.hasNoEffectiveOperations } && !TaskQueue.shared.items.contains { $0.planId == plan.id }
+        }
+    }
+
+    public func cancelPendingPlan(id: String) {
+        guard var plan = pendingPlans.first(where: { $0.id == id }) else { return }
+        plan.reviewDisposition = "cancelled"
+        savePlan(plan)
     }
 
     public func saveTask(_ run: TaskRun) {

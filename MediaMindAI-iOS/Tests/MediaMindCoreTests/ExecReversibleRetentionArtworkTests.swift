@@ -35,6 +35,7 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         private var seq: Int = 100
         private var nodes: [String: Node] = [:]
         var trashedIds: [String] = []
+        var truncateUploadsForTest = false
 
         init(
             kind: ProviderKind = .p123,
@@ -169,7 +170,7 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
                     return existing.id
                 }
                 let nid = nextIdLocked(prefix: "u")
-                nodes[nid] = Node(id: nid, parentId: parentId, name: name, isDir: false, size: Int64(data.count), etag: "\"etag-\(nid)\"", data: data)
+                nodes[nid] = Node(id: nid, parentId: parentId, name: name, isDir: false, size: Int64(data.count) - (truncateUploadsForTest ? 1 : 0), etag: "\"etag-\(nid)\"", data: data)
                 return nid
             }
         }
@@ -369,6 +370,61 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         let groups = LooseSeriesGrouping.candidates(from: [looseA, looseB, looseC])
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(groups.first?.files.count, 2)
+    }
+
+    func testEmptyWalIsCorruptAndCannotBeOverwritten() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("empty-wal-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data().write(to: url)
+        let wal = ReversibleWalStore(storageURL: url)
+        XCTAssertTrue(wal.hasStorageCorruption)
+        XCTAssertThrowsError(try wal.prepare(taskId: "t", accountId: "a", actionId: "x", operation: "upload", before: nil, after: nil))
+        XCTAssertEqual(try Data(contentsOf: url).count, 0)
+        let backups = try FileManager.default.contentsOfDirectory(at: url.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(url.deletingPathExtension().lastPathComponent + ".corrupt.") }
+        for backup in backups { try? FileManager.default.removeItem(at: backup) }
+    }
+
+    func testWalCommitFailureKeepsPreviousStateAndBlocksFurtherWrites() throws {
+        for reverting in [false, true] {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("wal-failure-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let url = dir.appendingPathComponent("wal.json")
+            let wal = ReversibleWalStore(storageURL: url)
+            let row = try wal.prepare(taskId: "t", accountId: "a", actionId: "x", operation: "rename", before: nil, after: nil)
+            if reverting { try wal.change(row, state: "undo_prepared") }
+            let previous = wal.find(taskId: "t", actionId: "x")
+            // 用普通文件占据父目录，稳定模拟写盘失败（不依赖 chmod 或运行用户权限）。
+            try FileManager.default.removeItem(at: dir)
+            try Data("blocked".utf8).write(to: dir)
+            if reverting {
+                XCTAssertThrowsError(try wal.reverted(row, undoResult: nil))
+            } else {
+                XCTAssertThrowsError(try wal.change(row, state: "applied"))
+            }
+            XCTAssertEqual(wal.find(taskId: "t", actionId: "x"), previous)
+            XCTAssertNotNil(wal.lastStorageError)
+            XCTAssertThrowsError(try wal.prepare(taskId: "t", accountId: "a", actionId: "y", operation: "move", before: nil, after: nil))
+        }
+    }
+
+    func testTruncatedUploadRemainsUncertain() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("upload-wal-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let drive = InMemoryCloudDrive()
+        drive.truncateUploadsForTest = true
+        let tx = ReversibleTransaction(taskId: "truncated", drive: drive, wal: wal)
+        do {
+            _ = try await tx.upload(action: "poster", parent: "0", name: "poster.jpg") { Data("image".utf8) }
+            XCTFail("截断上传不能标记为成功")
+        } catch {
+            XCTAssertEqual(wal.find(taskId: "truncated", actionId: "poster")?.state, "uncertain")
+        }
+        let report = await JournalReconciler.reconcileReversibleWal(taskId: "truncated", drive: drive, wal: wal)
+        XCTAssertEqual(report.stillUncertain, 1)
+        XCTAssertEqual(wal.find(taskId: "truncated", actionId: "poster")?.state, "uncertain")
     }
 
     // MARK: - 4. ReversibleWalStore & ReversibleTransaction 全链路事务与逆序回滚

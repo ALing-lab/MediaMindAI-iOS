@@ -1,4 +1,5 @@
 import XCTest
+import Observation
 #if canImport(MediaMindCore)
 @testable import MediaMindCore
 #else
@@ -10,6 +11,58 @@ import XCTest
 /// TMDB（TmdbNet / TmdbRequestPacer / TmdbClient.connectHelp）、
 /// AI（AiResponseParser 全链路容错解析）以及 Core（NetLog / HistoryStore / UpdateChecker / HostMatch / AppDirs）。
 final class DrivesTmdbAiCoreSuiteTests: XCTestCase {
+
+    func testSettingsObservationAndConcurrentAccess() throws {
+        let suite = "settings-regression-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        let changed = expectation(description: "保持 SwiftUI Observation 通知")
+        withObservationTracking {
+            _ = settings.scanAutomatic
+        } onChange: {
+            changed.fulfill()
+        }
+        settings.scanAutomatic.toggle()
+        wait(for: [changed], timeout: 1)
+        DispatchQueue.concurrentPerform(iterations: 100) { index in
+            settings.scanAutomatic = index.isMultiple(of: 2)
+            _ = settings.scanAutomatic
+            _ = settings.policies
+            _ = settings.aiConfig
+            _ = settings.tmdbNetConfig
+        }
+        XCTAssertEqual(defaults.bool(forKey: "scan_auto"), settings.scanAutomatic)
+    }
+
+    func testDistilledRulesRejectCategoriesAndMovieFolderOnlyHits() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rules-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let rules = AiRuleDistiller(storageURL: url)
+        for category in ["电影", "电视剧", "Season 01", "2024"] {
+            await rules.distill(pattern: category, targetTitle: "错误作品", mediaType: "movie", tmdbId: 1)
+        }
+        let emptyCount = await rules.count()
+        XCTAssertEqual(emptyCount, 0)
+        await rules.distill(pattern: "Inception", targetTitle: "盗梦空间", mediaType: "movie", tmdbId: 27205)
+        let folderOnly = await rules.match(rawName: "Other.Movie.mkv", folderName: "Inception", expectedKind: "movie")
+        let exact = await rules.match(rawName: "Inception.mkv", folderName: "电影", expectedKind: "movie")
+        XCTAssertNil(folderOnly)
+        XCTAssertEqual(exact?.tmdbId, 27205)
+        await rules.distill(pattern: "Breaking Bad", targetTitle: "绝命毒师", mediaType: "tv", tmdbId: 1396)
+        let tv = await rules.match(rawName: "S01E01.mkv", folderName: "Breaking Bad", expectedKind: "tv")
+        XCTAssertEqual(tv?.tmdbId, 1396)
+    }
+
+    func testLegacyCategoryRuleIsIgnoredOnLoad() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-rules-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let legacy = DistilledRule(pattern: "电影", targetTitle: "错误作品", mediaType: "movie", tmdbId: 1)
+        try JSONEncoder().encode([legacy]).write(to: url)
+        let rules = AiRuleDistiller(storageURL: url)
+        let hit = await rules.match(rawName: "Other.mkv", folderName: "电影", expectedKind: "movie")
+        XCTAssertNil(hit)
+    }
 
     // MARK: - 1. GuangyaDrive 纯函数与安全脱敏
 

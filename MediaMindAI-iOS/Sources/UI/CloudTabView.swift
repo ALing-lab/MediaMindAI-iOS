@@ -29,7 +29,7 @@ public final class BackgroundScanManager {
         scanTask = Task {
             do {
                 let drive = try AccountStore.shared.buildDrive(for: account)
-                let plan = try await Scanner.scan(
+                var plan = try await Scanner.scan(
                     roots: roots,
                     drive: drive,
                     fullDrive: false,
@@ -41,6 +41,7 @@ public final class BackgroundScanManager {
                     }
                 }
                 guard !Task.isCancelled, self.scanEpoch == epoch else { return }
+                plan.reviewDisposition = "pending"
                 PlanAndTaskStore.shared.savePlan(plan)
                 isScanning = false
                 scanTask = nil

@@ -105,7 +105,7 @@ public struct MediaDetailView: View {
                     fetchedBackdropPath = nil
                     currentPageIndex = 0
                 }
-                .task(id: "\(g.id)-\(g.tmdbId ?? 0)-\(pageList.count)-\(eff.scrapeEnabled)-\(eff.downloadFanart)-\(eff.downloadClearlogo)-\(eff.downloadEpisodeThumb)-\(eff.episodeNfo)") {
+                .task(id: "\(g.id)-\(g.tmdbId ?? 0)-\(pageList.map(\.id).joined(separator: ","))-\(eff.scrapeEnabled)-\(eff.downloadFanart)-\(eff.downloadClearlogo)-\(eff.downloadEpisodeThumb)-\(eff.episodeNfo)") {
                     await loadMetadata(for: g, pageList: pageList, eff: eff)
                 }
             } else {
@@ -296,6 +296,12 @@ public struct MediaDetailView: View {
                                     .frame(width: item.isWide ? 128 : 78, height: 108)
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
+                                    if let title = item.title {
+                                        Text(title)
+                                            .font(.caption2.weight(.medium))
+                                            .lineLimit(1)
+                                            .frame(width: item.isWide ? 128 : 78)
+                                    }
                                     Text(item.fileName)
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
@@ -631,7 +637,19 @@ public struct MediaDetailView: View {
         guard eff.scrapeEnabled else { return [] }
         var items: [BaseArtworkItem] = []
 
-        if eff.downloadPoster {
+        if eff.downloadPoster && g.kind == "collection" {
+            // 合集动作中每部电影都有 poster.jpg，不能只取第一条。
+            for page in buildPages(for: g, actions: actions) {
+                items.append(BaseArtworkItem(
+                    id: "poster-\(page.id)",
+                    fileName: page.posterFileName ?? "poster.jpg",
+                    url: resolvedPagePosterURL(group: g, page: page),
+                    placeholder: "film",
+                    isWide: false,
+                    title: page.headerTitle
+                ))
+            }
+        } else if eff.downloadPoster {
             let act = actions.first {
                 $0.op == "artwork" && $0.kind == "image" && $0.season == nil && $0.episode == nil
                 && $0.newName.lowercased().contains("poster") && $0.enabled
@@ -655,14 +673,18 @@ public struct MediaDetailView: View {
             }
             if !fanartActs.isEmpty {
                 for a in fanartActs {
+                    let backdropPath = g.kind == "collection"
+                        ? a.tmdbId.flatMap { movieMetas[$0]?.backdropPath }
+                        : fetchedBackdropPath
                     let url = a.artworkUrl.flatMap(URL.init(string:))
-                        ?? fetchedBackdropPath.flatMap { settings.imageUrl(path: $0, size: "w780") }
+                        ?? backdropPath.flatMap { settings.imageUrl(path: $0, size: "w780") }
                     items.append(BaseArtworkItem(
                         id: "fanart-\(a.id)",
                         fileName: a.newName,
                         url: url,
                         placeholder: "photo",
-                        isWide: true
+                        isWide: true,
+                        title: g.kind == "collection" ? a.tmdbId.flatMap { movieMetas[$0]?.title } : nil
                     ))
                 }
             } else if let bp = fetchedBackdropPath {
@@ -848,10 +870,23 @@ public struct MediaDetailView: View {
         if let mid = page.movieTmdbId, let mp = movieMetas[mid]?.posterPath, !mp.isEmpty {
             return settings.imageUrl(path: mp, size: "w342")
         }
+        // 单部海报尚未返回时显示占位，避免把合集海报误当成每部电影的海报。
+        if g.kind == "collection", page.movieTmdbId != nil { return nil }
         return g.posterPath.flatMap { settings.imageUrl(path: $0, size: "w342") }
     }
 
     private func loadMetadata(for g: PlanGroup, pageList: [DetailPage], eff: EffectivePolicy) async {
+        if g.kind == "collection" {
+            for page in pageList {
+                guard !Task.isCancelled else { return }
+                guard let mid = page.movieTmdbId, mid > 0, movieMetas[mid] == nil else { continue }
+                if let info = await TmdbClient.shared.movieDetails(id: mid) {
+                    guard !Task.isCancelled else { return }
+                    movieMetas[mid] = info
+                }
+            }
+            return
+        }
         guard let tid = g.tmdbId, tid > 0 else { return }
 
         if g.kind != "collection" {
@@ -895,15 +930,6 @@ public struct MediaDetailView: View {
                     }
                 }
             }
-        } else if g.kind == "collection" {
-            for page in pageList {
-                guard !Task.isCancelled else { return }
-                guard let mid = page.movieTmdbId, mid > 0, movieMetas[mid] == nil else { continue }
-                if let info = await TmdbClient.shared.movieDetails(id: mid) {
-                    guard !Task.isCancelled else { return }
-                    movieMetas[mid] = info
-                }
-            }
         }
     }
 
@@ -923,6 +949,7 @@ private struct BaseArtworkItem: Identifiable {
     let url: URL?
     let placeholder: String
     let isWide: Bool
+    var title: String? = nil
 }
 
 private struct DetailPage: Identifiable {

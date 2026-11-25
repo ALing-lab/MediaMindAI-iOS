@@ -27,12 +27,12 @@ public actor AiRuleDistiller {
     private var rules: [DistilledRule] = []
     private let fileUrl: URL
 
-    private init() {
+    init(storageURL: URL? = nil) {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let folder = dir.appendingPathComponent("MediaMindAI", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        self.fileUrl = folder.appendingPathComponent("ai_distilled_rules.json")
+        self.fileUrl = storageURL ?? folder.appendingPathComponent("ai_distilled_rules.json")
         if let data = try? Data(contentsOf: fileUrl), let list = try? JSONDecoder().decode([DistilledRule].self, from: data) {
             self.rules = list
         }
@@ -47,6 +47,13 @@ public actor AiRuleDistiller {
         return String(norm.prefix(64))
     }
 
+    /// 分类目录及季目录不能作为作品身份；同样拒绝旧规则中的这类键。
+    private static func isWorkKey(_ key: String) -> Bool {
+        let categories: Set<String> = ["电影", "电视剧", "剧集", "电视", "动漫", "动画", "综艺", "纪录片", "未分类", "待整理", "视频", "下载", "movies", "movie", "tv", "tvshows", "series", "anime", "downloads", "media", "videos"]
+        return key.count >= 2 && !categories.contains(key.lowercased())
+            && ScannerTreeEngine.titleLikeDir(key)
+    }
+
     public func match(rawName: String, folderName: String?, expectedKind: String? = nil) -> DistilledRule? {
         let rawKey = Self.ruleKey(rawName)
         let folderKey = folderName.map { Self.ruleKey($0) } ?? ""
@@ -54,8 +61,8 @@ public actor AiRuleDistiller {
         return rules.first { r in
             if let expectedKind, !expectedKind.isEmpty, r.mediaType != expectedKind { return false }
             let patKey = Self.ruleKey(r.pattern)
-            guard patKey.count >= 2 else { return false }
-            return patKey == rawKey || (!folderKey.isEmpty && patKey == folderKey)
+            guard Self.isWorkKey(patKey) else { return false }
+            return patKey == rawKey || (r.mediaType == "tv" && Self.isWorkKey(folderKey) && patKey == folderKey)
         }
     }
 
@@ -64,7 +71,7 @@ public actor AiRuleDistiller {
         let cleanTitle = String(targetTitle.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         let kind = mediaType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let key = Self.ruleKey(cleanPat)
-        guard key.count >= 2, !cleanTitle.isEmpty, (kind == "movie" || kind == "tv") else { return }
+        guard Self.isWorkKey(key), !cleanTitle.isEmpty, (kind == "movie" || kind == "tv") else { return }
         if let tid = tmdbId, tid <= 0 { return }
         rules.removeAll { Self.ruleKey($0.pattern) == key }
         rules.insert(DistilledRule(pattern: cleanPat, targetTitle: cleanTitle, mediaType: kind, tmdbId: tmdbId), at: 0)

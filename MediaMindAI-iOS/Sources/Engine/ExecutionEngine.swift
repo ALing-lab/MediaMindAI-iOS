@@ -148,6 +148,7 @@ public final class ExecutionEngine {
 
     private var activeTask: Task<Void, Never>?
     private var stopRequested = false
+    public private(set) var lastStartError: String?
     public var driveResolver: (@MainActor (String) -> (any CloudDrive)?)?
 
     private init() {}
@@ -180,12 +181,27 @@ public final class ExecutionEngine {
     }
 
     /// 若当前已有任务运行，则自动加入 TaskQueue 排队等待；否则立即开始执行。
-    public func enqueueOrStart(plan: ScrapePlan, drive: any CloudDrive, actionIds: [String]? = nil) {
+    public nonisolated static func executableActionIds(plan: ScrapePlan, requested: [String]? = nil) -> [String] {
+        let byId = Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        var seen = Set<String>()
+        return (requested ?? plan.actions.filter(\.selected).map(\.id)).filter { id in
+            guard seen.insert(id).inserted, let action = byId[id] else { return false }
+            return PlanSelection.executable(action) && execOps.contains(action.op)
+        }
+    }
+
+    @discardableResult
+    public func enqueueOrStart(plan: ScrapePlan, drive: any CloudDrive, actionIds: [String]? = nil) -> Bool {
+        guard !Self.executableActionIds(plan: plan, requested: actionIds).isEmpty else {
+            lastStartError = "没有可执行的操作，请在预览中检查勾选、策略和待手动识别项"
+            return false
+        }
+        lastStartError = nil
         if isRunning {
             TaskQueue.shared.enqueue(plan: plan, actionIds: actionIds)
-            return
+            return true
         }
-        start(plan: plan, drive: drive, actionIds: actionIds)
+        return start(plan: plan, drive: drive, actionIds: actionIds)
     }
 
     public func rollback(runId: String, drive: any CloudDrive) async -> RollbackSummary {
@@ -318,24 +334,27 @@ public final class ExecutionEngine {
 
     // MARK: - 2. 完整五阶段批处理状态机（1:1 对标 ExecutionEngine.run）
 
+    @discardableResult
     public func start(
         plan: ScrapePlan,
         drive: any CloudDrive,
         actionIds: [String]? = nil,
         skipDelaysForTest: Bool = false
-    ) {
-        guard !isRunning else { return }
+    ) -> Bool {
+        guard !isRunning else { return false }
+        let requestedIds = Self.executableActionIds(plan: plan, requested: actionIds)
+        guard !requestedIds.isEmpty else {
+            lastStartError = "没有可执行的操作，请在预览中检查勾选、策略和待手动识别项"
+            return false
+        }
+        lastStartError = nil
+        var plan = plan
+        plan.reviewDisposition = "started"
+        PlanAndTaskStore.shared.savePlan(plan)
         isRunning = true
         isPaused = false
         stopRequested = false
         BackgroundTaskManager.shared.begin()
-
-        let requestedIds: [String]
-        if let actionIds {
-            requestedIds = actionIds
-        } else {
-            requestedIds = plan.actions.filter { $0.selected && PlanSelection.executable($0) && Self.execOps.contains($0.op) }.map(\.id)
-        }
 
         let runId = String(UUID().uuidString.prefix(8).lowercased())
         var run = TaskRun(
@@ -354,6 +373,7 @@ public final class ExecutionEngine {
             finishedAt: nil,
             errors: []
         )
+        run.executionSnapshot = plan.executionSnapshot(actionIds: requestedIds)
         currentRun = run
         PlanAndTaskStore.shared.saveTask(run)
 
@@ -472,6 +492,11 @@ public final class ExecutionEngine {
                     updatedPlan.actions[idx].done = done
                     updatedPlan.actions[idx].error = error
                     if let note { updatedPlan.actions[idx].note = note }
+                    if let snapshotIndex = run.executionSnapshot?.actions.firstIndex(where: { $0.id == id }) {
+                        var captured = updatedPlan.actions[idx]
+                        captured.selected = true
+                        run.executionSnapshot?.actions[snapshotIndex] = captured
+                    }
                 }
             }
 
@@ -1088,7 +1113,7 @@ public final class ExecutionEngine {
                 run.finishedAt = Date()
                 run.message = "已停止（成功 \(run.succeeded) · 失败 \(run.failed)）"
             } else {
-                run.status = run.failed == 0 ? "done" : "failed"
+                run.status = run.failed > 0 ? "failed" : (run.total > 0 && run.completed == run.total && run.succeeded > 0 ? "done" : "no_changes")
                 run.finishedAt = Date()
                 let extra = stoppedOnFails ? "（曾因连续失败暂停）" : ""
                 run.message = "完成：成功 \(run.succeeded) 项，失败 \(run.failed) 项\(extra)"
@@ -1145,11 +1170,11 @@ public final class ExecutionEngine {
                         continue
                     }
                     _ = TaskQueue.shared.popNext()
-                    start(plan: nextPlan, drive: nextDrive, actionIds: candidate.actionIds)
-                    break
+                    if start(plan: nextPlan, drive: nextDrive, actionIds: candidate.actionIds) { break }
                 }
             }
         }
+        return true
     }
 
     /// 纯云端并发 IO 辅助（nonisolated，全程经由 ReversibleTransaction 落盘 WAL 与覆盖前备份）。

@@ -27,6 +27,21 @@ final class Batch2ExecTests: XCTestCase {
         func trash(fileId: String) async throws -> String { fileId }
     }
 
+    @MainActor
+    func testCancellationRetryKeepsPreviouslyAcceptedSubstitutions() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("controls-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let id = UUID().uuidString
+        let previous = TaskControl(taskId: id, accountId: "acc", mode: "undo", state: "needs_backup_choice",
+                                   missingBackupIds: ["second:backup"], acceptedSubstitutions: ["first:backup"])
+        try JSONEncoder().encode([id: previous]).write(to: url)
+        let controls = TaskCancellation(storageURL: url)
+        let retry = try controls.request(taskId: id, accountId: "acc", undo: true, acceptedSubstitutions: ["second:backup"])
+        XCTAssertEqual(Set(retry.acceptedSubstitutions), ["first:backup", "second:backup"])
+        let reloaded = TaskCancellation(storageURL: url)
+        XCTAssertEqual(reloaded.controls[id]?.acceptedSubstitutions, retry.acceptedSubstitutions)
+    }
+
     func testNfoXmlEscapingCdataSplittingAndImageBytes() {
         XCTAssertEqual(NfoXml.esc("A & B <C> \"D\" 'E'\u{0001}"), "A &amp; B &lt;C&gt; &quot;D&quot; &apos;E&apos;")
         let cd = NfoXml.cdata(name: "plot", value: "hello ]]> world\u{0007}")

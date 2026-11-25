@@ -10,6 +10,7 @@ public final class ScannerTvVideo: @unchecked Sendable {
     public let ext: String
     public var season: Int = 1
     public var episode: Int = 0
+    public var episodeEnd: Int? = nil
     public var metadataSeason: Int? = nil
     public var metadataEpisode: Int? = nil
     public var special: Bool = false
@@ -424,6 +425,17 @@ public enum ScannerTvAndBdmv {
                 if extra != nil, let ps = parsed.season, ps != 0, !matches(cnExtraRx, s2) {
                     extra = nil
                 }
+                if parsed.episodeEnd != nil && (strategy != .original || episodeGroupId != nil || extra != nil || hint == 0) {
+                    let note = "多集文件暂不自动映射剧集策略或特别篇，请使用默认策略并核实季集编号"
+                    flags.append("\(note)：\(f.fileName)")
+                    actions.append(PlanAction(
+                        id: aid(), op: "unmatched", groupId: gid, fileId: f.fileId, parentId: n.id,
+                        oldName: f.fileName, newName: "", destParentId: nil, destRef: nil,
+                        kind: "file", mediaKind: "tv", tmdbId: show.id, season: parsed.season,
+                        episode: parsed.episode, artworkUrl: nil, selected: false, done: false, error: nil, note: note
+                    ))
+                    continue
+                }
                 if extra == "movie" && parsed.episode == nil {
                     movieCands.append(v)
                     continue
@@ -434,6 +446,7 @@ public enum ScannerTvAndBdmv {
                 } else if let epNum = parsed.episode {
                     v.season = parsed.season ?? hint ?? 1
                     v.episode = epNum
+                    v.episodeEnd = parsed.episodeEnd
                 } else {
                     flags.append("剧集文件认不出集数，未改名：\(f.fileName)")
                     actions.append(PlanAction(
@@ -606,6 +619,7 @@ public enum ScannerTvAndBdmv {
                 title: show.title,
                 season: v.season,
                 episode: v.episode,
+                episodeEnd: v.episodeEnd,
                 tmdbId: show.id,
                 fileStem: v.stem,
                 releaseDirName: folder.fileName,
@@ -824,6 +838,7 @@ public enum ScannerTvAndBdmv {
             episodeStrategy: strategy.rawValue,
             episodeGroupId: episodeGroupId,
             episodeGroupName: episodeGroupName,
+            genreIds: show.genreIds ?? [],
             originalTitle: show.originalTitle
         ))
         return allVideos.count

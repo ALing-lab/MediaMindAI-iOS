@@ -542,7 +542,7 @@ public enum ScannerMovieLooseAndArtwork {
         groups.append(PlanGroup(
             id: gid, kind: "tv", tmdbId: show.id, title: show.title, year: show.year, posterPath: show.posterPath,
             folderId: folder.fileId, folderName: folder.fileName, folderNewName: nil,
-            rating: show.rating, confidence: "中", note: "季文件夹（不改名）", warn: nil, actionIds: ids
+            rating: show.rating, confidence: "中", note: "季文件夹（不改名）", warn: nil, actionIds: ids, genreIds: show.genreIds ?? []
         ))
         return videos.count
     }
@@ -577,7 +577,7 @@ public enum ScannerMovieLooseAndArtwork {
             }
             let season = parsed.season ?? defaultSeason ?? 1
             let base = StandardNaming.episodeFileBase(
-                title: show.title, season: season, episode: epNum, tmdbId: show.id, fileStem: stem, year: show.year
+                title: show.title, season: season, episode: epNum, episodeEnd: parsed.episodeEnd, tmdbId: show.id, fileStem: stem, year: show.year
             )
             guard let target = ScannerTvAndBdmv.claimName(base + ext, currentName: item.fileName, taken: &taken) else {
                 flags.append("目标名已被占用（命名冲突），未改名：\(item.fileName)")
@@ -749,6 +749,7 @@ public enum ScannerMovieLooseAndArtwork {
         for item in looseVideos {
             let (stem, ext) = MediaParser.splitNameExt(item.fileName)
             seen += 1
+            let parsedRange = MediaParser.parse(stem)
             let resolved = preResolved[item.fileId]
             let epPair = resolved?.epPair
             let info = resolved?.info
@@ -798,7 +799,7 @@ public enum ScannerMovieLooseAndArtwork {
                 }
                 let season = ep.0 ?? 1
                 let base = StandardNaming.episodeFileBase(
-                    title: info.title, season: season, episode: ep.1, tmdbId: info.id, fileStem: stem, year: info.year
+                    title: info.title, season: season, episode: ep.1, episodeEnd: parsedRange.episodeEnd.map { ep.1 + $0 - (parsedRange.episode ?? ep.1) }, tmdbId: info.id, fileStem: stem, year: info.year
                 )
                 guard let target = ScannerTvAndBdmv.claimName(base + ext, currentName: item.fileName, taken: &taken) else {
                     flags.append("目标名已被占用（命名冲突），未改名：\(item.fileName)")
@@ -815,7 +816,7 @@ public enum ScannerMovieLooseAndArtwork {
                     id: gid, kind: info.kind, tmdbId: info.id, title: info.title, year: info.year, posterPath: info.posterPath,
                     folderId: nil, folderName: dir.fileName, folderNewName: nil,
                     rating: info.rating, confidence: "中", note: "散文件（剧集单集，只改名）", warn: nil,
-                    actionIds: actions[start..<actions.count].map { $0.id }
+                    actionIds: actions[start..<actions.count].map { $0.id }, genreIds: info.genreIds ?? []
                 ))
                 continue
             }

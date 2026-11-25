@@ -14,6 +14,7 @@ public struct MatchInfo: Codable, Hashable, Sendable {
     public let collectionId: Int?
     public let collectionName: String?
     public let collectionPosterPath: String?
+    public let genreIds: [Int]?
 
     public init(
         kind: String,
@@ -27,7 +28,8 @@ public struct MatchInfo: Codable, Hashable, Sendable {
         rating: Double? = nil,
         collectionId: Int? = nil,
         collectionName: String? = nil,
-        collectionPosterPath: String? = nil
+        collectionPosterPath: String? = nil,
+        genreIds: [Int]? = nil
     ) {
         self.kind = kind
         self.id = id
@@ -41,6 +43,7 @@ public struct MatchInfo: Codable, Hashable, Sendable {
         self.collectionId = collectionId
         self.collectionName = collectionName
         self.collectionPosterPath = collectionPosterPath
+        self.genreIds = genreIds
     }
 }
 
@@ -880,7 +883,8 @@ public actor TmdbClient {
             backdropPath: obj["backdrop_path"] as? String,
             originalTitle: obj["original_name"] as? String,
             overview: obj["overview"] as? String ?? "",
-            rating: obj["vote_average"] as? Double
+            rating: obj["vote_average"] as? Double,
+            genreIds: (obj["genres"] as? [[String: Any]])?.compactMap { $0["id"] as? Int }
         )
     }
 
@@ -1081,7 +1085,8 @@ public actor TmdbClient {
             backdropPath: o["backdrop_path"] as? String,
             originalTitle: orig,
             overview: o["overview"] as? String ?? "",
-            rating: o["vote_average"] as? Double
+            rating: o["vote_average"] as? Double,
+            genreIds: o["genre_ids"] as? [Int]
         )
     }
 }

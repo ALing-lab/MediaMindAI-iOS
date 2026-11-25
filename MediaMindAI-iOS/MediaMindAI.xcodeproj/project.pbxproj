@@ -73,7 +73,7 @@
 		EB451ED2996E2CAFA0C8BBBE /* CloudTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C87177C50E1B673B00AB0F /* CloudTabView.swift */; };
 		0486EF11EE8672C996BD50B5 /* LoginViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D434FAA52B291CDFAFB1E27D /* LoginViews.swift */; };
 		CBA1B73848A41516DCCC2CB9 /* MediaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1542121FC17A3C1D771B929F /* MediaDetailView.swift */; };
-		857FCC821150D23BDB2C16D0 /* PreviewInboxAndLibraryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABD7C51D15D51939674C004 /* PreviewInboxAndLibraryViews.swift */; };
+		857FCC821150D23BDB2C16D0 /* FilmLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABD7C51D15D51939674C004 /* FilmLibraryView.swift */; };
 		2C05A06C763796A5602D5BFE /* PreviewTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AA98E44A2AD6B27E848277 /* PreviewTabView.swift */; };
 		34F3C97BFB3640C85BD09A26 /* ManualMatchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDE8D7D1036CDB5698DA784 /* ManualMatchSheet.swift */; };
 		99D16A4371DC87679E8ED789 /* DefaultPolicyScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92D077186F8EDD9B07FC904 /* DefaultPolicyScreen.swift */; };
@@ -159,7 +159,7 @@
 		E3C87177C50E1B673B00AB0F /* CloudTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "CloudTabView.swift"; path = "Sources/UI/CloudTabView.swift"; sourceTree = "<group>"; };
 		D434FAA52B291CDFAFB1E27D /* LoginViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "LoginViews.swift"; path = "Sources/UI/LoginViews.swift"; sourceTree = "<group>"; };
 		1542121FC17A3C1D771B929F /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "MediaDetailView.swift"; path = "Sources/UI/MediaDetailView.swift"; sourceTree = "<group>"; };
-		0ABD7C51D15D51939674C004 /* PreviewInboxAndLibraryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PreviewInboxAndLibraryViews.swift"; path = "Sources/UI/PreviewInboxAndLibraryViews.swift"; sourceTree = "<group>"; };
+		0ABD7C51D15D51939674C004 /* FilmLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "FilmLibraryView.swift"; path = "Sources/UI/FilmLibraryView.swift"; sourceTree = "<group>"; };
 		A9AA98E44A2AD6B27E848277 /* PreviewTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PreviewTabView.swift"; path = "Sources/UI/PreviewTabView.swift"; sourceTree = "<group>"; };
 		AEDE8D7D1036CDB5698DA784 /* ManualMatchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ManualMatchSheet.swift"; path = "Sources/UI/ManualMatchSheet.swift"; sourceTree = "<group>"; };
 		B92D077186F8EDD9B07FC904 /* DefaultPolicyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DefaultPolicyScreen.swift"; path = "Sources/UI/DefaultPolicyScreen.swift"; sourceTree = "<group>"; };
@@ -278,7 +278,7 @@
 				E3C87177C50E1B673B00AB0F /* CloudTabView.swift */,
 				D434FAA52B291CDFAFB1E27D /* LoginViews.swift */,
 				1542121FC17A3C1D771B929F /* MediaDetailView.swift */,
-				0ABD7C51D15D51939674C004 /* PreviewInboxAndLibraryViews.swift */,
+				0ABD7C51D15D51939674C004 /* FilmLibraryView.swift */,
 				A9AA98E44A2AD6B27E848277 /* PreviewTabView.swift */,
 				AEDE8D7D1036CDB5698DA784 /* ManualMatchSheet.swift */,
 				B92D077186F8EDD9B07FC904 /* DefaultPolicyScreen.swift */,
@@ -434,7 +434,7 @@
 				EB451ED2996E2CAFA0C8BBBE /* CloudTabView.swift in Sources */,
 				0486EF11EE8672C996BD50B5 /* LoginViews.swift in Sources */,
 				CBA1B73848A41516DCCC2CB9 /* MediaDetailView.swift in Sources */,
-				857FCC821150D23BDB2C16D0 /* PreviewInboxAndLibraryViews.swift in Sources */,
+				857FCC821150D23BDB2C16D0 /* FilmLibraryView.swift in Sources */,
 				2C05A06C763796A5602D5BFE /* PreviewTabView.swift in Sources */,
 				34F3C97BFB3640C85BD09A26 /* ManualMatchSheet.swift in Sources */,
 				99D16A4371DC87679E8ED789 /* DefaultPolicyScreen.swift in Sources */,

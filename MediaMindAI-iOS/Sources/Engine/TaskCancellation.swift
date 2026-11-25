@@ -81,7 +81,7 @@ public final class TaskCancellation: @unchecked Sendable {
             accountId: accountId,
             mode: undo ? "undo" : "keep",
             state: "requested",
-            acceptedSubstitutions: acceptedSubstitutions
+            acceptedSubstitutions: Array(Set(controls[taskId]?.acceptedSubstitutions ?? []).union(acceptedSubstitutions)).sorted()
         )
         controls[taskId] = ctrl
         persist()
@@ -121,6 +121,7 @@ public final class TaskCancellation: @unchecked Sendable {
             next.updatedAt = Date()
             controls[control.taskId] = next
             persist()
+            syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "撤销暂停：任务账号与当前网盘不匹配")
             return next
         }
         // 确保在途正向云盘写入任务已彻底退出，再进入保留/撤销收口，杜绝并发写/撤销竞态
@@ -162,8 +163,10 @@ public final class TaskCancellation: @unchecked Sendable {
             } catch let mb as MissingBackupsError {
                 next.state = "needs_backup_choice"
                 next.missingBackupIds = mb.files.map(\.actionId)
+                syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "撤销暂停：缺失备份，请在任务中心选择补齐方式")
             } catch {
                 next.state = "conflict"
+                syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "撤销暂停：\(error.localizedDescription)")
             }
             next.updatedAt = Date()
             controls[control.taskId] = next

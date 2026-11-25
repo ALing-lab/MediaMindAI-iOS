@@ -4,12 +4,17 @@ import UIKit
 /// 识别结果预览页（1:1 对标 Android ScrapeScreens + FilmPolicySheets：任务级第 2 层策略 + 影片级第 3 层策略实时重算 + 冲突预警 + 批量手动修正 + 保留区）。
 public struct PreviewTabView: View {
     public let onStartExecution: () -> Void
-    public init(onStartExecution: @escaping () -> Void = {}) {
+    private let planId: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var showSearch = false
+    @FocusState private var searchFocused: Bool
+
+    public init(planId: String, onStartExecution: @escaping () -> Void = {}) {
+        self.planId = planId
         self.onStartExecution = onStartExecution
     }
 
     @State private var planStore = PlanAndTaskStore.shared
-    @State private var selectedPlanId: String?
     @State private var manualTab = false
     @State private var rematchTargets: [PlanGroup] = []
     @State private var rematchSeasonFilter: Int? = nil
@@ -22,8 +27,8 @@ public struct PreviewTabView: View {
     @State private var strategyApplying = false
     @State private var strategyError: String?
     @State private var showTaskPolicySheet = false
-    @State private var showInboxSheet = false
     @State private var filterKind: PreviewFilterKind = .all
+    @State private var categoryToggleSelected = false
     @State private var groupBySource = false
     @State private var editingAssetsGroup: PlanGroup?
     @State private var searchQuery = ""
@@ -32,289 +37,71 @@ public struct PreviewTabView: View {
     @State private var errorMsg: String?
 
     private var activePlan: ScrapePlan? {
-        if let id = selectedPlanId, let hit = planStore.plans.first(where: { $0.id == id }) { return hit }
-        return planStore.plans.first
+        planStore.plans.first { $0.id == planId }
     }
 
     public var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                Color(.systemGroupedBackground).ignoresSafeArea()
-                TopAmbientGlow()
-                Group {
+            Group {
                 if let plan = activePlan {
                     let ready = plan.groups.filter { $0.kind != "unmatched" }
                     let manual = plan.groups.filter { $0.kind == "unmatched" }
-                    let baseShown = manualTab ? manual : ready
-                    let shown = manualTab ? baseShown : PreviewFilter.apply(groups: baseShown, kind: filterKind, query: searchQuery)
-                    let selectedCount = plan.actions.filter { $0.selected && !$0.done && $0.op != "unmatched" }.count
-                    let conflicts = ConflictDetector.detect(in: plan.actions)
-
-                    VStack(spacing: 0) {
-                        Picker("分类", selection: $manualTab) {
-                            Text("可整理 (\(ready.count))").tag(false)
-                            Text("待手动确认 (\(manual.count))").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        .padding(.top, 10)
-                        .padding(.bottom, 6)
-
-                        if !manualTab {
-                                VStack(spacing: 6) {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        ForEach(PreviewFilterKind.allCases) { fk in
-                                            Button(fk.rawValue) { filterKind = fk }
-                                                .font(.caption.weight(filterKind == fk ? .semibold : .regular))
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 5)
-                                                .background(filterKind == fk ? MMTheme.accent : Color.secondary.opacity(0.14), in: Capsule())
-                                                .foregroundStyle(filterKind == fk ? .white : .primary)
-                                        }
-                                        Button(groupBySource ? "按来源分组" : "按类别分组") {
-                                            groupBySource.toggle()
-                                        }
-                                        .font(.caption.weight(.medium))
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color.secondary.opacity(0.14), in: Capsule())
-                                        .foregroundStyle(MMTheme.accent)
-                                    }
-                                    .padding(.horizontal)
+                    let shown = PreviewFilter.apply(groups: manualTab ? manual : ready, kind: filterKind, query: searchQuery, plan: plan)
+                    let sections = PreviewSectionGrouping.sections(plan: plan, groups: shown, bySource: groupBySource)
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
+                            Section {
+                                let conflicts = ConflictDetector.detect(in: plan.actions)
+                                if !manualTab, let conflict = conflicts.first {
+                                    Label("检测到 \(conflicts.count) 处命名冲突（如：\(conflict.targetName)），请检查勾选", systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption).foregroundStyle(.orange).padding(.horizontal, 20)
                                 }
-                            }
-                            .padding(.bottom, 6)
-                        }
-
-                        if !conflicts.isEmpty && !manualTab {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
-                                Text("检测到 \(conflicts.count) 处目标文件名冲突（如：\(conflicts[0].targetName)），建议先取消重复项勾选。")
-                                    .font(.caption)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
-                            .padding(10)
-                            .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-                            .padding(.horizontal)
-                            .padding(.bottom, 6)
-                        }
-
-                        if let errorMsg {
-                            Text(errorMsg).font(.footnote).foregroundStyle(MMTheme.redErr).padding(.horizontal)
-                        }
-
-                        if shown.isEmpty {
-                            ContentUnavailableView(
-                                manualTab ? "没有待手动确认的项目" : "暂无可整理作品",
-                                systemImage: manualTab ? "checkmark.circle" : "film",
-                                description: Text(manualTab ? "未识别的文件会显示在这里。" : "在「云盘」选择目录开始扫描。")
-                            )
-                        } else {
-                            let sections = PreviewSectionGrouping.sections(plan: plan, groups: shown, bySource: groupBySource)
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 14) {
-                                    ForEach(sections) { sec in
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Text(sec.title)
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundStyle(.secondary)
-                                                .padding(.horizontal, 4)
-
-                                            ForEach(sec.groups) { group in
-                                                let groupActions = plan.actions.filter { $0.groupId == group.id && $0.enabled }
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    if group.confirmRequired {
-                                                        Label("需人工确认：\(group.confirmReasons.joined(separator: "、"))", systemImage: "exclamationmark.shield.fill")
-                                                            .font(.caption2)
-                                                            .foregroundStyle(.orange)
-                                                    }
-                                                    MediaGroupCardRow(
-                                                        group: group,
-                                                        actions: groupActions,
-                                                        hasTaskOverride: plan.taskPolicy != nil,
-                                                        isManualMode: manualTab,
-                                                        isBatchSelected: batchSelectedManualIds.contains(group.id),
-                                                        onToggleBatchManual: {
-                                                            if batchSelectedManualIds.contains(group.id) {
-                                                                batchSelectedManualIds.remove(group.id)
-                                                            } else {
-                                                                batchSelectedManualIds.insert(group.id)
-                                                            }
-                                                        },
-                                                        onToggleGroup: { on in toggleGroup(groupId: group.id, selected: on) },
-                                                        onRematch: { season in
-                                                            rematchTargets = [group]
-                                                            rematchSeasonFilter = season
-                                                            showRematchSheet = true
-                                                        },
-                                                        onParkRetention: {
-                                                            parkToRetention(plan: plan, group: group, actions: groupActions)
-                                                        },
-                                                        detailDestination: {
-                                                            MediaDetailView(
-                                                                planId: plan.id,
-                                                                groupId: group.id,
-                                                                onRematch: {
-                                                                    let latest = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
-                                                                    rematchTargets = [latest]
-                                                                    rematchSeasonFilter = nil
-                                                                    showRematchSheet = true
-                                                                },
-                                                                onEditPolicy: {
-                                                                    editingFilmPolicyGroup = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
-                                                                },
-                                                                onEditAssets: {
-                                                                    editingAssetsGroup = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
-                                                                },
-                                                                onEditEpisodeStrategy: group.kind == "tv" ? {
-                                                                    let latest = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
-                                                                    strategyError = nil
-                                                                    strategyEpisodeGroups = []
-                                                                    editingStrategyGroup = latest
-                                                                    if let tid = latest.tmdbId {
-                                                                        strategyLoadEpoch += 1
-                                                                        let epoch = strategyLoadEpoch
-                                                                        let targetGid = group.id
-                                                                        Task {
-                                                                            let loaded = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
-                                                                            await MainActor.run {
-                                                                                guard strategyLoadEpoch == epoch, editingStrategyGroup?.id == targetGid else { return }
-                                                                                strategyEpisodeGroups = loaded
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                } : nil
-                                                            )
-                                                        }
-                                                    )
-                                                }
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 12)
-                                                .background(Color(.secondarySystemGroupedBackground))
-                                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                                .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
-                                            }
-                                        }
-                                    }
+                                if let errorMsg {
+                                    Text(errorMsg).font(.footnote).foregroundStyle(MMTheme.redErr).padding(.horizontal, 20)
                                 }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 8)
+                                if shown.isEmpty {
+                                    ContentUnavailableView(manualTab ? "没有待手动识别的项目" : "暂无匹配作品",
+                                        systemImage: manualTab ? "checkmark.circle" : "film")
+                                }
+                                resultCards(plan: plan, sections: sections)
+                            } header: {
+                                previewHeader(plan: plan, ready: ready, manual: manual)
                             }
-                            .background(Color.clear)
                         }
-
-                        if manualTab && !batchSelectedManualIds.isEmpty {
-                            HStack {
-                                Text("已选 \(batchSelectedManualIds.count) 组待确认项").font(.subheadline).foregroundStyle(.secondary)
-                                Spacer()
-                                Button {
-                                    rematchTargets = manual.filter { batchSelectedManualIds.contains($0.id) }
-                                    rematchSeasonFilter = nil
-                                    showRematchSheet = true
-                                } label: {
-                                    Text("批量匹配 (\(batchSelectedManualIds.count))")
-                                        .fontWeight(.semibold)
-                                        .padding(.horizontal, 18)
-                                        .padding(.vertical, 10)
-                                        .background(MMTheme.accent, in: Capsule())
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .padding()
-                            .background(.bar)
-                        } else if !manualTab {
-                            HStack(spacing: 12) {
-                                Button {
-                                    showTaskPolicySheet = true
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "slider.horizontal.3")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(MMTheme.accent)
-                                        Text("任务策略")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(Color(.label))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 46)
-                                    .background(Color(.secondarySystemGroupedBackground), in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
-                                    .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
-                                }
-                                .buttonStyle(.plain)
-
-                                if selectedCount > 0 {
-                                    Button {
-                                        execute(plan: plan)
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: ExecutionEngine.shared.isRunning ? "text.badge.plus" : "play.fill")
-                                                .font(.subheadline.weight(.semibold))
-                                            Text(ExecutionEngine.shared.isRunning ? "加入队列" : "立即执行")
-                                                .font(.subheadline.weight(.semibold))
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 46)
-                                        .background(MMTheme.accent, in: Capsule())
-                                        .foregroundStyle(.white)
-                                        .shadow(color: MMTheme.accent.opacity(0.28), radius: 8, y: 3)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(.bar)
-                        }
+                        .padding(.bottom, 8)
+                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        bottomActions(plan: plan, manual: manual)
                     }
                 } else {
-                    ContentUnavailableView("暂无识别结果", systemImage: "eye", description: Text("请在「云盘」页面选择文件夹并开始扫描。"))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+                    ContentUnavailableView("扫描计划已不存在", systemImage: "film")
                 }
             }
-            // iOS 18+/26+/27 已在底栏平行位置提供原生圆形放大镜搜索 Tab，此处不再重复悬浮遮挡卡片
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("识别结果")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar(.hidden, for: .tabBar)
             .toolbar {
-                if let plan = activePlan {
-                    if manualTab {
-                        let manual = plan.groups.filter { $0.kind == "unmatched" }
-                        if !manual.isEmpty {
-                            ToolbarItem(placement: .topBarLeading) {
-                                let allOn = batchSelectedManualIds.count == manual.count
-                                Button(allOn ? "取消全选" : "全选待确认") {
-                                    batchSelectedManualIds = allOn ? [] : Set(manual.map(\.id))
-                                }
-                            }
-                        }
-                    } else {
-                        ToolbarItem(placement: .topBarLeading) {
-                            let execs = plan.actions.filter { !$0.done && $0.op != "unmatched" }
-                            let allSelected = !execs.isEmpty && execs.allSatisfy(\.selected)
-                            Button(allSelected ? "取消全选" : "全选") {
-                                toggleAll(selected: !allSelected)
-                            }
-                        }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left").font(.headline)
+                            .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
                     }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button("收件箱") { showInboxSheet = true }
-                        if planStore.plans.count > 1 {
-                            Menu("切换") {
-                                ForEach(planStore.plans) { p in
-                                    Button("\(p.provider) · \(p.roots.map(\.name).joined(separator: "、"))") {
-                                        selectedPlanId = p.id
-                                        batchSelectedManualIds.removeAll()
-                                    }
-                                }
-                            }
-                        }
+                    .accessibilityLabel("返回任务中心")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSearch.toggle()
+                        searchFocused = showSearch
+                        if !showSearch { searchQuery = "" }
+                    } label: {
+                        Image(systemName: "magnifyingglass").font(.headline)
+                            .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
                     }
+                    .accessibilityLabel("搜索识别结果")
                 }
             }
+            .onChange(of: manualTab) { _, _ in filterKind = .all; categoryToggleSelected = false }
             .sheet(isPresented: $showRematchSheet, onDismiss: {
                 rematchApplying = false
                 rematchError = nil
@@ -363,12 +150,6 @@ public struct PreviewTabView: View {
                         applyEpisodeStrategy(group: grp, strategy: EpisodeStrategy.fromId(grp.episodeStrategy), episodeGroupId: gid)
                     }
                 )
-            }
-            .sheet(isPresented: $showInboxSheet) {
-                PreviewInboxView { pickedPlanId in
-                    selectedPlanId = pickedPlanId
-                    batchSelectedManualIds.removeAll()
-                }
             }
             .sheet(isPresented: $showTaskPolicySheet) {
                 if let plan = activePlan {
@@ -430,6 +211,215 @@ public struct PreviewTabView: View {
         }
     }
 
+    private func previewHeader(plan: ScrapePlan, ready: [PlanGroup], manual: [PlanGroup]) -> some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("任务 ID：\(plan.id)，共 \(plan.uniqueMediaCount) 部影片")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            Picker("识别状态", selection: $manualTab) {
+                Text("可整理 (\(ready.count))").tag(false)
+                Text("待手动识别 (\(manual.count))").tag(true)
+            }
+            .pickerStyle(.segmented)
+            if showSearch {
+                HStack {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("搜索片名、目录、年份或 TMDB ID", text: $searchQuery)
+                        .focused($searchFocused).submitLabel(.search)
+                }
+                .font(.subheadline).padding(9)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+            }
+            if !manualTab {
+                HStack(spacing: 6) {
+                    ForEach(PreviewFilterKind.visibleCases) { kind in
+                        Button { selectCategory(kind, plan: plan) } label: {
+                            Text(kind.rawValue).font(.caption.weight(.medium)).lineLimit(1)
+                                .frame(maxWidth: .infinity).padding(.vertical, 7)
+                                .background(filterKind == kind ? MMTheme.accent : Color.secondary.opacity(0.12), in: Capsule())
+                                .foregroundStyle(filterKind == kind ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("再次点击全选该分组，再次点击取消全选")
+                    }
+                    Button { groupBySource.toggle() } label: {
+                        Image(systemName: groupBySource ? "folder" : "square.grid.2x2")
+                            .font(.caption).frame(width: 28, height: 28)
+                    }
+                    .accessibilityLabel(groupBySource ? "切换为按类别分组" : "切换为按来源分组")
+                }
+            }
+        }
+        .padding(.horizontal, 20).padding(.vertical, 10)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func selectCategory(_ kind: PreviewFilterKind, plan: ScrapePlan) {
+        guard filterKind == kind else { filterKind = kind; categoryToggleSelected = false; return }
+        let groups = PreviewFilter.apply(groups: plan.groups.filter { $0.kind != "unmatched" }, kind: kind, query: searchQuery, plan: plan)
+        let groupIds = Set(groups.map(\.id))
+        let actions = plan.actions.filter { groupIds.contains($0.groupId) && PlanSelection.executable($0) }
+        guard !actions.isEmpty else { return }
+        categoryToggleSelected.toggle()
+        planStore.savePlan(PlanSelection.set(plan: plan, ids: actions.map(\.id), on: categoryToggleSelected))
+    }
+
+    private func resultCards(plan: ScrapePlan, sections: [PreviewSectionGrouping.Section]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(sections) { sec in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(sec.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+
+                    ForEach(sec.groups) { group in
+                        let groupActions = plan.actions.filter { $0.groupId == group.id && $0.enabled }
+                        VStack(alignment: .leading, spacing: 8) {
+                            if group.confirmRequired {
+                                Label("需人工确认：\(group.confirmReasons.joined(separator: "、"))", systemImage: "exclamationmark.shield.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                            MediaGroupCardRow(
+                                group: group,
+                                actions: groupActions,
+                                hasTaskOverride: plan.taskPolicy != nil,
+                                isManualMode: manualTab,
+                                isBatchSelected: batchSelectedManualIds.contains(group.id),
+                                onToggleBatchManual: {
+                                    if batchSelectedManualIds.contains(group.id) {
+                                        batchSelectedManualIds.remove(group.id)
+                                    } else {
+                                        batchSelectedManualIds.insert(group.id)
+                                    }
+                                },
+                                onToggleGroup: { on in toggleGroup(groupId: group.id, selected: on) },
+                                onRematch: { season in
+                                    rematchTargets = [group]
+                                    rematchSeasonFilter = season
+                                    showRematchSheet = true
+                                },
+                                onParkRetention: {
+                                    parkToRetention(plan: plan, group: group, actions: groupActions)
+                                },
+                                detailDestination: {
+                                    MediaDetailView(
+                                        planId: plan.id,
+                                        groupId: group.id,
+                                        onRematch: {
+                                            let latest = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
+                                            rematchTargets = [latest]
+                                            rematchSeasonFilter = nil
+                                            showRematchSheet = true
+                                        },
+                                        onEditPolicy: {
+                                            editingFilmPolicyGroup = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
+                                        },
+                                        onEditAssets: {
+                                            editingAssetsGroup = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
+                                        },
+                                        onEditEpisodeStrategy: group.kind == "tv" ? {
+                                            let latest = activePlan?.groups.first(where: { $0.id == group.id }) ?? group
+                                            strategyError = nil
+                                            strategyEpisodeGroups = []
+                                            editingStrategyGroup = latest
+                                            if let tid = latest.tmdbId {
+                                                strategyLoadEpoch += 1
+                                                let epoch = strategyLoadEpoch
+                                                let targetGid = group.id
+                                                Task {
+                                                    let loaded = await TmdbClient.shared.tvEpisodeGroups(tvId: tid)
+                                                    await MainActor.run {
+                                                        guard strategyLoadEpoch == epoch, editingStrategyGroup?.id == targetGid else { return }
+                                                        strategyEpisodeGroups = loaded
+                                                    }
+                                                }
+                                            }
+                                        } : nil
+                                    )
+                                }
+                            )
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 12)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    @ViewBuilder
+    private func bottomActions(plan: ScrapePlan, manual: [PlanGroup]) -> some View {
+        let selectedCount = ExecutionEngine.executableActionIds(plan: plan).count
+        if manualTab && !batchSelectedManualIds.isEmpty {
+            HStack {
+                Text("已选 \(batchSelectedManualIds.count) 组待确认项").font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    rematchTargets = manual.filter { batchSelectedManualIds.contains($0.id) }
+                    rematchSeasonFilter = nil
+                    showRematchSheet = true
+                } label: {
+                    Text("批量匹配 (\(batchSelectedManualIds.count))")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background(MMTheme.accent, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding()
+            .background(.bar)
+        } else if !manualTab {
+            HStack(spacing: 12) {
+                Button {
+                    showTaskPolicySheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(MMTheme.accent)
+                        Text("任务策略")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Color(.label))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+                    .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    execute(plan: plan)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: ExecutionEngine.shared.isRunning ? "text.badge.plus" : "play.fill")
+                        Text(ExecutionEngine.shared.isRunning ? "加入队列" : "立即执行")
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .frame(maxWidth: .infinity).frame(height: 38)
+                    .foregroundStyle(.white).background(MMTheme.accent, in: Capsule())
+                    .shadow(color: MMTheme.accent.opacity(0.28), radius: 8, y: 3)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedCount == 0)
+                .opacity(selectedCount == 0 ? 0.5 : 1)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(.bar)
+        }
+    }
+
     private func applyTaskPolicy(_ override: PolicyOverride?) {
         guard var plan = activePlan else { return }
         let global = AppSettings.shared.policies
@@ -457,8 +447,12 @@ public struct PreviewTabView: View {
         }
         do {
             let drive = try AccountStore.shared.buildDrive(for: acct)
-            ExecutionEngine.shared.enqueueOrStart(plan: plan, drive: drive)
-            onStartExecution()
+            if ExecutionEngine.shared.enqueueOrStart(plan: plan, drive: drive) {
+                onStartExecution()
+                dismiss()
+            } else {
+                errorMsg = ExecutionEngine.shared.lastStartError
+            }
         } catch {
             errorMsg = error.localizedDescription
         }
@@ -499,10 +493,6 @@ public struct PreviewTabView: View {
         }
     }
 
-    private func toggleAll(selected: Bool) {
-        guard let plan = activePlan else { return }
-        PlanAndTaskStore.shared.savePlan(PlanSelection.setAll(plan: plan, on: selected))
-    }
 
     private func toggleGroup(groupId: String, selected: Bool) {
         guard let plan = activePlan else { return }
