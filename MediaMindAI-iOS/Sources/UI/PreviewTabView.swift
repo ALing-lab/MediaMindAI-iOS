@@ -432,8 +432,14 @@ public struct PreviewTabView: View {
 
     private func applyTaskPolicy(_ override: PolicyOverride?) {
         guard var plan = activePlan else { return }
+        let global = AppSettings.shared.policies
         plan.taskPolicy = override
-        plan = PolicyResolver.applyOverrides(to: plan, global: AppSettings.shared.policies)
+        plan = PolicyResolver.applyOverrides(to: plan, global: global)
+        let mergeEnabled = plan.taskPolicy?.mergeSeries ?? global.mergeSeries
+        let mergeMovies = plan.taskPolicy?.mergeMovieSeries ?? global.mergeMovieSeries
+        let mergeTv = plan.taskPolicy?.mergeTvSeries ?? global.mergeTvSeries
+        let appendTag = (plan.taskPolicy?.movieNaming ?? global.movieNaming).folderTmdbEnabled
+        plan = SeriesMerger.mergeIfEnabled(plan, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
         PlanAndTaskStore.shared.savePlan(plan)
     }
 

@@ -534,11 +534,11 @@ private struct AiSettingsView: View {
             }
 
             Section("AI 服务商（支持 5 家国内直连预设）") {
-                Picker("服务商", selection: $settings.aiProviderId) {
-                    ForEach(AiProviderPreset.all) { p in
-                        Text(p.label).tag(p.id)
-                    }
-                }
+                OptionSheetPickerRow(
+                    "服务商",
+                    selection: $settings.aiProviderId,
+                    options: AiProviderPreset.all.map { ($0.id, $0.label) }
+                )
                 .onChange(of: settings.aiProviderId) { _, newId in
                     let p = AiProviderPreset.of(newId)
                     settings.aiBaseUrl = p.defaultBaseUrl
@@ -563,12 +563,16 @@ private struct AiSettingsView: View {
             }
 
             Section("AI 网络代理") {
-                Picker("代理模式", selection: $settings.aiProxyType) {
-                    Text("直连").tag(AiRecognizerConfig.proxyNone)
-                    Text("复用 TMDB 代理").tag(AiRecognizerConfig.proxyFollowTmdb)
-                    Text("HTTP 代理").tag(AiRecognizerConfig.proxyHttp)
-                    Text("SOCKS5 代理").tag(AiRecognizerConfig.proxySocks)
-                }
+                OptionSheetPickerRow(
+                    "代理模式",
+                    selection: $settings.aiProxyType,
+                    options: [
+                        (AiRecognizerConfig.proxyNone, "直连"),
+                        (AiRecognizerConfig.proxyFollowTmdb, "复用 TMDB 代理"),
+                        (AiRecognizerConfig.proxyHttp, "HTTP 代理"),
+                        (AiRecognizerConfig.proxySocks, "SOCKS5 代理")
+                    ]
+                )
                 if settings.aiProxyType == AiRecognizerConfig.proxyFollowTmdb && settings.tmdbProxyType == "none" {
                     Text("当前 TMDB 未配置代理，复用模式下将直连").font(.caption).foregroundStyle(.orange)
                 }

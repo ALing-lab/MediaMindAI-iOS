@@ -89,11 +89,15 @@ public struct TmdbSettingsView: View {
             }
 
             Section("TMDB 专用代理（可选）") {
-                Picker("代理类型", selection: $settings.tmdbProxyType) {
-                    Text("不使用代理").tag("none")
-                    Text("HTTP 代理").tag("http")
-                    Text("SOCKS 代理").tag("socks")
-                }
+                OptionSheetPickerRow(
+                    "代理类型",
+                    selection: $settings.tmdbProxyType,
+                    options: [
+                        ("none", "不使用代理"),
+                        ("http", "HTTP 代理"),
+                        ("socks", "SOCKS 代理")
+                    ]
+                )
                 if settings.tmdbProxyType != "none" {
                     TextField("代理主机（如 127.0.0.1）", text: $settings.tmdbProxyHost)
                         .textInputAutocapitalization(.never)

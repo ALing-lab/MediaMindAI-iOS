@@ -854,19 +854,21 @@ public struct MediaDetailView: View {
     private func loadMetadata(for g: PlanGroup, pageList: [DetailPage], eff: EffectivePolicy) async {
         guard let tid = g.tmdbId, tid > 0 else { return }
 
-        if eff.scrapeEnabled && eff.downloadClearlogo && fetchedClearlogoPath == nil {
-            let kind = g.kind == "tv" ? "tv" : "movie"
-            let logo = await TmdbClient.shared.clearlogoPath(kind: kind, id: tid)
-            guard !Task.isCancelled else { return }
-            fetchedClearlogoPath = logo
-        }
+        if g.kind != "collection" {
+            if eff.scrapeEnabled && eff.downloadClearlogo && fetchedClearlogoPath == nil {
+                let kind = g.kind == "tv" ? "tv" : "movie"
+                let logo = await TmdbClient.shared.clearlogoPath(kind: kind, id: tid)
+                guard !Task.isCancelled else { return }
+                fetchedClearlogoPath = logo
+            }
 
-        if eff.scrapeEnabled && eff.downloadFanart && fetchedBackdropPath == nil {
-            let bp = g.kind == "tv"
-                ? await TmdbClient.shared.tvDetails(id: tid)?.backdropPath
-                : await TmdbClient.shared.movieDetails(id: tid)?.backdropPath
-            guard !Task.isCancelled else { return }
-            fetchedBackdropPath = bp
+            if eff.scrapeEnabled && eff.downloadFanart && fetchedBackdropPath == nil {
+                let bp = g.kind == "tv"
+                    ? await TmdbClient.shared.tvDetails(id: tid)?.backdropPath
+                    : await TmdbClient.shared.movieDetails(id: tid)?.backdropPath
+                guard !Task.isCancelled else { return }
+                fetchedBackdropPath = bp
+            }
         }
 
         if g.kind == "tv" {

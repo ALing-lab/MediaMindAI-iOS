@@ -6,53 +6,125 @@ public enum SeriesMerger {
     /// 对扫描生成的计划执行跨目录归并：
     /// 1. 同一 TMDB 合集的 2 部以上独立电影目录（且位于同一父目录下）→ 建立 `{tmdb-collection-ID}` 目录并移入；
     /// 2. 同一 TMDB ID 的多季独立剧集目录 → 合并到主剧集目录并保留各自 Season 文件夹。
-    public static func mergeIfEnabled(_ plan: ScrapePlan, enabled: Bool, appendTag: Bool) -> ScrapePlan {
-        guard enabled else { return plan }
+    public static func mergeIfEnabled(
+        _ plan: ScrapePlan,
+        enabled: Bool,
+        appendTag: Bool,
+        mergeMovies: Bool? = nil,
+        mergeTv: Bool? = nil
+    ) -> ScrapePlan {
+        let doMovies = enabled && (mergeMovies ?? true)
+        let doTv = enabled && (mergeTv ?? true)
+        guard doMovies || doTv else { return plan }
         var out = plan
 
-        // 1. 跨目录同剧多季归并
-        let tvGroups = out.groups.filter { $0.kind == "tv" && $0.tmdbId != nil }
+        // 1. 跨目录同剧多季归并：自动提级 Season XX 子目录 / 重定向缺失季 mkdir 至主剧集目录，避免多套一层外层目录
+        let tvGroups = doTv ? out.groups.filter { $0.kind == "tv" && $0.tmdbId != nil } : []
         let byShow = Dictionary(grouping: tvGroups) { $0.tmdbId ?? -1 }.filter { $0.key > 0 && $0.value.count >= 2 }
         for (showId, list) in byShow {
             let primary = list[0]
             guard let primaryFolderId = primary.folderId else { continue }
             for dup in list.dropFirst() {
                 guard let dupFolderId = dup.folderId, dupFolderId != primaryFolderId else { continue }
-                if out.actions.contains(where: { $0.op == "move" && $0.kind == "folder" && $0.fileId == dupFolderId && $0.destParentId == primaryFolderId }) {
-                    continue
+
+                // 情况 A：dup 下本来就存在待新建的 Season XX mkdir（散落文件），直接把 mkdir 父目录重定向到 primaryFolderId
+                var redirectedSeasonMkdir = false
+                for aIdx in out.actions.indices {
+                    let a = out.actions[aIdx]
+                    if a.groupId == dup.id && a.op == "mkdir" && a.kind == "folder" && a.parentId == dupFolderId && a.season != nil {
+                        out.actions[aIdx].parentId = primaryFolderId
+                        out.actions[aIdx].destParentId = primaryFolderId
+                        redirectedSeasonMkdir = true
+                    }
                 }
-                let origParent = out.actions.first(where: { $0.fileId == dupFolderId })?.parentId
-                let moveAct = PlanAction(
-                    id: "merge-\(UUID().uuidString.prefix(8).lowercased())",
-                    op: "move",
-                    groupId: primary.id,
-                    fileId: dupFolderId,
-                    parentId: origParent,
-                    oldName: dup.folderName,
-                    newName: dup.folderName,
-                    destParentId: primaryFolderId,
-                    destRef: nil,
-                    kind: "folder",
-                    mediaKind: "tv",
-                    tmdbId: showId,
-                    season: nil,
-                    episode: nil,
-                    artworkUrl: nil,
-                    selected: true,
-                    done: false,
-                    error: nil,
-                    note: "同剧多季跨目录归并至《\(primary.title)》"
-                )
-                out.actions.append(moveAct)
-                if let pIdx = out.groups.firstIndex(where: { $0.id == primary.id }) {
-                    out.groups[pIdx].actionIds.append(moveAct.id)
+
+                // 情况 B：dup 内已有独立的季子目录（如 Season 02 / S02），直接把季子目录移入 primaryFolderId 成为主剧集下的 Season XX
+                var seasonSubdirIds: [(id: String, name: String, season: Int?)] = []
+                var seenSubIds = Set<String>()
+                for a in out.actions where a.groupId == dup.id {
+                    if a.op == "rename" && a.kind == "folder" && a.fileId != dupFolderId,
+                       let fid = a.fileId, a.parentId == dupFolderId, !seenSubIds.contains(fid) {
+                        seenSubIds.insert(fid)
+                        seasonSubdirIds.append((fid, a.newName.isEmpty ? a.oldName : a.newName, a.season))
+                    } else if (a.kind == "file" || a.kind == "subtitle" || a.kind == "companion"),
+                              let pid = a.parentId, pid != dupFolderId, !seenSubIds.contains(pid) {
+                        seenSubIds.insert(pid)
+                        let sLabel = a.season.map { StandardNaming.seasonDirName($0) } ?? dup.folderName
+                        seasonSubdirIds.append((pid, sLabel, a.season))
+                    }
                 }
-                out.flags.append("同剧多季归并：已将「\(dup.folderName)」规划移入「\(primary.folderName)」")
+
+                if !seasonSubdirIds.isEmpty {
+                    for sub in seasonSubdirIds {
+                        if out.actions.contains(where: { $0.op == "move" && $0.kind == "folder" && $0.fileId == sub.id && $0.destParentId == primaryFolderId }) {
+                            continue
+                        }
+                        let moveAct = PlanAction(
+                            id: "merge-\(UUID().uuidString.prefix(8).lowercased())",
+                            op: "move",
+                            groupId: primary.id,
+                            fileId: sub.id,
+                            parentId: dupFolderId,
+                            oldName: sub.name,
+                            newName: sub.name,
+                            destParentId: primaryFolderId,
+                            destRef: nil,
+                            kind: "folder",
+                            mediaKind: "tv",
+                            tmdbId: showId,
+                            season: sub.season,
+                            episode: nil,
+                            artworkUrl: nil,
+                            selected: true,
+                            done: false,
+                            error: nil,
+                            note: "同剧多季归并：将「\(sub.name)」直接移入《\(primary.title)》"
+                        )
+                        out.actions.append(moveAct)
+                        if let pIdx = out.groups.firstIndex(where: { $0.id == primary.id }) {
+                            out.groups[pIdx].actionIds.append(moveAct.id)
+                        }
+                    }
+                    out.flags.append("同剧多季归并：已将「\(dup.folderName)」季目录合并至「\(primary.folderName)」")
+                } else if redirectedSeasonMkdir {
+                    out.flags.append("同剧多季归并：已将「\(dup.folderName)」分集规划移入「\(primary.folderName)」")
+                } else {
+                    if out.actions.contains(where: { $0.op == "move" && $0.kind == "folder" && $0.fileId == dupFolderId && $0.destParentId == primaryFolderId }) {
+                        continue
+                    }
+                    let origParent = out.actions.first(where: { $0.fileId == dupFolderId })?.parentId
+                    let moveAct = PlanAction(
+                        id: "merge-\(UUID().uuidString.prefix(8).lowercased())",
+                        op: "move",
+                        groupId: primary.id,
+                        fileId: dupFolderId,
+                        parentId: origParent,
+                        oldName: dup.folderName,
+                        newName: dup.folderName,
+                        destParentId: primaryFolderId,
+                        destRef: nil,
+                        kind: "folder",
+                        mediaKind: "tv",
+                        tmdbId: showId,
+                        season: nil,
+                        episode: nil,
+                        artworkUrl: nil,
+                        selected: true,
+                        done: false,
+                        error: nil,
+                        note: "同剧多季跨目录归并至《\(primary.title)》"
+                    )
+                    out.actions.append(moveAct)
+                    if let pIdx = out.groups.firstIndex(where: { $0.id == primary.id }) {
+                        out.groups[pIdx].actionIds.append(moveAct.id)
+                    }
+                    out.flags.append("同剧多季归并：已将「\(dup.folderName)」规划移入「\(primary.folderName)」")
+                }
             }
         }
 
         // 2. 跨目录同系列电影合集归并（同一父目录下 2 部以上属于同一 TMDB Collection 的独立电影目录）
-        let movieColGroups = out.groups.filter { $0.kind == "movie" && $0.collectionId != nil && $0.folderId != nil }
+        let movieColGroups = doMovies ? out.groups.filter { $0.kind == "movie" && $0.collectionId != nil && $0.folderId != nil } : []
         let byCol = Dictionary(grouping: movieColGroups) { $0.collectionId ?? -1 }.filter { $0.key > 0 && $0.value.count >= 2 }
         for (cid, list) in byCol {
             // 仅当这些电影目录共享同一个父目录时才建合集文件夹，避免跨磁盘/跨根目录误移
@@ -119,18 +191,18 @@ public enum SeriesMerger {
             out.flags.append("同系列电影归并：已将 \(list.count) 部《\(colName)》电影规划归入「\(colFolderName)」")
         }
 
-        return mergeSplitTvSeasons(out)
+        return mergeSplitTvSeasons(out, mergeMovies: doMovies, mergeTv: doTv)
     }
 
     /// 跨文件夹合并同剧多季与同系列电影合集为同一张作品卡（即使文件分散在不同目录）。
-    public static func mergeSplitTvSeasons(_ plan: ScrapePlan) -> ScrapePlan {
+    public static func mergeSplitTvSeasons(_ plan: ScrapePlan, mergeMovies: Bool = true, mergeTv: Bool = true) -> ScrapePlan {
         var remap: [String: String] = [:]
         var upgradedCollectionTitle: [String: String] = [:]
         var droppedDuplicateFolderRenameIds = Set<String>()
         var extraFlags: [String] = []
 
         // 1. 同一 TMDB 剧集（即使分散在不同目录）统一合并到主作品卡
-        let tvGroups = plan.groups.filter { $0.kind == "tv" && ($0.tmdbId ?? 0) > 0 }
+        let tvGroups = mergeTv ? plan.groups.filter { $0.kind == "tv" && ($0.tmdbId ?? 0) > 0 } : []
         let byShow = Dictionary(grouping: tvGroups) { $0.tmdbId ?? -1 }
         for (_, bucket) in byShow where bucket.count >= 2 {
             let primary = bucket[0]
@@ -152,7 +224,7 @@ public enum SeriesMerger {
         }
 
         // 2. 同一 TMDB 系列电影合集（即使分散在不同目录）统一合并为一张合集作品卡
-        let movieGroups = plan.groups.filter { $0.kind == "movie" && ($0.collectionId ?? 0) > 0 }
+        let movieGroups = mergeMovies ? plan.groups.filter { $0.kind == "movie" && ($0.collectionId ?? 0) > 0 } : []
         let byCollection = Dictionary(grouping: movieGroups) { $0.collectionId ?? -1 }
         for (_, bucket) in byCollection where bucket.count >= 2 {
             let primary = bucket[0]

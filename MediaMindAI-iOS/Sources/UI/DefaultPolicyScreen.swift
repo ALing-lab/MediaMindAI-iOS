@@ -272,11 +272,15 @@ public struct DefaultPolicyScreen: View {
             }
             Toggle("文件重命名", isOn: policiesBinding.renameFiles)
             Toggle("文件夹重命名", isOn: policiesBinding.renameFolders)
-            Toggle("整理季目录", isOn: policiesBinding.seasonFolders)
+            if !isScopedOverride {
+                Toggle("整理季目录", isOn: policiesBinding.seasonFolders)
+            }
         } header: {
             Text("整理开关")
         } footer: {
-            Text("关闭季目录时，依赖该目录的移动和素材操作也会关闭。")
+            if !isScopedOverride {
+                Text("关闭季目录时，依赖该目录的移动和素材操作也会关闭。")
+            }
         }
 
         Section("实时命名预览") {
@@ -316,30 +320,14 @@ public struct DefaultPolicyScreen: View {
             Section(organizeIsTv ? "剧集文件名偏好" : "电影文件名偏好") {
                 Toggle("TMDB 标签", isOn: activeNamingBinding.fileTmdbEnabled)
                 if activeNamingBinding.wrappedValue.fileTmdbEnabled {
-                    Picker("TMDB 标签样式", selection: activeNamingBinding.fileTmdbStyle) {
-                        ForEach(tmdbStyles, id: \.value) { opt in
-                            Text(opt.label).tag(opt.value)
-                        }
-                    }
+                    OptionSheetPickerRow("TMDB 标签样式", selection: activeNamingBinding.fileTmdbStyle, options: tmdbStyles)
                 }
-                Picker("文件名分隔符", selection: activeNamingBinding.fileSeparator) {
-                    ForEach(separators, id: \.value) { opt in
-                        Text(opt.label).tag(opt.value)
-                    }
-                }
+                OptionSheetPickerRow("文件名分隔符", selection: activeNamingBinding.fileSeparator, options: separators)
                 Toggle("文件名年份", isOn: activeNamingBinding.fileYearEnabled)
                 if activeNamingBinding.wrappedValue.fileYearEnabled {
-                    Picker("年份样式", selection: activeNamingBinding.fileYearStyle) {
-                        ForEach(yearStyles, id: \.value) { opt in
-                            Text(opt.label).tag(opt.value)
-                        }
-                    }
+                    OptionSheetPickerRow("年份样式", selection: activeNamingBinding.fileYearStyle, options: yearStyles)
                 }
-                Picker("文件名语言偏好", selection: activeNamingBinding.fileLanguage) {
-                    ForEach(langOptions, id: \.value) { opt in
-                        Text(opt.label).tag(opt.value)
-                    }
-                }
+                OptionSheetPickerRow("文件名语言偏好", selection: activeNamingBinding.fileLanguage, options: langOptions)
                 Toggle("保留附加信息", isOn: activeNamingBinding.keepExtraInfo)
                 if activeNamingBinding.wrappedValue.keepExtraInfo {
                     Toggle("分辨率（如 2160p、1080p）", isOn: activeNamingBinding.keepResolution)
@@ -358,71 +346,57 @@ public struct DefaultPolicyScreen: View {
                 Toggle("与文件名保持一致", isOn: activeNamingBinding.folderMatchFileName)
                 Toggle("TMDB 标签", isOn: activeNamingBinding.folderTmdbEnabled)
                 if activeNamingBinding.wrappedValue.folderTmdbEnabled {
-                    Picker("TMDB 标签样式", selection: activeNamingBinding.folderTmdbStyle) {
-                        ForEach(tmdbStyles, id: \.value) { opt in
-                            Text(opt.label).tag(opt.value)
-                        }
-                    }
+                    OptionSheetPickerRow("TMDB 标签样式", selection: activeNamingBinding.folderTmdbStyle, options: tmdbStyles)
                 }
-                Picker("文件夹分隔符", selection: activeNamingBinding.folderSeparator) {
-                    ForEach(separators, id: \.value) { opt in
-                        Text(opt.label).tag(opt.value)
-                    }
-                }
+                OptionSheetPickerRow("文件夹分隔符", selection: activeNamingBinding.folderSeparator, options: separators)
                 Toggle("文件夹年份", isOn: activeNamingBinding.folderYearEnabled)
                 if activeNamingBinding.wrappedValue.folderYearEnabled {
-                    Picker("年份样式", selection: activeNamingBinding.folderYearStyle) {
-                        ForEach(yearStyles, id: \.value) { opt in
-                            Text(opt.label).tag(opt.value)
-                        }
-                    }
+                    OptionSheetPickerRow("年份样式", selection: activeNamingBinding.folderYearStyle, options: yearStyles)
                 }
                 if !activeNamingBinding.wrappedValue.folderMatchFileName {
-                    Picker("文件夹语言偏好", selection: activeNamingBinding.folderLanguage) {
-                        ForEach(langOptions, id: \.value) { opt in
-                            Text(opt.label).tag(opt.value)
-                        }
-                    }
+                    OptionSheetPickerRow("文件夹语言偏好", selection: activeNamingBinding.folderLanguage, options: langOptions)
                 }
             }
         }
 
-        Section {
-            Toggle("启用自定义归档目标库", isOn: policiesBinding.adaptiveDirectory)
-            if currentPolicies.adaptiveDirectory {
-                Button {
-                    showDestinationPicker = true
-                } label: {
-                    HStack {
-                        Text("目标媒体库目录").foregroundStyle(.primary)
-                        Spacer()
-                        Text(currentPolicies.adaptiveTargetDirPath.isEmpty ? "点击选择" : currentPolicies.adaptiveTargetDirPath)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+        if !isScopedOverride {
+            Section {
+                Toggle("启用自定义归档目标库", isOn: policiesBinding.adaptiveDirectory)
+                if currentPolicies.adaptiveDirectory {
+                    Button {
+                        showDestinationPicker = true
+                    } label: {
+                        HStack {
+                            Text("目标媒体库目录").foregroundStyle(.primary)
+                            Spacer()
+                            Text(currentPolicies.adaptiveTargetDirPath.isEmpty ? "点击选择" : currentPolicies.adaptiveTargetDirPath)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
-                }
-                .disabled(AccountStore.shared.activeAccount == nil)
+                    .disabled(AccountStore.shared.activeAccount == nil)
 
-                if !currentPolicies.adaptiveTargetDirId.isEmpty {
-                    Button("清除已选目标目录", role: .destructive) {
-                        var next = policiesBinding.wrappedValue
-                        next.adaptiveTargetDirId = ""
-                        next.adaptiveTargetDirPath = ""
-                        policiesBinding.wrappedValue = next
+                    if !currentPolicies.adaptiveTargetDirId.isEmpty {
+                        Button("清除已选目标目录", role: .destructive) {
+                            var next = policiesBinding.wrappedValue
+                            next.adaptiveTargetDirId = ""
+                            next.adaptiveTargetDirPath = ""
+                            policiesBinding.wrappedValue = next
+                        }
                     }
                 }
+                Toggle("确定重复项自动移入保留区", isOn: policiesBinding.autoMoveConfirmedDuplicates)
+            } header: {
+                Text("目标库归档与重复处理")
+            } footer: {
+                Text(AccountStore.shared.activeAccount == nil
+                     ? "请先在「网盘账号」中登录一个账号，再选择自定义归档目标目录。"
+                     : "开启目标库归档后，整理完成的作品将按标准分类目录归档至指定根目录；疑似重复仍默认原位保留。")
             }
-            Toggle("确定重复项自动移入保留区", isOn: policiesBinding.autoMoveConfirmedDuplicates)
-        } header: {
-            Text("目标库归档与重复处理")
-        } footer: {
-            Text(AccountStore.shared.activeAccount == nil
-                 ? "请先在「网盘账号」中登录一个账号，再选择自定义归档目标目录。"
-                 : "开启目标库归档后，整理完成的作品将按标准分类目录归档至指定根目录；疑似重复仍默认原位保留。")
         }
     }
 
@@ -449,19 +423,21 @@ public struct DefaultPolicyScreen: View {
             Text("刮削文件策略")
         } footer: {
             Text(!currentPolicies.scrapeEnabled
-                 ? "全局已关闭海报与 NFO 刮削，扫描与执行时仅做文件整理。"
+                 ? "已关闭刮削，仅执行文件与目录整理。"
                  : (currentPolicies.fullScrape
                     ? "重新生成所选素材，同名旧文件先备份。"
-                    : "默认只补缺失项：复用历史影视匹配，仍实时检查文件是否存在。"))
+                    : "只补缺失项：复用历史匹配并实时核查文件。"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.88)
         }
 
         if currentPolicies.scrapeEnabled {
             Section {
-                Picker("图片清晰度", selection: policiesBinding.imageQuality) {
-                    ForEach(ImageQualityOption.allCases, id: \.self) { q in
-                        Text(q.label).tag(q)
-                    }
-                }
+                OptionSheetPickerRow(
+                    "图片清晰度",
+                    selection: policiesBinding.imageQuality,
+                    options: ImageQualityOption.allCases.map { ($0, $0.label) }
+                )
             } header: {
                 Text("海报下载设置")
             } footer: {
@@ -570,12 +546,23 @@ public struct DefaultPolicyScreen: View {
             }
         }
 
-        Section {
-            Toggle("合并同系列（电影合集 / 同剧多季）", isOn: policiesBinding.mergeSeries)
-        } header: {
-            Text("同系列归并")
-        } footer: {
-            Text("开启后：同系列电影归并至带 {tmdb-collection-ID} 的系列目录，不同位置的同剧多季归并至主剧目录并保留实际季号。")
+        if !isScopedOverride {
+            Section {
+                Toggle("合并同系列（电影合集 / 同剧多季）", isOn: policiesBinding.mergeSeries)
+            } header: {
+                Text("同系列归并")
+            } footer: {
+                Text("开启后：同系列电影归并至带 {tmdb-collection-ID} 的系列目录，不同位置的同剧多季归并至主剧目录并保留实际季号。")
+            }
+        } else if case .task = layerMode, settings.policies.mergeSeries {
+            Section {
+                Toggle("合并同系列（电影）", isOn: policiesBinding.mergeMovieSeries)
+                Toggle("合并同系列（剧集）", isOn: policiesBinding.mergeTvSeries)
+            } header: {
+                Text("同系列归并")
+            } footer: {
+                Text("可分别控制本次任务中同系列电影合集与跨目录同剧多季是否自动归并。")
+            }
         }
     }
 

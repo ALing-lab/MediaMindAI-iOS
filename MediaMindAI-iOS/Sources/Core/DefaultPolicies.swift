@@ -188,6 +188,8 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
     public var renameFolders: Bool = true
     public var seasonFolders: Bool = true
     public var mergeSeries: Bool = true
+    public var mergeMovieSeries: Bool = true
+    public var mergeTvSeries: Bool = true
     public var episodeStrategy: String = EpisodeStrategy.original.rawValue
     public var fullScrape: Bool = false
     public var imageQuality: ImageQualityOption = .standard
@@ -207,7 +209,7 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case organizeEnabled, scrapeEnabled, renameFiles, renameFolders, seasonFolders
-        case mergeSeries, episodeStrategy, fullScrape, imageQuality
+        case mergeSeries, mergeMovieSeries, mergeTvSeries, episodeStrategy, fullScrape, imageQuality
         case movieNaming, tvNaming, movie, tv
         case seasonPoster, episodeNfo, episodeThumb
         case adaptiveDirectory, adaptiveTargetDirId, adaptiveTargetDirPath, autoMoveConfirmedDuplicates
@@ -221,6 +223,8 @@ public struct DefaultPolicies: Codable, Hashable, Sendable {
         self.renameFolders = try c.decodeIfPresent(Bool.self, forKey: .renameFolders) ?? true
         self.seasonFolders = try c.decodeIfPresent(Bool.self, forKey: .seasonFolders) ?? true
         self.mergeSeries = try c.decodeIfPresent(Bool.self, forKey: .mergeSeries) ?? true
+        self.mergeMovieSeries = try c.decodeIfPresent(Bool.self, forKey: .mergeMovieSeries) ?? true
+        self.mergeTvSeries = try c.decodeIfPresent(Bool.self, forKey: .mergeTvSeries) ?? true
         self.episodeStrategy = try c.decodeIfPresent(String.self, forKey: .episodeStrategy) ?? EpisodeStrategy.original.rawValue
         self.fullScrape = try c.decodeIfPresent(Bool.self, forKey: .fullScrape) ?? false
         self.imageQuality = try c.decodeIfPresent(ImageQualityOption.self, forKey: .imageQuality) ?? .standard
@@ -262,6 +266,8 @@ public extension DefaultPolicies {
         if let v = ov.renameFolders { out.renameFolders = v }
         if let v = ov.seasonFolders { out.seasonFolders = v }
         if let v = ov.mergeSeries { out.mergeSeries = v }
+        if let v = ov.mergeMovieSeries { out.mergeMovieSeries = v }
+        if let v = ov.mergeTvSeries { out.mergeTvSeries = v }
         if let v = ov.episodeStrategy { out.episodeStrategy = v }
         if let v = ov.fullScrape { out.fullScrape = v }
         if let v = ov.imageQuality { out.imageQuality = v }
@@ -290,6 +296,8 @@ public extension DefaultPolicies {
         if renameFolders != base.renameFolders { ov.renameFolders = renameFolders }
         if seasonFolders != base.seasonFolders { ov.seasonFolders = seasonFolders }
         if mergeSeries != base.mergeSeries { ov.mergeSeries = mergeSeries }
+        if mergeMovieSeries != base.mergeMovieSeries { ov.mergeMovieSeries = mergeMovieSeries }
+        if mergeTvSeries != base.mergeTvSeries { ov.mergeTvSeries = mergeTvSeries }
         if episodeStrategy != base.episodeStrategy { ov.episodeStrategy = episodeStrategy }
         if fullScrape != base.fullScrape { ov.fullScrape = fullScrape }
         if imageQuality != base.imageQuality { ov.imageQuality = imageQuality }
@@ -323,6 +331,8 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
     public var renameFolders: Bool?
     public var seasonFolders: Bool?
     public var mergeSeries: Bool?
+    public var mergeMovieSeries: Bool?
+    public var mergeTvSeries: Bool?
     public var episodeStrategy: String?
     public var fullScrape: Bool?
     public var imageQuality: ImageQualityOption?
@@ -347,6 +357,8 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         renameFolders: Bool? = nil,
         seasonFolders: Bool? = nil,
         mergeSeries: Bool? = nil,
+        mergeMovieSeries: Bool? = nil,
+        mergeTvSeries: Bool? = nil,
         episodeStrategy: String? = nil,
         fullScrape: Bool? = nil,
         imageQuality: ImageQualityOption? = nil,
@@ -370,6 +382,8 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         self.renameFolders = renameFolders
         self.seasonFolders = seasonFolders
         self.mergeSeries = mergeSeries
+        self.mergeMovieSeries = mergeMovieSeries
+        self.mergeTvSeries = mergeTvSeries
         self.episodeStrategy = episodeStrategy
         self.fullScrape = fullScrape
         self.imageQuality = imageQuality
@@ -397,6 +411,8 @@ public struct EffectivePolicy: Hashable, Sendable {
     public let renameFolders: Bool
     public let seasonFolders: Bool
     public let mergeSeries: Bool
+    public let mergeMovieSeries: Bool
+    public let mergeTvSeries: Bool
     public let fullScrape: Bool
     public let imageQuality: ImageQualityOption
     public let naming: MediaNamingPrefs
@@ -435,6 +451,8 @@ public enum PolicyResolver {
             renameFolders: film?.renameFolders ?? task?.renameFolders ?? global.renameFolders,
             seasonFolders: film?.seasonFolders ?? task?.seasonFolders ?? global.seasonFolders,
             mergeSeries: film?.mergeSeries ?? task?.mergeSeries ?? global.mergeSeries,
+            mergeMovieSeries: (film?.mergeSeries ?? task?.mergeSeries ?? global.mergeSeries) && (film?.mergeMovieSeries ?? task?.mergeMovieSeries ?? global.mergeMovieSeries),
+            mergeTvSeries: (film?.mergeSeries ?? task?.mergeSeries ?? global.mergeSeries) && (film?.mergeTvSeries ?? task?.mergeTvSeries ?? global.mergeTvSeries),
             fullScrape: film?.fullScrape ?? task?.fullScrape ?? global.fullScrape,
             imageQuality: film?.imageQuality ?? task?.imageQuality ?? global.imageQuality,
             naming: filmNaming ?? taskNaming ?? baseNaming,
@@ -475,6 +493,7 @@ public enum PolicyResolver {
                 $0.groupId == group.id && $0.op == "mkdir" && $0.mediaKind == "collection"
             })
             var disabledMkdirIds: [String] = []
+            var disabledSeasonIds: [String] = []
             for aIdx in out.actions.indices where out.actions[aIdx].groupId == group.id && !out.actions[aIdx].done {
                 let act = out.actions[aIdx]
                 if isCollection && hasCollectionMkdir && act.op == "mkdir" && act.mediaKind == "collection" {
@@ -487,9 +506,15 @@ public enum PolicyResolver {
                     if act.fileId == group.folderId && act.season == nil && (!isCollection || !hasCollectionMkdir) {
                         out.actions[aIdx].newName = targetFolder
                     }
-                    let enableFolder = eff.organizeEnabled && eff.renameFolders
+                    let enableFolder = eff.organizeEnabled && eff.renameFolders && (act.season == nil || eff.seasonFolders)
                     out.actions[aIdx].enabled = enableFolder
                     out.actions[aIdx].selected = enableFolder
+                    if act.season != nil && !enableFolder { disabledSeasonIds.append(act.id) }
+                } else if isTv && act.season != nil && ((act.op == "mkdir" && act.kind == "folder") || (act.op == "move" && act.kind != "folder")) {
+                    let enableSeason = eff.organizeEnabled && eff.seasonFolders
+                    out.actions[aIdx].enabled = enableSeason
+                    out.actions[aIdx].selected = enableSeason
+                    if !enableSeason { disabledSeasonIds.append(act.id) }
                 } else if act.op == "rename" && act.kind == "file" {
                     if !isCollection {
                         let (oldStem, ext) = MediaParser.splitNameExt(act.oldName)
@@ -549,8 +574,9 @@ public enum PolicyResolver {
                     out.actions[aIdx].selected = enableArt
                 }
             }
-            if !disabledMkdirIds.isEmpty {
-                out = PlanSelection.setEnabled(plan: out, ids: disabledMkdirIds, enabled: false)
+            let cascadeDisable = disabledMkdirIds + disabledSeasonIds
+            if !cascadeDisable.isEmpty {
+                out = PlanSelection.setEnabled(plan: out, ids: cascadeDisable, enabled: false)
             }
         }
         return out

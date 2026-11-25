@@ -392,3 +392,52 @@ public extension View {
         modifier(BottomFloatingSearchModifier(text: text, prompt: prompt, bottomOffset: bottomOffset, visible: visible))
     }
 }
+
+
+/// 规避 iOS 26/27 Form/List 内嵌 `.menu` Picker 收起后右侧文字滞留原位不随页面滚动的系统渲染缺陷：
+/// 外观与原生下拉选项行一致，点击弹出原生底部选项表，选中收起后文字严格随列表同步滚动。
+public struct OptionSheetPickerRow<Value: Hashable>: View {
+    public let title: String
+    @Binding public var selection: Value
+    public let options: [(value: Value, label: String)]
+    @State private var showSheet = false
+
+    public init(_ title: String, selection: Binding<Value>, options: [(value: Value, label: String)]) {
+        self.title = title
+        self._selection = selection
+        self.options = options
+    }
+
+    private var currentLabel: String {
+        options.first(where: { $0.value == selection })?.label ?? ""
+    }
+
+    public var body: some View {
+        Button {
+            showSheet = true
+        } label: {
+            HStack {
+                Text(title)
+                    .foregroundStyle(Color(.label))
+                Spacer(minLength: 12)
+                HStack(spacing: 4) {
+                    Text(currentLabel)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                }
+                .foregroundStyle(MMTheme.accent)
+            }
+            .contentShape(Rectangle())
+        }
+        .tint(Color(.label))
+        .confirmationDialog(title, isPresented: $showSheet, titleVisibility: .visible) {
+            ForEach(options, id: \.value) { opt in
+                Button(opt.value == selection ? "✓ \(opt.label)" : opt.label) {
+                    selection = opt.value
+                }
+            }
+            Button("取消", role: .cancel) {}
+        }
+    }
+}
