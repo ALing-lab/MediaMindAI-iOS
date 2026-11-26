@@ -11,6 +11,42 @@ public enum JournalRowStatus: String, Codable, Sendable {
     case undone
 }
 
+/// 使用当次快照关联作品日志；无法归属的任务级辅助日志仅保留在“全部日志”。
+public struct TaskLogScope: Sendable {
+    private let actionIds: Set<String>
+    private let allActionIds: Set<String>
+
+    public init(plan: ScrapePlan?, groupId: String) {
+        let actions = plan?.actions ?? []
+        allActionIds = Set(actions.map(\.id))
+        var ids = Set(actions.filter { $0.groupId == groupId }.map(\.id))
+        var queue = Array(ids)
+        while let id = queue.popLast() {
+            guard let action = actions.first(where: { $0.id == id }),
+                  let dependency = PlanSelection.dependencyOf(action, all: actions),
+                  ids.insert(dependency.id).inserted else { continue }
+            queue.append(dependency.id)
+        }
+        actionIds = ids
+    }
+
+    public func contains(actionId: String) -> Bool {
+        // 先认完整动作 ID，避免一个作品的 ID 恰好是另一作品 ID 的前缀。
+        if allActionIds.contains(actionId) { return actionIds.contains(actionId) }
+        var base = actionId
+        for prefix in ["substitution-name:", "substitution:"] where base.hasPrefix(prefix) {
+            base = String(base.dropFirst(prefix.count))
+            break
+        }
+        if allActionIds.contains(base) { return actionIds.contains(base) }
+        while let suffix = [":finalize", ":backup"].first(where: { base.hasSuffix($0) }) {
+            base = String(base.dropLast(suffix.count))
+            if allActionIds.contains(base) { return actionIds.contains(base) }
+        }
+        return actionIds.contains(base)
+    }
+}
+
 public struct JournalRow: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let runId: String

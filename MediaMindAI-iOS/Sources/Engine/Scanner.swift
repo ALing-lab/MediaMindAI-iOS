@@ -154,12 +154,19 @@ public enum Scanner {
         var dirPathMap: [String: String] = [:]
         var scannedCount = 0
 
-        let effectiveRoots: [PlanRoot] = {
+        var effectiveRoots: [PlanRoot] = {
             if fullDrive || roots.isEmpty {
                 return [PlanRoot(folderId: drive.rootId, name: "根目录", parentId: nil)]
             }
             return roots
         }()
+        // 根作品目录不在子列表中，必须把已知／查询到的父目录传给外层改名规划。
+        for index in effectiveRoots.indices where effectiveRoots[index].parentId == nil && effectiveRoots[index].folderId != drive.rootId {
+            let root = effectiveRoots[index]
+            if let parent = try await drive.parentIdOf(fileId: root.folderId) {
+                effectiveRoots[index] = PlanRoot(folderId: root.folderId, name: root.name, parentId: parent)
+            }
+        }
 
         func walkContainer(dir: CloudEntry, items: [CloudEntry], depth: Int) async throws -> Int {
             try Task.checkCancellation()
@@ -586,6 +593,8 @@ public actor ScanSnapshotDrive: CloudDrive {
             let entries = try await list(folderId: folder)
             count += entries.count
             guard count <= 200_000 else { throw DriveError.invalidInput("扫描文件过多，请拆分目录；旧计划未更新") }
+            // 原盘由既有规划器整体保护，不读取其中的 Extras 等附属视频子树。
+            if StandardNaming.isBdmvRoot(directChildDirNames: entries.filter(\.isDir).map(\.fileName)) { continue }
             queue += entries.filter { $0.isDir && !ScannerTreeEngine.ignoredDir($0.fileName) && !["BDMV", "CERTIFICATE"].contains($0.fileName.uppercased()) }.map { ($0.fileId, depth + 1) }
         }
     }
@@ -726,7 +735,15 @@ public enum ScanPlanUpdater {
         }
         let newFiles = files(sourceListings)
         let plannedSources = Set(plan.actions.compactMap(\.fileId))
-        guard Set(newFiles.keys).isSubset(of: plannedSources) else {
+        // 必须同时有原盘结构和对应作品分组，才认可为规划器有意保护的范围。
+        let protectedDiscRoots = plan.groups.compactMap(\.folderId).filter { folder in
+            guard let entries = sourceListings[folder] else { return false }
+            return StandardNaming.isBdmvRoot(directChildDirNames: entries.filter(\.isDir).map(\.fileName))
+        }
+        let requiredSources = Set(newFiles.keys.filter { id in
+            !protectedDiscRoots.contains { contains(id, root: $0, parents: inventory.parents, paths: drive.kind.idsArePaths) }
+        })
+        guard requiredSources.isSubset(of: plannedSources) else {
             throw DriveError.invalidInput("部分源视频未进入识别计划，不能安全判断删除或合并；请拆分目录重新扫描，旧计划未更新")
         }
         let allOldFiles = files(affected.reduce(into: [String: [CloudEntry]]()) { result, old in
@@ -845,8 +862,10 @@ public enum ScanPlanUpdater {
             return "\(source)|\(action.op)|\(action.kind)|\(action.newName)|\(destination)"
         }
         var prior: [String: PlanAction] = [:]
+        var priorIds = Set<String>()
         for old in affected {
             let reserved = store.reservedActionIds(planId: old.id)
+            priorIds.formUnion(reserved)
             for action in old.actions where reserved.contains(action.id) { prior[operationKey(action, oldSource: true, context: old)] = action }
         }
         let reservedFileRoles = Set(prior.values.filter { $0.kind == "file" }.compactMap { action in action.fileId.map { "\($0)|\(action.op)|\(action.kind)" } })
@@ -857,11 +876,21 @@ public enum ScanPlanUpdater {
             if let old = prior[operationKey(committed.actions[index], oldSource: false, context: unmodifiedPlan)] {
                 remapped[committed.actions[index].id] = old.id
                 committed.actions[index] = committed.actions[index].withId(old.id)
-                committed.actions[index].done = old.done
+                // 当前扫描仍需建目录，保留相同语义的历史 ID 供重试，但不套用旧完成状态。
+                committed.actions[index].done = committed.actions[index].op == "mkdir" ? false : old.done
                 committed.actions[index].selected = false
-            } else if let file = committed.actions[index].fileId,
-                      reservedFileRoles.contains("\(original(file))|\(committed.actions[index].op)|\(committed.actions[index].kind)") {
-                changedIntentGroups.insert(committed.actions[index].groupId)
+            } else {
+                // 分类目录等动作使用固定 ID；更换目标库后不能仍命中旧提交范围与旧 WAL。
+                if priorIds.contains(committed.actions[index].id) {
+                    let oldId = committed.actions[index].id
+                    let newId = "scan-\(UUID().uuidString.lowercased())"
+                    remapped[oldId] = newId
+                    committed.actions[index] = committed.actions[index].withId(newId)
+                }
+                if let file = committed.actions[index].fileId,
+                   reservedFileRoles.contains("\(original(file))|\(committed.actions[index].op)|\(committed.actions[index].kind)") {
+                    changedIntentGroups.insert(committed.actions[index].groupId)
+                }
             }
         }
         for index in committed.groups.indices where changedIntentGroups.contains(committed.groups[index].id) {
@@ -873,7 +902,7 @@ public enum ScanPlanUpdater {
             if let ref = committed.actions[index].destRef { committed.actions[index].destRef = remapped[ref] ?? ref }
         }
         for index in committed.groups.indices { committed.groups[index].actionIds = committed.groups[index].actionIds.map { remapped[$0] ?? $0 } }
-        committed.submittedActionIds = Array(Set(prior.values.map(\.id)))
+        committed.submittedActionIds = priorIds.sorted()
         committed.executionRunIds = Array(Set(affected.flatMap { $0.executionRunIds ?? [] }))
         committed.scanPriorRunIds = committed.executionRunIds
         let owners = Dictionary(grouping: committed.actions.filter { $0.kind == "file" && $0.fileId != nil }, by: { $0.fileId! })

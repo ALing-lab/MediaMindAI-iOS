@@ -1,16 +1,22 @@
 import SwiftUI
 import UIKit
 
+private struct TaskLogRequest: Identifiable {
+    let id = UUID()
+    let groupId: String
+    let title: String
+}
+
 /// 任务执行结果详情页（参考图 3/4/5：顶部暖色结果头 + 每部作品海报与「已整理 / 已刮削」状态条 + 整理日志 / 刮削日志底部抽屉 + 重试与一键撤销回滚）。
 public struct CompletedTaskDetailScreen: View {
     private let initialRun: TaskRun
 
-    @State private var showLogSheet = false
-    @State private var initialLogTab: TaskLogTab = .organize
+    @State private var logRequest: TaskLogRequest?
     @State private var rollingBack = false
     @State private var rollbackHint: String?
     @State private var retryHint: String?
     @State private var showRollbackConfirm = false
+    @State private var showRetryConfirm = false
 
     public init(run: TaskRun) {
         self.initialRun = run
@@ -136,8 +142,8 @@ public struct CompletedTaskDetailScreen: View {
                             .padding(.horizontal, 4)
                     }
 
-                    // 操作卡片：查看日志 / 逐条明细 / 重试失败项 / 一键撤销
-                    actionSectionCard
+                    // 操作卡片：逐条明细 / 重试失败项 / 一键撤销
+                    if matchingPlan != nil || hasRollbackable { actionSectionCard }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -145,21 +151,31 @@ public struct CompletedTaskDetailScreen: View {
         }
         .navigationTitle("MediaMind AI 智能整理")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showLogSheet) {
+        .sheet(item: $logRequest) { request in
+            let scope = TaskLogScope(plan: matchingPlan, groupId: request.groupId)
             TaskExecutionLogSheet(
                 run: run,
-                initialTab: initialLogTab,
-                journalRows: journalRows,
-                walRows: walRows
+                initialTab: .organize,
+                journalRows: journalRows.filter { row in scope.contains(actionId: row.actionId) },
+                walRows: walRows.filter { row in scope.contains(actionId: row.actionId) },
+                scopeTitle: request.title
             )
             .presentationDetents([.large, .medium])
             .presentationDragIndicator(.visible)
         }
-        .confirmationDialog("确认撤销本次任务的全部已执行操作？", isPresented: $showRollbackConfirm, titleVisibility: .visible) {
+        .alert("重试失败／未完成项？", isPresented: $showRetryConfirm) {
+            Button(ExecutionEngine.shared.isRunning ? "加入重试队列" : "确认重试") { retryFailedActions() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("仅提交本次任务的失败或未完成项，并补齐必要的目录依赖。确认后会生成新的执行记录，旧记录保留。")
+        }
+        .alert("撤销本次任务？", isPresented: $showRollbackConfirm) {
             Button("确认逆序撤销", role: .destructive) {
                 Task { await runRollback() }
             }
             Button("取消", role: .cancel) {}
+        } message: {
+            Text("尝试按逆序撤销本次任务已执行的操作。遇到文件变更、冲突或素材校验信息不足时会停止，并保留日志。")
         }
     }
 
@@ -323,8 +339,7 @@ public struct CompletedTaskDetailScreen: View {
                     Spacer(minLength: 4)
 
                     Button("查看日志") {
-                        initialLogTab = .organize
-                        showLogSheet = true
+                        logRequest = TaskLogRequest(groupId: g.id, title: g.title.isEmpty ? g.folderName : g.title)
                     }
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
@@ -345,13 +360,6 @@ public struct CompletedTaskDetailScreen: View {
                 Text(run.sourceLabel.isEmpty ? "任务 \(run.id)" : run.sourceLabel)
                     .font(.subheadline.bold())
                 Spacer()
-                Button("查看日志") {
-                    initialLogTab = .organize
-                    showLogSheet = true
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(MMTheme.accent)
-                .buttonStyle(.plain)
             }
             Text("网盘：\(run.provider) · 成功 \(run.succeeded) / 失败 \(run.failed) / 共 \(run.total)")
                 .font(.caption)
@@ -397,16 +405,7 @@ public struct CompletedTaskDetailScreen: View {
 
     private var actionSectionCard: some View {
         VStack(spacing: 0) {
-            Button {
-                initialLogTab = .organize
-                showLogSheet = true
-            } label: {
-                actionRowLabel(icon: "doc.text.magnifyingglass", title: "查看整理日志 / 刮削日志", tint: MMTheme.accent)
-            }
-            .buttonStyle(.plain)
-
             if matchingPlan != nil {
-                Divider().padding(.leading, 44)
                 NavigationLink {
                     TaskItemsView(run: run)
                 } label: {
@@ -418,7 +417,7 @@ public struct CompletedTaskDetailScreen: View {
             if !isAllSucceeded, matchingPlan != nil {
                 Divider().padding(.leading, 44)
                 Button {
-                    retryFailedActions()
+                    showRetryConfirm = true
                 } label: {
                     actionRowLabel(icon: "arrow.clockwise.circle.fill", title: "仅重试失败 / 未完成项", tint: MMTheme.accent)
                 }
@@ -426,7 +425,7 @@ public struct CompletedTaskDetailScreen: View {
             }
 
             if hasRollbackable {
-                Divider().padding(.leading, 44)
+                if matchingPlan != nil { Divider().padding(.leading, 44) }
                 Button {
                     showRollbackConfirm = true
                 } label: {
@@ -547,17 +546,17 @@ private struct TaskLogEntry: Identifiable {
 
 private struct TaskExecutionLogSheet: View {
     let run: TaskRun
-    let initialTab: TaskLogTab
     let journalRows: [JournalRow]
     let walRows: [ReversibleWalRecord]
+    let scopeTitle: String
 
     @State private var selectedTab: TaskLogTab
 
-    init(run: TaskRun, initialTab: TaskLogTab, journalRows: [JournalRow], walRows: [ReversibleWalRecord]) {
+    init(run: TaskRun, initialTab: TaskLogTab, journalRows: [JournalRow], walRows: [ReversibleWalRecord], scopeTitle: String) {
         self.run = run
-        self.initialTab = initialTab
         self.journalRows = journalRows
         self.walRows = walRows
+        self.scopeTitle = scopeTitle
         self._selectedTab = State(initialValue: initialTab)
     }
 
@@ -657,11 +656,16 @@ private struct TaskExecutionLogSheet: View {
                 .padding(.top, 16)
                 .padding(.bottom, 12)
 
+                Text("作品：\(scopeTitle)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 18).padding(.bottom, 8)
+
                 if shownEntries.isEmpty {
                     ContentUnavailableView(
                         selectedTab == .organize ? "暂无整理日志" : "暂无刮削日志",
                         systemImage: selectedTab == .organize ? "folder" : "photo.on.rectangle.angled",
-                        description: Text("本轮任务没有对应的执行日志记录。")
+                        description: Text("这部作品在本轮任务中没有对应的执行日志记录。")
                     )
                 } else {
                     ScrollView {

@@ -191,6 +191,45 @@ public final class ExecutionEngine {
         }
     }
 
+    nonisolated static func reusableDirectoryIds(plan: ScrapePlan, runIds: Set<String>, wal: ReversibleWalStore = .shared) -> Set<String> {
+        // 新计划不能查询整个账号：分类 mkdir 的 ID 可能在不同计划中相同。
+        guard !runIds.isEmpty else { return [] }
+        let rows = wal.appliedRecords(accountId: plan.accountId, actionIds: Set(plan.actions.map(\.id)), taskIds: runIds)
+        let scannedHistory = Set(plan.scanPriorRunIds ?? [])
+        return Set(rows.filter { !scannedHistory.contains($0.taskId) && $0.operation == "mkdir" && $0.after?.id.isEmpty == false }.map(\.actionId))
+    }
+
+    /// 仅补齐所选动作的 mkdir 前置步骤；未生效的历史目录可重建，历史影片操作不扩大。
+    nonisolated static func preparedExecution(plan: ScrapePlan, actionIds: [String], appliedDirectoryIds: Set<String>) throws -> (plan: ScrapePlan, actionIds: [String]) {
+        var byId = Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        var visiting = Set<String>(), visited = Set<String>(), ordered: [String] = []
+        func visit(_ id: String) throws {
+            guard !visited.contains(id) else { return }
+            guard var action = byId[id] else { throw DriveError.invalidInput("目录依赖已变化，请重新扫描确认") }
+            if action.op == "mkdir" && appliedDirectoryIds.contains(id) { visited.insert(id); return }
+            guard visiting.insert(id).inserted else { throw DriveError.invalidInput("目录依赖循环，请重新扫描确认") }
+            guard action.enabled && action.blocked == nil else { throw DriveError.invalidInput("所选操作依赖的目录已禁用或待确认，请检查策略") }
+            if let dependency = PlanSelection.dependencyOf(action, all: plan.actions) {
+                try visit(dependency.id)
+            } else if action.destRef != nil && action.destParentId == nil {
+                throw DriveError.invalidInput("缺少目录依赖，请重新扫描确认")
+            }
+            visiting.remove(id)
+            visited.insert(id)
+            if action.op == "mkdir" {
+                // 撤销后 done 可能仍为 true，以当前已生效 WAL 为准。
+                action.done = false
+                action.selected = true
+                byId[id] = action
+            }
+            ordered.append(id)
+        }
+        for id in actionIds { try visit(id) }
+        var prepared = plan
+        prepared.actions = plan.actions.map { byId[$0.id] ?? $0 }
+        return (prepared, ordered)
+    }
+
     @discardableResult
     public func enqueueOrStart(plan: ScrapePlan, drive: any CloudDrive, actionIds: [String]? = nil) -> Bool {
         if let binding = plan.scanBinding, !binding.isEmpty && binding != drive.approvalBinding {
@@ -351,14 +390,28 @@ public final class ExecutionEngine {
             lastStartError = "账号凭据或端点已变化，请重新扫描确认后执行"
             return false
         }
-        let requestedIds = Self.executableActionIds(plan: plan, requested: actionIds)
-        guard !requestedIds.isEmpty else {
+        let initialIds = Self.executableActionIds(plan: plan, requested: actionIds)
+        guard !initialIds.isEmpty else {
             lastStartError = "没有可执行的操作，请在预览中检查勾选、策略和待手动识别项"
+            return false
+        }
+        let priorRunIds = Set(PlanAndTaskStore.shared.tasks.filter { $0.planId == plan.id }.map(\.id)).union(plan.executionRunIds ?? [])
+        let appliedDirectoryIds = Self.reusableDirectoryIds(plan: plan, runIds: priorRunIds)
+        let prepared: (plan: ScrapePlan, actionIds: [String])
+        do {
+            prepared = try Self.preparedExecution(plan: plan, actionIds: initialIds, appliedDirectoryIds: appliedDirectoryIds)
+        } catch {
+            lastStartError = error.localizedDescription
+            return false
+        }
+        let requestedIds = prepared.actionIds
+        guard !requestedIds.isEmpty else {
+            lastStartError = "所选目录已完成，没有新的可执行操作"
             return false
         }
         lastStartError = nil
         let runId = String(UUID().uuidString.prefix(8).lowercased())
-        let plan = PlanAndTaskStore.shared.markExecutionStarted(plan, requested: requestedIds, runId: runId)
+        let plan = PlanAndTaskStore.shared.markExecutionStarted(prepared.plan, requested: requestedIds, runId: runId)
         isRunning = true
         currentPhase = nil
         isPaused = false
@@ -461,7 +514,7 @@ public final class ExecutionEngine {
                 accountId: plan.accountId,
                 actionIds: Set(planActions.keys),
                 taskIds: planTaskIds.isEmpty ? nil : planTaskIds
-            ).filter { !scannedHistory.contains($0.taskId) || $0.operation == "mkdir" || $0.actionId.hasSuffix(":finalize") }
+            ).filter { !scannedHistory.contains($0.taskId) }
             // 第 1 遍先建 idRemap（含 :finalize 重命名），第 2 遍再用 remap 解析重建 mkdirRefs（含 parent:label 键）
             for rec in priorApplied where rec.operation == "rename" || rec.operation == "move" || rec.operation == "quarantine" || rec.operation == "backup" {
                 if let oldId = rec.before?.id, let newId = rec.after?.id, !oldId.isEmpty, !newId.isEmpty {
@@ -555,7 +608,7 @@ public final class ExecutionEngine {
                     guard let rawFid = act.fileId else { throw DriveError.invalidInput("缺少 fileId") }
                     let fid = ((try? idRemap.resolve(rawFid)) ?? rawFid)
                     let resolvedParent: String?
-                    if let rawParent = act.parentId {
+                    if let rawParent = act.parentId ?? plan.scanParents?[rawFid] ?? plan.roots.first(where: { $0.folderId == rawFid })?.parentId {
                         resolvedParent = idRemap.resolveOrSelf(rawParent)
                     } else if drive.kind.idsArePaths {
                         resolvedParent = DrivePaths.parentOf(fid)

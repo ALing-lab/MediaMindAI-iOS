@@ -770,7 +770,7 @@ public actor GuangyaDrive: CloudDrive {
         let o = try await api("/v1/file/get_info_by_file_id", body: ["fileId": fileId], idempotent: true)
         guard let d = o["data"] as? [String: Any] else { return nil }
         let info = (d["fileInfo"] as? [String: Any]) ?? d
-        return info["parentId"] as? String
+        return Self.jsonStr(info, "parentId")
     }
 
     // MARK: - 4. 写操作（改名、建目录竞态回退、100项分片移动与任务轮询、秒传+OSS分片上传、回收站）

@@ -18,6 +18,8 @@ public struct TaskItemsView: View {
     @State private var showSearch = false
     @State private var selectedFailedIds: Set<String> = []
     @State private var retryHint: String?
+    @State private var showRetryConfirm = false
+    @State private var pendingRetryIds: Set<String> = []
 
     public init(run: TaskRun) {
         self.run = run
@@ -146,11 +148,24 @@ public struct TaskItemsView: View {
                 selectedFailedIds = failedSet
             }
         }
+        .alert("重试选中的失败项？", isPresented: $showRetryConfirm) {
+            Button("确认重试") {
+                if let plan = linkedPlan {
+                    let failed = Set(plan.actions.filter { !$0.done && $0.error != nil }.map(\.id))
+                    retrySelected(plan: plan, selectedIds: pendingRetryIds.intersection(failed))
+                }
+                pendingRetryIds.removeAll()
+            }
+            Button("取消", role: .cancel) { pendingRetryIds.removeAll() }
+        } message: {
+            Text("将重试选中的 \(pendingRetryIds.count) 项失败操作，并补齐必要的目录依赖。确认后会生成新的执行记录，旧记录保留。")
+        }
         .toolbar {
-            if !failedActions.isEmpty, let plan = linkedPlan {
+            if !failedActions.isEmpty, linkedPlan != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("重试选中 (\(activeSelection.count))") {
-                        retrySelected(plan: plan, selectedIds: activeSelection)
+                        pendingRetryIds = activeSelection
+                        showRetryConfirm = true
                     }
                     .disabled(activeSelection.isEmpty)
                 }

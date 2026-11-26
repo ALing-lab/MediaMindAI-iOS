@@ -429,6 +429,31 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
 
     // MARK: - 4. ReversibleWalStore & ReversibleTransaction 全链路事务与逆序回滚
 
+    func testUndoWithoutAssetChecksumStopsWithoutMovingUnverifiedFiles() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("undo-no-checksum-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let drive = InMemoryCloudDrive(accountId: "no-checksum")
+        let video = drive.seedFile(id: "video", parentId: "0", name: "renamed.mkv")
+        let poster = drive.seedFile(id: "poster", parentId: "0", name: "poster.jpg", size: 100, etag: "")
+        let entries = try await drive.list(folderId: "0")
+        let videoAfter = RemoteSnapshot.from(try XCTUnwrap(entries.first { $0.fileId == video }), parent: "0")
+        let rename = try wal.prepare(taskId: "undo", accountId: drive.accountId, actionId: "rename", operation: "rename",
+            before: videoAfter.with(name: "original.mkv"), after: videoAfter)
+        try wal.change(rename, state: "applied")
+        let upload = try wal.prepare(taskId: "undo", accountId: drive.accountId, actionId: "poster", operation: "upload", before: nil,
+            after: RemoteSnapshot.from(try XCTUnwrap(entries.first { $0.fileId == poster }), parent: "0"))
+        try wal.change(upload, state: "applied")
+        let tx = ReversibleTransaction(taskId: "undo", drive: drive, wal: wal)
+        do { try await tx.undo(); XCTFail("不能绕过缺失的素材校验信息") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("云盘未提供素材校验信息")) }
+        XCTAssertEqual(drive.node(id: poster)?.parentId, "0")
+        XCTAssertEqual(drive.node(id: video)?.name, "renamed.mkv")
+        XCTAssertEqual(wal.find(taskId: "undo", actionId: "poster")?.state, "conflict")
+        XCTAssertEqual(wal.find(taskId: "undo", actionId: "rename")?.state, "applied")
+        XCTAssertTrue(drive.trashedIds.isEmpty)
+    }
+
     func testReversibleTransactionForwardAndSafeUndoWithBackup() async throws {
         let walURL = FileManager.default.temporaryDirectory.appendingPathComponent("wal_\(UUID().uuidString).json")
         let wal = ReversibleWalStore(storageURL: walURL)

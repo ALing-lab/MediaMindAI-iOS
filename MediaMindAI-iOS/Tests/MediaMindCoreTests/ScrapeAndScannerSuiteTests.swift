@@ -218,6 +218,173 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         XCTAssertEqual(ExecutionEngine.executableActionIds(plan: plan, requested: ["a1"]), ["a1"])
     }
 
+    func testWorkLogScopeSeparatesSameTitleAndPrefixCollisions() {
+        var plan = makeSamplePlan()
+        let movie = plan.groups[0]
+        plan.groups.append(PlanGroup(id: "g2", kind: movie.kind, tmdbId: movie.tmdbId, title: movie.title, year: movie.year,
+            posterPath: movie.posterPath, folderId: "f2", folderName: "Second", folderNewName: nil,
+            rating: nil, confidence: nil, note: nil, warn: nil, actionIds: ["a10", "a1:backup"]))
+        plan.actions += [videoAction(id: "a10", fileId: "vid2", groupId: "g2"),
+                         videoAction(id: "a1:backup", fileId: "vid3", groupId: "g2")]
+        let scope = TaskLogScope(plan: plan, groupId: "g1")
+        XCTAssertTrue(scope.contains(actionId: "a1"))
+        XCTAssertTrue(scope.contains(actionId: "a2"))
+        XCTAssertFalse(scope.contains(actionId: "a10"))
+        XCTAssertFalse(scope.contains(actionId: "a10:finalize"))
+        XCTAssertFalse(scope.contains(actionId: "a1:backup"), "完整动作 ID 的归属优先于后缀推断")
+        XCTAssertFalse(scope.contains(actionId: "substitution:a1:backup"))
+        XCTAssertTrue(TaskLogScope(plan: plan, groupId: "g2").contains(actionId: "substitution:a1:backup"))
+        XCTAssertFalse(scope.contains(actionId: "a1-other"))
+    }
+
+    func testWorkLogScopeIncludesOnlyItsDirectoryDependenciesAndDerivedSteps() {
+        var plan = sharedDirectoryPlan()
+        plan.actions.append(PlanAction(id: "work-B", op: "move", groupId: "g2", fileId: "vid-B", parentId: "f1",
+            oldName: "B.mkv", newName: "B.mkv", destParentId: nil, destRef: "mkdir-B", kind: "file", mediaKind: "movie",
+            tmdbId: 42, season: nil, episode: nil, artworkUrl: nil, selected: true, done: false, error: nil, note: nil))
+        let scope = TaskLogScope(plan: plan, groupId: "g2")
+        for id in ["work-B", "mkdir-B", "category", "category:finalize", "work-B:backup", "substitution:work-B", "substitution-name:work-B"] {
+            XCTAssertTrue(scope.contains(actionId: id), id)
+        }
+        for id in ["rename-A", "mkdir-A", "mkdir-A:finalize", "undo-root", "backup-root:0"] {
+            XCTAssertFalse(scope.contains(actionId: id), id)
+        }
+    }
+
+    func testWorkLogScopeStaysOnExecutionSnapshotAndMissingScopeDoesNotShowAll() {
+        var plan = makeSamplePlan()
+        let snapshot = plan.executionSnapshot(actionIds: ["a1"])
+        plan.actions = [videoAction(id: "later", fileId: "new-video")]
+        let scope = TaskLogScope(plan: snapshot, groupId: "g1")
+        XCTAssertTrue(scope.contains(actionId: "a1"))
+        XCTAssertFalse(scope.contains(actionId: "a2"))
+        XCTAssertFalse(scope.contains(actionId: "later"))
+        XCTAssertFalse(TaskLogScope(plan: nil, groupId: "g1").contains(actionId: "a1"))
+        XCTAssertFalse(TaskLogScope(plan: snapshot, groupId: "missing").contains(actionId: "a1"))
+    }
+
+    @MainActor
+    func testSubmittedWorkWithOnlyDisabledRemainderDoesNotLeaveEmptyCard() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        var plan = makeSamplePlan(); plan.actions[1].enabled = false; plan.actions[1].selected = false
+        store.savePlan(plan)
+        let begun = store.markExecutionStarted(plan, requested: ["a1"], runId: "cancelled-run")
+        XCTAssertEqual(begun.reviewDisposition, "started")
+        var run = sampleRun(total: 1, completed: 0, succeeded: 0); run.status = "stopped"
+        run.executionSnapshot = plan.executionSnapshot(actionIds: ["a1"]); store.saveTask(run)
+        XCTAssertTrue(store.pendingPlans.isEmpty)
+        XCTAssertTrue(store.pendingProjection(begun).groups.isEmpty)
+        XCTAssertEqual(store.tasks.count, 1)
+        XCTAssertEqual(store.plans[0].actions.count, 2)
+    }
+
+    @MainActor
+    func testOldPersistedGhostCardIsHiddenWithoutRemovingHistory() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        var plan = makeSamplePlan()
+        plan.reviewDisposition = "pending"; plan.submittedActionIds = ["a1"]
+        plan.actions[1].enabled = false; plan.actions[1].selected = false
+        store.savePlan(plan)
+        let reloaded = PlanAndTaskStore(storageURL: dir)
+        XCTAssertTrue(reloaded.pendingPlans.isEmpty)
+        XCTAssertEqual(reloaded.plans[0].actions.map(\.id), ["a1", "a2"])
+        XCTAssertEqual(reloaded.plans[0].submittedActionIds, ["a1"])
+    }
+
+    @MainActor
+    func testUnselectedRemainderAndUntouchedDisabledWorkStayEditable() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        var plan = makeSamplePlan(); plan.actions[1].selected = false
+        store.savePlan(plan)
+        let begun = store.markExecutionStarted(plan, requested: ["a1"], runId: "run")
+        XCTAssertEqual(begun.reviewDisposition, "pending")
+        XCTAssertEqual(store.pendingPlans.count, 1, "未勾选不等于禁用或取消")
+        var untouched = makeSamplePlan()
+        for index in untouched.actions.indices { untouched.actions[index].enabled = false; untouched.actions[index].selected = false }
+        let untouchedStore = PlanAndTaskStore(storageURL: dir.appendingPathComponent("untouched"))
+        untouchedStore.savePlan(untouched)
+        XCTAssertEqual(untouchedStore.pendingPlans.count, 1, "尚未提交的作品仍允许在预览调整策略")
+    }
+
+    @MainActor
+    func testUnsubmittedDisabledVideoInPartiallySubmittedGroupStaysVisible() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        var plan = makeSamplePlan(); plan.actions[1].enabled = false
+        var otherVideo = videoAction(id: "another-video", fileId: "vid2")
+        otherVideo.enabled = false; otherVideo.selected = false
+        plan.actions.append(otherVideo); store.savePlan(plan)
+        _ = store.markExecutionStarted(plan, requested: ["a1"], runId: "run")
+        let remainder = try XCTUnwrap(store.pendingPlans.first)
+        XCTAssertEqual(remainder.groups.map(\.id), ["g1"])
+        XCTAssertEqual(remainder.manualMatchActions(groupId: "g1").map(\.fileId), ["vid2"])
+    }
+
+    @MainActor
+    func testSubmittedGroupKeepsUnmatchedFilesForManualRecognition() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        var plan = makeSamplePlan(); plan.actions[1].enabled = false
+        plan.actions.append(videoAction(id: "unmatched-episode", fileId: "vid2", operation: "unmatched"))
+        store.savePlan(plan)
+        _ = store.markExecutionStarted(plan, requested: ["a1"], runId: "run")
+        let remainder = try XCTUnwrap(store.pendingPlans.first)
+        XCTAssertEqual(remainder.groups.map(\.id), ["g1"])
+        XCTAssertEqual(remainder.manualMatchActions(groupId: "g1").map(\.id), ["unmatched-episode"])
+    }
+
+    @MainActor
+    func testCancellingPendingPlanDoesNotLeaveAnEditablePreview() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let plan = makeSamplePlan(); store.savePlan(plan)
+        let original = try XCTUnwrap(store.pendingPlans.first)
+        store.cancelPendingPlan(id: plan.id)
+        XCTAssertNil(store.pendingPlans.first { $0.id == plan.id })
+        XCTAssertThrowsError(try store.saveEditedPlan(original, original: original))
+        XCTAssertEqual(store.plans.first?.reviewDisposition, "cancelled")
+        XCTAssertTrue(store.tasks.isEmpty)
+    }
+
+    @MainActor
+    func testScanPropagatesDiscoveredRootParentToFolderRename() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let video = CloudEntry(fileId: "episode", fileName: "Show.S01E01.mkv", isDir: false, size: 100, parentFileId: "show")
+        let drive = MockScrapeDrive(tree: ["show": [video]], parents: ["show": "parent", "parent": "0"])
+        let provider = MockScannerTmdb(movies: [:], shows: ["show": MatchInfo(kind: "tv", id: 777, title: "Show", year: "2020")], seasonCounts: [:])
+        let plan = try await ScanPlanUpdater.scan(roots: [PlanRoot(folderId: "show", name: "Raw Show")],
+            drive: drive, store: store, tmdbProvider: provider, preflightTmdb: false)
+        XCTAssertEqual(plan.roots.first?.parentId, "parent")
+        XCTAssertEqual(plan.scanParents?["show"], "parent")
+        let rename = try XCTUnwrap(plan.actions.first { $0.op == "rename" && $0.kind == "folder" && $0.fileId == "show" })
+        XCTAssertEqual(rename.parentId, "parent")
+    }
+
+    func testExplicitEmptyRootParentIsPreservedAndUnknownParentIsNotInvented() async throws {
+        let video = CloudEntry(fileId: "episode", fileName: "Show.S01E01.mkv", isDir: false, parentFileId: "show")
+        let provider = MockScannerTmdb(movies: [:], shows: ["show": MatchInfo(kind: "tv", id: 777, title: "Show", year: "2020")], seasonCounts: [:])
+        let parents: [String?] = ["", nil]
+        for parent in parents {
+            let plan = try await Scanner.scan(roots: [PlanRoot(folderId: "show", name: "Show", parentId: parent)],
+                drive: MockScrapeDrive(tree: ["show": [video]]), tmdbProvider: provider,
+                globalPolicies: DefaultPolicies(), persistResult: false)
+            let rename = try XCTUnwrap(plan.actions.first { $0.op == "rename" && $0.kind == "folder" && $0.fileId == "show" })
+            XCTAssertEqual(rename.parentId, parent)
+            XCTAssertEqual(plan.roots[0].parentId, parent)
+        }
+    }
+
     @MainActor
     func testStaleAsyncEditCannotOverwriteMergedOrUpdatedPlan() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -400,6 +567,300 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         XCTAssertTrue(ExecutionEngine.shared.lastStartError?.contains("账号") == true)
     }
 
+    func testManualMatchTargetsExcludeSubmittedSourceEvenWithDifferentActionId() {
+        var plan = makeSamplePlan()
+        let remaining = videoAction(id: "remaining", fileId: "vid2")
+        plan.actions += [plan.actions[0].withId("same-source-new-id"), remaining]
+        plan.submittedActionIds = ["a1"]
+        XCTAssertEqual(plan.manualMatchActions(groupId: "g1").map(\.id), ["remaining"])
+        plan.actions[plan.actions.count - 1].done = true
+        XCTAssertTrue(plan.manualMatchActions(groupId: "g1").isEmpty)
+    }
+
+    @MainActor
+    func testPendingEditRejectsSubmittedSourceRecreatedWithNewId() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let original = makeSamplePlan(); store.savePlan(original)
+        _ = store.markExecutionStarted(original, requested: ["a1"], runId: "history")
+        let remainder = try XCTUnwrap(store.pendingPlans.first)
+        var edited = remainder
+        edited.actions += [original.actions[0].withId("new-id-for-submitted-video")]
+        XCTAssertThrowsError(try store.saveEditedPlan(edited, original: remainder))
+        store.savePendingPlan(edited)
+        XCTAssertEqual(store.plans[0].actions.filter { $0.fileId == "vid1" }.map(\.id), ["a1"])
+        XCTAssertEqual(store.plans[0].actions.count, original.actions.count)
+    }
+
+    @MainActor
+    func testLegacySnapshotReservationsReachManualMatchProjection() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let original = makeSamplePlan(); store.savePlan(original)
+        var run = sampleRun(total: 1, completed: 0, succeeded: 0)
+        run.executionSnapshot = original.executionSnapshot(actionIds: ["a1"])
+        store.saveTask(run)
+        let projected = store.pendingProjection(original)
+        XCTAssertEqual(projected.submittedActionIds, ["a1"])
+        XCTAssertTrue(projected.manualMatchActions(groupId: "g1").isEmpty)
+    }
+
+    func testReplanRejectsSubmittedFileAndWholeGroupBeforeReadingCloud() async throws {
+        var plan = makeSamplePlan(); plan.submittedActionIds = ["a1"]
+        let drive = MockScrapeDrive(tree: [:], accountId: plan.accountId)
+        let info = MatchInfo(kind: "movie", id: 27205, title: "盗梦空间", year: "2010")
+        let provider = MockScannerTmdb(movies: [:], shows: [:], seasonCounts: [:])
+        let hooks = ScannerMovieLooseAndArtwork.makeReplanHooks(drive: drive, tmdb: provider, fullScrape: false)
+        do {
+            _ = try await ScannerReplan.replanFile(plan: plan, actionId: "a1", info: info, cloud: drive, hooks: hooks)
+            XCTFail("已提交且未完成的文件不能重新规划")
+        } catch let error as ScannerReplanError {
+            if case .fileAlreadyProcessed = error { } else { XCTFail("错误类型不符：\(error)") }
+        }
+        do {
+            _ = try await ScannerReplan.replanGroup(plan: plan, groupId: "g1", info: info, cloud: drive, hooks: hooks)
+            XCTFail("含历史范围的整组不能全量重建")
+        } catch let error as ScannerReplanError {
+            if case .alreadyExecuted = error { } else { XCTFail("错误类型不符：\(error)") }
+        }
+    }
+
+    @MainActor
+    func testUnsubmittedVideoCanStillBeRematchedAndSaved() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        var original = makeSamplePlan()
+        original.actions.append(videoAction(id: "remaining", fileId: "vid2"))
+        original.groups[0].actionIds.append("remaining")
+        store.savePlan(original)
+        _ = store.markExecutionStarted(original, requested: ["a1"], runId: "history")
+        let remainder = try XCTUnwrap(store.pendingPlans.first)
+        let drive = MockScrapeDrive(tree: ["f1": [CloudEntry(fileId: "vid2", fileName: "Video.mkv", isDir: false, parentFileId: "f1")]], accountId: original.accountId)
+        let info = MatchInfo(kind: "movie", id: 27205, title: "盗梦空间", year: "2010")
+        let provider = MockScannerTmdb(movies: [:], shows: [:], seasonCounts: [:])
+        let hooks = ScannerMovieLooseAndArtwork.makeReplanHooks(drive: drive, tmdb: provider, fullScrape: false)
+        let edited = try await ScannerReplan.replanFile(plan: remainder, actionId: "remaining", info: info, cloud: drive, hooks: hooks)
+        try store.saveEditedPlan(edited, original: remainder)
+        XCTAssertEqual(store.plans[0].actions.first { $0.id == "a1" }, original.actions[0])
+        XCTAssertTrue(store.plans[0].actions.contains { $0.fileId == "vid2" && $0.tmdbId == 27205 })
+        XCTAssertEqual(store.plans[0].actions.filter { $0.fileId == "vid1" }.count, 1)
+    }
+
+    func testRemainderExecutionRestoresOnlyRequiredDirectoryChain() throws {
+        let plan = sharedDirectoryPlan()
+        let selected = ExecutionEngine.executableActionIds(plan: plan)
+        let prepared = try ExecutionEngine.preparedExecution(plan: plan, actionIds: selected, appliedDirectoryIds: [])
+        XCTAssertEqual(prepared.actionIds, ["category", "mkdir-B", "move-B"])
+        XCTAssertFalse(prepared.actionIds.contains("rename-A"))
+        XCTAssertFalse(prepared.actionIds.contains("mkdir-A"))
+        let snapshot = prepared.plan.executionSnapshot(actionIds: prepared.actionIds)
+        XCTAssertEqual(snapshot.actions.count, 3)
+        XCTAssertFalse(snapshot.actions.contains { $0.fileId == "vid1" })
+    }
+
+    func testAppliedSharedDirectoryIsReusedAndRevertedDoneDirectoryIsRebuilt() throws {
+        var plan = sharedDirectoryPlan()
+        plan.actions[0].done = true
+        let selected = ExecutionEngine.executableActionIds(plan: plan)
+        let reused = try ExecutionEngine.preparedExecution(plan: plan, actionIds: selected, appliedDirectoryIds: ["category"])
+        XCTAssertEqual(reused.actionIds, ["mkdir-B", "move-B"])
+        let rebuilt = try ExecutionEngine.preparedExecution(plan: plan, actionIds: selected, appliedDirectoryIds: [])
+        XCTAssertEqual(rebuilt.actionIds, ["category", "mkdir-B", "move-B"])
+        XCTAssertFalse(try XCTUnwrap(rebuilt.plan.actions.first { $0.id == "category" }).done)
+    }
+
+    func testDirectoryReuseIsScopedToPlanRunsAndExcludesRevertedWal() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("directory-wal-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let plan = sharedDirectoryPlan()
+        let record = try wal.prepare(taskId: "other-plan-run", accountId: plan.accountId, actionId: "category",
+            operation: "mkdir", before: nil, after: RemoteSnapshot(id: "directory", parent: "0", name: "category", directory: true))
+        try wal.change(record, state: "applied")
+        XCTAssertTrue(ExecutionEngine.reusableDirectoryIds(plan: plan, runIds: [], wal: wal).isEmpty)
+        XCTAssertTrue(ExecutionEngine.reusableDirectoryIds(plan: plan, runIds: ["this-plan-run"], wal: wal).isEmpty)
+        XCTAssertEqual(ExecutionEngine.reusableDirectoryIds(plan: plan, runIds: ["other-plan-run"], wal: wal), ["category"])
+        var rescanned = plan; rescanned.scanPriorRunIds = ["other-plan-run"]
+        XCTAssertTrue(ExecutionEngine.reusableDirectoryIds(plan: rescanned, runIds: ["other-plan-run"], wal: wal).isEmpty)
+        try wal.reverted(record, undoResult: nil)
+        XCTAssertTrue(ExecutionEngine.reusableDirectoryIds(plan: plan, runIds: ["other-plan-run"], wal: wal).isEmpty)
+    }
+
+    @MainActor
+    func testChangedLibraryDirectoryGetsFreshIdentityAcrossRepeatedScans() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let savedPolicies = AppSettings.shared.policies
+        defer { AppSettings.shared.policies = savedPolicies }
+        var policies = DefaultPolicies()
+        policies.adaptiveDirectory = true
+        policies.adaptiveTargetDirId = "library-A"; policies.adaptiveTargetDirPath = "/A"
+        AppSettings.shared.policies = policies
+        let folder = CloudEntry(fileId: "movie", fileName: "Inception", isDir: true, parentFileId: "source")
+        let file = CloudEntry(fileId: "video", fileName: "Inception.2010.mkv", isDir: false, size: 100, parentFileId: "movie", etag: "unchanged")
+        let drive = MockScrapeDrive(tree: ["source": [folder], "movie": [file]])
+        let provider = MockScannerTmdb(movies: ["inception": MatchInfo(kind: "movie", id: 27205, title: "盗梦空间", year: "2010")], shows: [:], seasonCounts: [:])
+        let roots = [PlanRoot(folderId: "source", name: "电影", parentId: "0")]
+        let first = try await ScanPlanUpdater.scan(roots: roots, drive: drive, store: store, tmdbProvider: provider, preflightTmdb: false)
+        let oldDirectory = try XCTUnwrap(first.actions.first { $0.kind == AdaptiveDirectoryPlanner.kindCategoryMkdir })
+        _ = store.markExecutionStarted(first, requested: [oldDirectory.id], runId: "library-A-run")
+        var oldRun = TaskRun(id: "library-A-run", planId: first.id, accountId: first.accountId, provider: first.provider,
+            sourceLabel: "A", status: "done", total: 1, completed: 1, succeeded: 1, failed: 0, message: "",
+            startedAt: Date(), finishedAt: Date(), errors: [])
+        oldRun.executionSnapshot = first.executionSnapshot(actionIds: [oldDirectory.id]); store.saveTask(oldRun)
+        let wal = ReversibleWalStore(storageURL: dir.appendingPathComponent("old-library-wal.json"))
+        let record = try wal.prepare(taskId: "library-A-run", accountId: first.accountId, actionId: oldDirectory.id,
+            operation: "mkdir", before: nil, after: RemoteSnapshot(id: "old-category", parent: "library-A", name: "电影", directory: true))
+        try wal.change(record, state: "applied")
+        var completedDirectoryPlan = try XCTUnwrap(store.plans.first)
+        let directoryIndex = try XCTUnwrap(completedDirectoryPlan.actions.firstIndex { $0.id == oldDirectory.id })
+        completedDirectoryPlan.actions[directoryIndex].done = true
+        store.savePlan(completedDirectoryPlan)
+        // 同一语义保留旧 ID 供历史重试，但当前列表已无目录时，旧完成日志不能阻止重建。
+        let missingAgain = try await ScanPlanUpdater.scan(roots: roots, drive: drive, store: store, tmdbProvider: provider, preflightTmdb: false)
+        let rebuiltDirectory = try XCTUnwrap(missingAgain.actions.first { $0.kind == AdaptiveDirectoryPlanner.kindCategoryMkdir })
+        XCTAssertEqual(rebuiltDirectory.id, oldDirectory.id)
+        XCTAssertFalse(rebuiltDirectory.done)
+        let directoryIds = ExecutionEngine.reusableDirectoryIds(plan: missingAgain, runIds: ["library-A-run"], wal: wal)
+        XCTAssertTrue(directoryIds.isEmpty)
+        let dependent = try XCTUnwrap(missingAgain.actions.first { $0.destRef == rebuiltDirectory.id })
+        let prepared = try ExecutionEngine.preparedExecution(plan: missingAgain, actionIds: [dependent.id], appliedDirectoryIds: directoryIds)
+        XCTAssertTrue(prepared.actionIds.contains(oldDirectory.id))
+        policies.adaptiveTargetDirId = "library-B"; policies.adaptiveTargetDirPath = "/B"
+        AppSettings.shared.policies = policies
+        var scanStore = store
+        for iteration in 0..<2 {
+            if iteration == 1 {
+                scanStore.deleteTask(id: "library-A-run")
+                scanStore = PlanAndTaskStore(storageURL: dir)
+            }
+            let refreshed = try await ScanPlanUpdater.scan(roots: roots, drive: drive, store: scanStore, tmdbProvider: provider, preflightTmdb: false)
+            let directory = try XCTUnwrap(refreshed.actions.first { $0.kind == AdaptiveDirectoryPlanner.kindCategoryMkdir })
+            XCTAssertEqual(directory.parentId, "library-B")
+            XCTAssertNotEqual(directory.id, oldDirectory.id)
+            XCTAssertTrue(refreshed.submittedActionIds?.contains(oldDirectory.id) == true)
+            XCTAssertFalse(refreshed.submittedActionIds?.contains(directory.id) == true)
+            XCTAssertTrue(refreshed.actions.contains { $0.destRef == directory.id })
+            XCTAssertFalse(refreshed.actions.contains { $0.destRef == oldDirectory.id })
+            XCTAssertTrue(ExecutionEngine.reusableDirectoryIds(plan: refreshed, runIds: ["library-A-run"], wal: wal).isEmpty)
+            let actionIds = Set(refreshed.actions.map(\.id))
+            XCTAssertTrue(refreshed.actions.allSatisfy { $0.destRef.map { actionIds.contains($0) } ?? true })
+            XCTAssertTrue(refreshed.groups.allSatisfy { Set($0.actionIds).isSubset(of: actionIds) })
+        }
+        XCTAssertEqual(scanStore.plans.count, 1)
+    }
+
+    func testQueuedScopeGainsOnlyDirectoryDependenciesAtStart() throws {
+        var plan = sharedDirectoryPlan()
+        let queuedIds = ExecutionEngine.executableActionIds(plan: plan)
+        // 排队后出现的新作品即使勾选，也不能扩入原队列的影片范围。
+        plan.actions.append(videoAction(id: "later-video", fileId: "vid3"))
+        let fixedIds = ExecutionEngine.executableActionIds(plan: plan, requested: queuedIds)
+        let prepared = try ExecutionEngine.preparedExecution(plan: plan, actionIds: fixedIds, appliedDirectoryIds: [])
+        XCTAssertEqual(prepared.actionIds, ["category", "mkdir-B", "move-B"])
+        XCTAssertFalse(prepared.actionIds.contains("later-video"))
+        XCTAssertFalse(prepared.actionIds.contains("rename-A"))
+    }
+
+    func testInvalidDirectoryDependenciesAreRejectedWithoutChangingPlan() throws {
+        let original = sharedDirectoryPlan()
+        var disabled = original; disabled.actions[0].enabled = false
+        XCTAssertThrowsError(try ExecutionEngine.preparedExecution(plan: disabled, actionIds: ["move-B"], appliedDirectoryIds: []))
+        var missing = original; missing.actions.removeAll { $0.id == "category" }
+        XCTAssertThrowsError(try ExecutionEngine.preparedExecution(plan: missing, actionIds: ["move-B"], appliedDirectoryIds: []))
+        var cyclic = original; cyclic.actions[0].destParentId = nil; cyclic.actions[0].destRef = "mkdir-B"
+        XCTAssertThrowsError(try ExecutionEngine.preparedExecution(plan: cyclic, actionIds: ["move-B"], appliedDirectoryIds: []))
+        XCTAssertEqual(original.actions.filter(\.selected).map(\.id), ["mkdir-B", "move-B"])
+    }
+
+    @MainActor
+    func testBdmvWithExtrasAndDirectVideoCommitsWithoutPlanningProtectedVideos() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let movie = CloudEntry(fileId: "disc", fileName: "Disc Movie", isDir: true, parentFileId: "root")
+        let bdmv = CloudEntry(fileId: "bdmv", fileName: "BDMV", isDir: true, parentFileId: "disc")
+        let extras = CloudEntry(fileId: "extras", fileName: "Extras", isDir: true, parentFileId: "disc")
+        let trailer = CloudEntry(fileId: "trailer", fileName: "trailer.mkv", isDir: false, parentFileId: "disc")
+        let bonus = CloudEntry(fileId: "bonus", fileName: "bonus.mkv", isDir: false, parentFileId: "extras")
+        let drive = MockScrapeDrive(tree: ["root": [movie], "disc": [bdmv, extras, trailer], "extras": [bonus]])
+        let provider = MockScannerTmdb(movies: ["disc": MatchInfo(kind: "movie", id: 1234, title: "Disc Movie", year: "2020")], shows: [:], seasonCounts: [:])
+        let roots = [PlanRoot(folderId: "root", name: "电影", parentId: "0")]
+        let first = try await ScanPlanUpdater.scan(roots: roots, drive: drive, store: store, tmdbProvider: provider, preflightTmdb: false)
+        XCTAssertTrue(first.groups.contains { $0.folderId == "disc" && $0.kind == "movie" })
+        XCTAssertFalse(first.actions.contains { ["trailer", "bonus"].contains($0.fileId ?? "") })
+        XCTAssertNil(first.scanListings?["extras"])
+        let second = try await ScanPlanUpdater.scan(roots: roots, drive: drive, store: store, tmdbProvider: provider, preflightTmdb: false)
+        XCTAssertEqual(second.id, first.id)
+        XCTAssertEqual(store.plans.count, 1)
+        // 原盘内部不做逐文件核验，沿用 fix7 的保守确认边界，不声称可自动继承身份。
+        XCTAssertTrue(second.groups.contains { $0.folderId == "disc" && $0.confirmRequired })
+        XCTAssertTrue(second.actions.allSatisfy { !$0.selected })
+    }
+
+    @MainActor
+    func testUnmatchedBdmvStillProducesProtectedManualGroup() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let bdmv = CloudEntry(fileId: "bdmv", fileName: "BDMV", isDir: true, parentFileId: "disc")
+        let trailer = CloudEntry(fileId: "trailer", fileName: "trailer.mkv", isDir: false, parentFileId: "disc")
+        let provider = MockScannerTmdb(movies: [:], shows: [:], seasonCounts: [:])
+        let plan = try await ScanPlanUpdater.scan(roots: [PlanRoot(folderId: "disc", name: "Unknown Disc", parentId: "0")],
+            drive: MockScrapeDrive(tree: ["disc": [bdmv, trailer]]), store: store, tmdbProvider: provider, preflightTmdb: false)
+        XCTAssertTrue(plan.groups.contains { $0.folderId == "disc" && $0.kind == "unmatched" })
+        XCTAssertTrue(plan.actions.isEmpty)
+        XCTAssertEqual(store.pendingPlans.count, 1)
+    }
+
+    @MainActor
+    func testOrdinaryUnplannedVideoStillRejectsWholeScan() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = PlanAndTaskStore(storageURL: dir)
+        let season = CloudEntry(fileId: "season", fileName: "Season 01", isDir: true, parentFileId: "0")
+        let video = CloudEntry(fileId: "episode", fileName: "Unknown.S01E01.mkv", isDir: false, parentFileId: "season")
+        let provider = MockScannerTmdb(movies: [:], shows: [:], seasonCounts: [:])
+        do {
+            _ = try await ScanPlanUpdater.scan(roots: [PlanRoot(folderId: "0", name: "根目录")],
+                drive: MockScrapeDrive(tree: ["0": [season], "season": [video]]), store: store, tmdbProvider: provider, preflightTmdb: false)
+            XCTFail("普通目录不能绕过完整性保护")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("部分源视频未进入识别计划"))
+            XCTAssertTrue(store.plans.isEmpty)
+        }
+    }
+
+    private func videoAction(id: String, fileId: String, operation: String = "rename", groupId: String = "g1") -> PlanAction {
+        PlanAction(id: id, op: operation, groupId: groupId, fileId: fileId, parentId: "f1",
+            oldName: "Video.mkv", newName: "Video (2020).mkv", destParentId: nil, destRef: nil,
+            kind: "file", mediaKind: "movie", tmdbId: 27205, season: nil, episode: nil, artworkUrl: nil,
+            selected: true, done: false, error: nil, note: nil)
+    }
+
+    private func sharedDirectoryPlan() -> ScrapePlan {
+        func mkdir(_ id: String, parentRef: String? = nil, selected: Bool) -> PlanAction {
+            PlanAction(id: id, op: "mkdir", groupId: id == "category" ? "" : "g1", fileId: nil, parentId: "0",
+                oldName: "", newName: id, destParentId: parentRef == nil ? "0" : nil, destRef: parentRef,
+                kind: "folder", mediaKind: "movie", tmdbId: nil, season: nil, episode: nil, artworkUrl: nil,
+                selected: selected, done: false, error: nil, note: nil)
+        }
+        var plan = makeSamplePlan()
+        var historical = videoAction(id: "rename-A", fileId: "vid1"); historical.selected = false
+        let move = PlanAction(id: "move-B", op: "move", groupId: "g1", fileId: "vid2", parentId: "f1",
+            oldName: "B.mkv", newName: "B.mkv", destParentId: nil, destRef: "mkdir-B", kind: "file",
+            mediaKind: "movie", tmdbId: 27205, season: nil, episode: nil, artworkUrl: nil,
+            selected: true, done: false, error: nil, note: nil)
+        plan.actions = [mkdir("category", selected: false), mkdir("mkdir-A", parentRef: "category", selected: false), historical,
+                        mkdir("mkdir-B", parentRef: "category", selected: true), move]
+        plan.submittedActionIds = ["category", "mkdir-A", "rename-A"]
+        return plan
+    }
+
     private actor ReadProbeDrive: CloudDrive {
         nonisolated let kind: ProviderKind = .p123
         nonisolated let accountId = "acct_1"
@@ -517,20 +978,24 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
 
     private final class MockScrapeDrive: CloudDrive, @unchecked Sendable {
         let kind: ProviderKind = .p123
-        let accountId: String = "mock-scrape-acct"
+        let accountId: String
         let rootId: String = "0"
         let isLanEndpoint: Bool = false
         let trashSupport: TrashSupport = .recycle
 
         private let tree: [String: [CloudEntry]]
+        private let parents: [String: String]
 
-        init(tree: [String: [CloudEntry]]) {
+        init(tree: [String: [CloudEntry]], accountId: String = "mock-scrape-acct", parents: [String: String] = [:]) {
             self.tree = tree
+            self.accountId = accountId
+            self.parents = parents
         }
 
         func list(folderId: String) async throws -> [CloudEntry] {
             tree[folderId] ?? []
         }
+        func parentIdOf(fileId: String) async throws -> String? { parents[fileId] }
 
         func rename(fileId: String, newName: String) async throws -> String { fileId }
         func mkdir(parentId: String, name: String) async throws -> String { "dir_\(parentId)_\(name)" }

@@ -158,13 +158,13 @@ public struct TasksTabView: View {
             .onChange(of: pendingPlans.map(\.id)) { old, new in
                 if new.contains(where: { !old.contains($0) }) { selectedTab = .active }
             }
-            .confirmationDialog("取消待执行任务？", isPresented: Binding(get: { pendingCancelPlan != nil }, set: { if !$0 { pendingCancelPlan = nil } })) {
+            .alert("取消待执行任务？", isPresented: Binding(get: { pendingCancelPlan != nil }, set: { if !$0 { pendingCancelPlan = nil } }), presenting: pendingCancelPlan) { plan in
                 Button("取消任务", role: .destructive) {
-                    if let plan = pendingCancelPlan { store.cancelPendingPlan(id: plan.id) }
+                    store.cancelPendingPlan(id: plan.id)
                     pendingCancelPlan = nil
                 }
                 Button("继续保留", role: .cancel) { pendingCancelPlan = nil }
-            } message: { Text("仅取消本地待执行计划，不修改云盘文件。") }
+            } message: { _ in Text("仅取消本地待执行计划，不修改云盘文件。") }
             .sheet(item: $backupChoice) { control in
                 NavigationStack {
                     Form {
@@ -186,7 +186,7 @@ public struct TasksTabView: View {
                     .interactiveDismissDisabled(applyingBackupChoice)
                 }
             }
-            .confirmationDialog("停止当前任务", isPresented: $showStopConfirm, titleVisibility: .visible) {
+            .alert("停止当前任务？", isPresented: $showStopConfirm) {
                 Button("停止并保留已完成项") {
                     let run = stoppingRun
                     if let run {
@@ -240,20 +240,18 @@ public struct TasksTabView: View {
             } message: {
                 Text("选择停止方式：保留已完成项，或尝试把本轮已执行的云端操作逐条回滚。")
             }
-            .confirmationDialog(
+            .alert(
                 "确认删除任务记录？",
                 isPresented: Binding(get: { pendingDeleteRun != nil }, set: { if !$0 { pendingDeleteRun = nil } }),
-                titleVisibility: .visible
-            ) {
+                presenting: pendingDeleteRun
+            ) { target in
                 Button("删除记录", role: .destructive) {
-                    if let target = pendingDeleteRun {
-                        let isActive = engine.currentRun?.id == target.id && (engine.isRunning || engine.isPaused)
-                        store.deleteTask(id: target.id, allowPaused: !isActive)
-                    }
+                    let isActive = engine.currentRun?.id == target.id && (engine.isRunning || engine.isPaused)
+                    store.deleteTask(id: target.id, allowPaused: !isActive)
                     pendingDeleteRun = nil
                 }
                 Button("取消", role: .cancel) { pendingDeleteRun = nil }
-            } message: {
+            } message: { _ in
                 Text("仅移除本地任务卡片，不影响网盘已有文件。若后续需要一键撤销回滚，建议保留该记录。")
             }
         }

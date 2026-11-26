@@ -1,0 +1,117 @@
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push less than a minute ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  * Run actions/checkout@v4
+  * Core logic tests (SwiftPM, macOS)
+  * Build unsigned app
+  * Package unsigned IPA
+  * Run actions/upload-artifact@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push less than a minute ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  * Core logic tests (SwiftPM, macOS)
+  * Build unsigned app
+  * Package unsigned IPA
+  * Run actions/upload-artifact@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push about 1 minute ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  * Core logic tests (SwiftPM, macOS)
+  * Build unsigned app
+  * Package unsigned IPA
+  * Run actions/upload-artifact@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push about 1 minute ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Core logic tests (SwiftPM, macOS)
+  * Build unsigned app
+  * Package unsigned IPA
+  * Run actions/upload-artifact@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push about 1 minute ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Core logic tests (SwiftPM, macOS)
+  * Build unsigned app
+  * Package unsigned IPA
+  * Run actions/upload-artifact@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push about 2 minutes ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Core logic tests (SwiftPM, macOS)
+  * Build unsigned app
+  * Package unsigned IPA
+  * Run actions/upload-artifact@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 25 seconds. Press Ctrl+C to quit.
+
+* main iOS Unsigned IPA · 45720083688
+Triggered via push about 2 minutes ago
+
+JOBS
+* build (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Core logic tests (SwiftPM, macOS)
+  ✓ Build unsigned app
+  ✓ Package unsigned IPA
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  * Complete job
+✓ main iOS Unsigned IPA · 45720083688
+Triggered via push about 3 minutes ago
+
+JOBS
+✓ build in 2m50s (ID 139575918543)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Core logic tests (SwiftPM, macOS)
+  ✓ Build unsigned app
+  ✓ Package unsigned IPA
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+build: .github#4
+

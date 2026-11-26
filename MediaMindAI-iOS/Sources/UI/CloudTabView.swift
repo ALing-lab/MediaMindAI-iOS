@@ -539,6 +539,7 @@ private struct CloudDirectoryBrowserView: View {
 
     @State private var store = AccountStore.shared
     @State private var pathStack: [(id: String, name: String)] = []
+    @State private var knownFolderParents: [String: String] = [:]
     @State private var entries: [CloudEntry] = []
     @State private var selectedIds: Set<String> = []
     @State private var loading = false
@@ -689,6 +690,7 @@ private struct CloudDirectoryBrowserView: View {
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 guard entry.isDir else { return }
+                                knownFolderParents[entry.fileId] = entry.parentFileId ?? currentFolder.id
                                 pathStack.append((entry.fileId, entry.fileName))
                                 selectedIds.removeAll()
                                 Task { await loadCurrent() }
@@ -836,15 +838,16 @@ private struct CloudDirectoryBrowserView: View {
         guard !BackgroundScanManager.shared.isScanning else { return }
         errorMsg = nil
         let cur = currentFolder
+        let currentRoot = PlanRoot(folderId: cur.id, name: cur.name, parentId: knownFolderParents[cur.id])
         let picked: [PlanRoot]
         if selectedIds.isEmpty {
-            picked = [PlanRoot(folderId: cur.id, name: cur.name)]
+            picked = [currentRoot]
         } else {
             picked = entries
                 .filter { $0.isDir && selectedIds.contains($0.fileId) }
-                .map { PlanRoot(folderId: $0.fileId, name: $0.fileName) }
+                .map { PlanRoot(folderId: $0.fileId, name: $0.fileName, parentId: $0.parentFileId ?? cur.id) }
         }
-        let targetRoots = picked.isEmpty ? [PlanRoot(folderId: cur.id, name: cur.name)] : picked
+        let targetRoots = picked.isEmpty ? [currentRoot] : picked
         selectedIds.removeAll()
         BackgroundScanManager.shared.startScan(account: account, roots: targetRoots)
     }

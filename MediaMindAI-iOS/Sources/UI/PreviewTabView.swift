@@ -37,7 +37,7 @@ public struct PreviewTabView: View {
     @State private var errorMsg: String?
 
     private var activePlan: ScrapePlan? {
-        planStore.plans.first { $0.id == planId }.map { planStore.pendingProjection($0) }
+        planStore.pendingPlans.first { $0.id == planId }
     }
 
     public var body: some View {
@@ -71,10 +71,15 @@ public struct PreviewTabView: View {
                         .padding(.bottom, 8)
                     }
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        bottomActions(plan: plan, manual: manual)
+                        if showSearch {
+                            searchKeyboardBar
+                        } else {
+                            bottomActions(plan: plan, manual: manual)
+                        }
                     }
                 } else {
-                    ContentUnavailableView("扫描计划已不存在", systemImage: "film")
+                    ContentUnavailableView("暂无待执行内容", systemImage: "film",
+                        description: Text("任务可能已取消或已提交执行，请返回任务中心查看。"))
                 }
             }
             .background(Color(.systemGroupedBackground))
@@ -91,9 +96,7 @@ public struct PreviewTabView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showSearch.toggle()
-                        searchFocused = showSearch
-                        if !showSearch { searchQuery = "" }
+                        if showSearch { closeSearch() } else { showSearch = true }
                     } label: {
                         Image(systemName: "magnifyingglass").font(.headline)
                             .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
@@ -108,32 +111,44 @@ public struct PreviewTabView: View {
                 rematchSeasonFilter = nil
             }) {
                 if let primary = rematchTargets.first {
-                    let useTargetMode = primary.kind == "unmatched" || rematchSeasonFilter != nil
+                    let submitted = Set(activePlan?.submittedActionIds ?? [])
+                    let hasSubmittedActions = activePlan?.actions.contains { action in
+                        submitted.contains(action.id) && rematchTargets.contains { $0.id == action.groupId }
+                    } ?? false
+                    let useTargetMode = primary.kind == "unmatched" || rematchSeasonFilter != nil || hasSubmittedActions
                     let targets = useTargetMode
                         ? buildMatchTargetGroups(for: rematchTargets, plan: activePlan, seasonFilter: rematchSeasonFilter)
                         : []
                     let parsedPrimary = MediaParser.parse(primary.folderName)
-                    ManualMatchSheet(
-                        initialQuery: parsedPrimary.cleanTitle,
-                        initialKind: primary.kind == "tv" ? "tv" : "movie",
-                        initialYear: primary.year.isEmpty ? (parsedPrimary.year.map { "\($0)" } ?? "") : primary.year,
-                        applying: rematchApplying,
-                        applyError: rematchError,
-                        targetGroups: targets,
-                        onApply: { picked in
-                            if let s = rematchSeasonFilter {
-                                let seasonOverrides = targets.map {
-                                    GroupMatchOverride(key: $0.key, actionIds: $0.actionIds, season: s)
+                    if useTargetMode && targets.isEmpty {
+                        VStack {
+                            ContentUnavailableView("没有可重新识别的剩余视频", systemImage: "checkmark.circle",
+                                description: Text("已提交的文件请从历史任务重试；剩余素材与目录操作仍可按原计划执行。"))
+                            Button("关闭") { showRematchSheet = false }.padding()
+                        }
+                    } else {
+                        ManualMatchSheet(
+                            initialQuery: parsedPrimary.cleanTitle,
+                            initialKind: primary.kind == "tv" ? "tv" : "movie",
+                            initialYear: primary.year.isEmpty ? (parsedPrimary.year.map { "\($0)" } ?? "") : primary.year,
+                            applying: rematchApplying,
+                            applyError: rematchError,
+                            targetGroups: targets,
+                            onApply: { picked in
+                                if let s = rematchSeasonFilter {
+                                    let seasonOverrides = targets.map {
+                                        GroupMatchOverride(key: $0.key, actionIds: $0.actionIds, season: s)
+                                    }
+                                    applyManualMatch(groups: rematchTargets, match: picked, overrides: seasonOverrides)
+                                } else {
+                                    applyManualMatch(groups: rematchTargets, match: picked, overrides: [])
                                 }
-                                applyManualMatch(groups: rematchTargets, match: picked, overrides: seasonOverrides)
-                            } else {
-                                applyManualMatch(groups: rematchTargets, match: picked, overrides: [])
-                            }
-                        },
-                        onApplyGroups: useTargetMode ? { picked, overrides in
-                            applyManualMatch(groups: rematchTargets, match: picked, overrides: overrides)
-                        } : nil
-                    )
+                            },
+                            onApplyGroups: useTargetMode ? { picked, overrides in
+                                applyManualMatch(groups: rematchTargets, match: picked, overrides: overrides)
+                            } : nil
+                        )
+                    }
                 }
             }
             .sheet(item: $editingStrategyGroup) { grp in
@@ -223,15 +238,6 @@ public struct PreviewTabView: View {
                 Text("待手动识别 (\(manual.count))").tag(true)
             }
             .pickerStyle(.segmented)
-            if showSearch {
-                HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("搜索片名、目录、年份或 TMDB ID", text: $searchQuery)
-                        .focused($searchFocused).submitLabel(.search)
-                }
-                .font(.subheadline).padding(9)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
-            }
             if !manualTab {
                 HStack(spacing: 6) {
                     ForEach(PreviewFilterKind.visibleCases) { kind in
@@ -256,6 +262,37 @@ public struct PreviewTabView: View {
         .background(Color(.systemGroupedBackground))
     }
 
+    private var searchKeyboardBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("搜索片名、目录、年份或 TMDB ID", text: $searchQuery)
+                    .focused($searchFocused).submitLabel(.search)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .onSubmit { searchFocused = false }
+                if !searchQuery.isEmpty {
+                    Button { searchQuery = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel("清空搜索")
+                }
+            }
+            .font(.subheadline).padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            Button("取消", action: closeSearch).font(.subheadline).foregroundStyle(MMTheme.accent)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20).padding(.vertical, 8)
+        .background(.bar)
+        .onAppear { searchFocused = true }
+    }
+
+    private func closeSearch() {
+        searchFocused = false
+        showSearch = false
+        searchQuery = ""
+    }
+
     private func selectCategory(_ kind: PreviewFilterKind, plan: ScrapePlan) {
         guard filterKind == kind else { filterKind = kind; categoryToggleSelected = false; return }
         let groups = PreviewFilter.apply(groups: plan.groups.filter { $0.kind != "unmatched" }, kind: kind, query: searchQuery, plan: plan)
@@ -276,7 +313,7 @@ public struct PreviewTabView: View {
                         .padding(.horizontal, 4)
 
                     ForEach(sec.groups) { group in
-                        let groupActions = plan.actions.filter { $0.groupId == group.id && $0.enabled && !(plan.submittedActionIds ?? []).contains($0.id) }
+                        let groupActions = plan.actions.filter { $0.groupId == group.id && !(plan.submittedActionIds ?? []).contains($0.id) }
                         VStack(alignment: .leading, spacing: 8) {
                             if group.confirmRequired {
                                 Label("需人工确认：\(group.confirmReasons.joined(separator: "、"))", systemImage: "exclamationmark.shield.fill")
@@ -502,22 +539,19 @@ public struct PreviewTabView: View {
 
     private func buildMatchTargetGroups(for groups: [PlanGroup], plan: ScrapePlan?, seasonFilter: Int? = nil) -> [MatchTargetGroup] {
         guard let plan else { return [] }
-        return groups.map { grp in
-            var seenFileKeys = Set<String>()
-            let allFiles = plan.actions.filter { act in
-                guard act.groupId == grp.id && (act.kind == "file" || act.op == "unmatched") else { return false }
-                return seenFileKeys.insert(act.fileId ?? act.id).inserted
-            }
+        return groups.compactMap { grp in
+            let allFiles = plan.manualMatchActions(groupId: grp.id)
             let fileActions: [PlanAction]
             if let seasonFilter {
                 let bySeason = allFiles.filter { act in
                     let s = act.season ?? MediaParser.parse(act.oldName.isEmpty ? act.newName : act.oldName, folderHint: grp.folderName).season ?? 1
                     return s == seasonFilter
                 }
-                fileActions = bySeason.isEmpty ? allFiles : bySeason
+                fileActions = bySeason
             } else {
                 fileActions = allFiles
             }
+            guard !fileActions.isEmpty else { return nil }
             let files = fileActions.map { MatchTargetGroup.FileItem(id: $0.id, name: $0.oldName.isEmpty ? $0.newName : $0.oldName) }
             let first = fileActions.first
             let basePath = grp.folderPath ?? grp.folderName
@@ -997,6 +1031,10 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                                 Text("同目录待手动识别")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                            } else if episodeFileActions.isEmpty {
+                                Text("目录或素材操作")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
 
                             HStack(spacing: 10) {
@@ -1065,7 +1103,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
                             .foregroundStyle(.secondary)
                             .buttonStyle(.borderless)
                     } else {
-                        let execs = actions.filter { !$0.done && $0.op != "unmatched" }
+                        let execs = actions.filter { PlanSelection.executable($0) }
                         if !execs.isEmpty {
                             let allOn = execs.allSatisfy(\.selected)
                             Button {
@@ -1238,7 +1276,7 @@ private struct MediaGroupCardRow<DetailDestination: View>: View {
             } else if !episodeFileActions.isEmpty {
                 episodeRowsList(episodeFileActions)
             } else {
-                Text("暂无视频文件条目")
+                Text("当前剩余操作不包含视频文件，可进入作品详情查看目录和素材。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

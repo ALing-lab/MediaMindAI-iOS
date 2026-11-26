@@ -317,6 +317,25 @@ public struct ScrapePlan: Identifiable, Codable, Sendable {
     public var executionRunIds: [String]? = nil
     public var scanPriorRunIds: [String]? = nil
 
+    /// 历史范围仍保留在计划中供依赖与日志使用，不能作为新的手动识别目标。
+    public var submittedSourceIds: Set<String> {
+        let submitted = Set(submittedActionIds ?? [])
+        return Set(actions.filter { submitted.contains($0.id) }.compactMap(\.fileId))
+    }
+
+    public func manualMatchActions(groupId: String) -> [PlanAction] {
+        let submitted = Set(submittedActionIds ?? [])
+        let sources = submittedSourceIds
+        var seen = Set<String>()
+        return actions.filter { action in
+            guard action.groupId == groupId, !action.done,
+                  action.kind == "file" || action.op == "unmatched",
+                  !submitted.contains(action.id),
+                  action.fileId.map({ !sources.contains($0) }) ?? true else { return false }
+            return seen.insert(action.fileId ?? action.id).inserted
+        }
+    }
+
     public var uniqueMediaCount: Int {
         var keys = Set<String>()
         for group in groups {
@@ -479,11 +498,27 @@ public final class PlanAndTaskStore {
             .union(plans.first(where: { $0.id == planId })?.submittedActionIds ?? [])
     }
 
+    private func remainingGroupIds(in plan: ScrapePlan, reserved: Set<String>) -> Set<String> {
+        let submittedActions = plan.actions.filter { reserved.contains($0.id) }
+        let submittedGroups = Set(submittedActions.map(\.groupId))
+        let submittedSources = Set(submittedActions.compactMap(\.fileId))
+        let pending = Set(plan.actions.filter { action in
+            guard !action.done && !reserved.contains(action.id) else { return false }
+            let untouchedSource = action.fileId.map { !submittedSources.contains($0) } ?? false
+            if action.op == "unmatched" { return action.fileId == nil || untouchedSource }
+            // 尚未提交的作品允许调整策略；已提交作品的禁用残留不能生成空卡片。
+            return ExecutionEngine.execOps.contains(action.op)
+                && (action.enabled || !submittedGroups.contains(action.groupId) || (action.kind == "file" && untouchedSource))
+        }.map(\.groupId))
+        return Set(plan.groups.filter { pending.contains($0.id) || $0.kind == "unmatched" }.map(\.id))
+    }
+
     public func pendingProjection(_ plan: ScrapePlan) -> ScrapePlan {
         var copy = plan
         let reserved = reservedActionIds(planId: plan.id)
-        let pending = Set(plan.actions.filter { !$0.done && !reserved.contains($0.id) && ExecutionEngine.execOps.contains($0.op) }.map(\.groupId))
-        copy.groups = plan.groups.filter { pending.contains($0.id) || $0.kind == "unmatched" }
+        copy.submittedActionIds = reserved.sorted()
+        let pending = remainingGroupIds(in: plan, reserved: reserved)
+        copy.groups = plan.groups.filter { pending.contains($0.id) }
         for index in copy.actions.indices where reserved.contains(copy.actions[index].id) { copy.actions[index].selected = false }
         return copy
     }
@@ -493,11 +528,22 @@ public final class PlanAndTaskStore {
               pendingPlans.contains(where: { $0.id == original.id }) else { throw DriveError.invalidInput("计划已被合并或开始执行，请重新打开预览") }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         guard try encoder.encode(pendingProjection(current)) == encoder.encode(original) else { throw DriveError.invalidInput("计划已更新，本次旧识别结果未覆盖新计划，请重新打开预览") }
+        guard !reintroducesSubmittedSource(edited, current: current) else { throw DriveError.invalidInput("识别结果包含已提交的源文件，请从历史任务重试该文件，或重新打开预览识别剩余文件") }
         savePendingPlan(edited)
+    }
+
+    private func reintroducesSubmittedSource(_ edited: ScrapePlan, current: ScrapePlan) -> Bool {
+        let reserved = reservedActionIds(planId: current.id)
+        let sources = Set(current.actions.filter { reserved.contains($0.id) }.compactMap(\.fileId))
+        let existingIds = Set(current.actions.map(\.id))
+        return edited.actions.contains { action in
+            !existingIds.contains(action.id) && action.fileId.map { sources.contains($0) } == true
+        }
     }
 
     public func savePendingPlan(_ edited: ScrapePlan) {
         guard let current = plans.first(where: { $0.id == edited.id }), pendingPlans.contains(where: { $0.id == edited.id }) else { return }
+        guard !reintroducesSubmittedSource(edited, current: current) else { return }
         let reserved = reservedActionIds(planId: edited.id)
         var next = edited
         next.actions = edited.actions.filter { !reserved.contains($0.id) } + current.actions.filter { reserved.contains($0.id) }
@@ -522,8 +568,7 @@ public final class PlanAndTaskStore {
     public func markExecutionStarted(_ plan: ScrapePlan, requested: [String], runId: String) -> ScrapePlan {
         var copy = plan
         let reserved = reservedActionIds(planId: plan.id).union(requested)
-        let remaining = plan.actions.contains { !$0.done && !reserved.contains($0.id) && ExecutionEngine.execOps.contains($0.op) }
-            || plan.groups.contains { $0.kind == "unmatched" }
+        let remaining = !remainingGroupIds(in: plan, reserved: reserved).isEmpty
         copy.reviewDisposition = remaining ? "pending" : "started"
         copy.submittedActionIds = reserved.sorted()
         copy.executionRunIds = Array(Set(plan.executionRunIds ?? []).union([runId])).sorted()

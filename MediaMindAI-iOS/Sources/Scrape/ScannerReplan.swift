@@ -51,7 +51,7 @@ public enum ScannerReplanError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .groupNotFound: return "找不到分组"
-        case .alreadyExecuted: return "该分组已有执行完成的操作，请重新扫描后再匹配"
+        case .alreadyExecuted: return "该分组包含已提交或完成的操作，请只识别剩余文件，或重新扫描后再匹配"
         case .looseStrategyUnsupported: return "散文件请先按剧集文件夹重新扫描，再切换剧集策略"
         case .accountMismatch: return "网盘账号与计划不一致"
         case .fileAlreadyProcessed: return "该文件已被处理，请刷新预览"
@@ -131,7 +131,8 @@ public enum ScannerReplan {
         guard let old = plan.groups.first(where: { $0.id == groupId }) else {
             throw ScannerReplanError.groupNotFound
         }
-        guard !plan.actions.contains(where: { $0.groupId == groupId && $0.done }) else {
+        let submitted = Set(plan.submittedActionIds ?? [])
+        guard !plan.actions.contains(where: { $0.groupId == groupId && ($0.done || submitted.contains($0.id)) }) else {
             throw ScannerReplanError.alreadyExecuted
         }
         let sameShowForStrategy = (old.tmdbId == info.id && old.kind == "tv")
@@ -482,6 +483,10 @@ public enum ScannerReplan {
     ) async throws -> ScrapePlan {
         guard cloud.accountId == plan.accountId else { throw ScannerReplanError.accountMismatch }
         guard let source = plan.actions.first(where: { $0.id == actionId && !$0.done && ($0.op == "unmatched" || $0.kind == "file") }) else {
+            throw ScannerReplanError.fileAlreadyProcessed
+        }
+        guard !(plan.submittedActionIds ?? []).contains(source.id),
+              source.fileId.map({ !plan.submittedSourceIds.contains($0) }) ?? true else {
             throw ScannerReplanError.fileAlreadyProcessed
         }
         guard source.fileId != nil && source.parentId != nil else {
