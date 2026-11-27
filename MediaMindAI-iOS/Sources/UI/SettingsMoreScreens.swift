@@ -519,6 +519,8 @@ public struct AboutView: View {
         }
         .navigationTitle("关于")
         .navigationBarTitleDisplayMode(.inline)
+        // 滚动前后均透出同一固定光晕，避免导航栏自动材质产生横向色带。
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { checking = true } label: {
