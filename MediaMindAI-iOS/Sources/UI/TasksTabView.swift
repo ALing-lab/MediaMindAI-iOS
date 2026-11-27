@@ -189,6 +189,7 @@ public struct TasksTabView: View {
                 }
             }
             .navigationTitle("任务中心")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.large)
             .fullScreenCover(item: $previewPlan) { plan in
                 PreviewTabView(planId: plan.id, onStartExecution: {

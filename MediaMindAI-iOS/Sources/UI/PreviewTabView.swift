@@ -82,13 +82,9 @@ public struct PreviewTabView: View {
                         description: Text("任务可能已取消或已提交执行，请返回任务中心查看。"))
                 }
             }
-            .background {
-                ZStack(alignment: .top) {
-                    Color(.systemGroupedBackground).ignoresSafeArea()
-                    TopAmbientGlow()
-                }
-            }
+            .background { previewSurface.ignoresSafeArea() }
             .navigationTitle("识别结果")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.large)
             .toolbar(.hidden, for: .tabBar)
             .toolbar {
@@ -229,6 +225,24 @@ public struct PreviewTabView: View {
                 }
             }
         }
+        .coordinateSpace(name: "recognitionViewport")
+    }
+
+    // 页面和置顶栏使用同一视口坐标的渐变切片；实色底层始终遮住作品内容。
+    private var previewSurface: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground)
+                LinearGradient(
+                    colors: [MMTheme.accent.opacity(0.22), MMTheme.accent.opacity(0.06), .clear],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: 180)
+                .offset(y: -geometry.frame(in: .named("recognitionViewport")).minY)
+            }
+            .clipped()
+        }
+        .allowsHitTesting(false)
     }
 
     private func previewHeader(plan: ScrapePlan, ready: [PlanGroup], manual: [PlanGroup]) -> some View {
@@ -264,7 +278,7 @@ public struct PreviewTabView: View {
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 10)
-        .background(Color(.systemGroupedBackground))
+        .background { previewSurface }
     }
 
     private var searchKeyboardBar: some View {

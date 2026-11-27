@@ -194,6 +194,7 @@ public struct CloudTabView: View {
                 }
             }
             .navigationTitle("文件来源")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

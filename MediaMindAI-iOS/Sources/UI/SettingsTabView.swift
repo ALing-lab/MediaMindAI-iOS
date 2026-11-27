@@ -101,6 +101,7 @@ public struct SettingsTabView: View {
                 .onAppear { engineRetainedCount = RetentionZoneEngine.shared.retainedRecords().count }
             }
             .navigationTitle("设置")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .confirmationDialog("清除全部本地计划、TMDB 与图片缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
                 Button("确认清除", role: .destructive) {
                     PlanAndTaskStore.shared.clearAllCache()
