@@ -8,6 +8,8 @@ public struct SettingsTabView: View {
     @State private var retention = RetentionZoneStore.shared
     @State private var engineRetainedCount: Int = RetentionZoneEngine.shared.retainedRecords().count
     @State private var showClearConfirm = false
+    @State private var scrollOriginY: CGFloat?
+    @State private var topVeilOpacity: Double = 0
 
     public var body: some View {
         NavigationStack {
@@ -46,6 +48,12 @@ public struct SettingsTabView: View {
                 .pickerStyle(.segmented)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: SettingsScrollOriginKey.self,
+                            value: geometry.frame(in: .named("settingsViewport")).minY)
+                    }
+                }
             }
 
             Section("识别与网络") {
@@ -122,6 +130,47 @@ public struct SettingsTabView: View {
             .scrollContentBackground(.hidden)
             .onAppear { engineRetainedCount = RetentionZoneEngine.shared.retainedRecords().count }
         }
+        .coordinateSpace(name: "settingsViewport")
+        .onPreferenceChange(SettingsScrollOriginKey.self) { y in
+            // 首行离开 List 的可见范围后保留遮罩，返回顶部时再连续淡出。
+            guard let y else { return }
+            if scrollOriginY == nil { scrollOriginY = y }
+            let distance = max(0, (scrollOriginY ?? y) - y)
+            topVeilOpacity = Double(min(1, distance / 64))
+        }
+        .overlay(alignment: .top) {
+            settingsTopVeil
+                .opacity(topVeilOpacity)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    // Material 随透明渐变混合，不使用带硬底边的矩形导航栏背景。
+    private var settingsTopVeil: some View {
+        Rectangle()
+            .fill(.regularMaterial)
+            .overlay {
+                LinearGradient(colors: [MMTheme.accent.opacity(0.16), .clear],
+                    startPoint: .top, endPoint: .bottom)
+            }
+            .mask {
+                LinearGradient(stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.35),
+                    .init(color: .black.opacity(0.65), location: 0.65),
+                    .init(color: .clear, location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+            }
+            .frame(height: 140)
+            .ignoresSafeArea(edges: .top)
+    }
+}
+
+private struct SettingsScrollOriginKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        if let next = nextValue() { value = next }
     }
 }
 
