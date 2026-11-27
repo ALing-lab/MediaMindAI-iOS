@@ -83,229 +83,257 @@ public struct TasksTabView: View {
 
     public var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                Color(.systemGroupedBackground).ignoresSafeArea()
-                TopAmbientGlow()
+            taskFinalPresentation
+        }
+    }
 
-                VStack(spacing: 0) {
-                    // 顶部双标签：进行中 (N) | 已完成
-                    Picker("任务状态", selection: $selectedTab) {
-                        Text(activeCount > 0 ? "进行中 (\(activeCount))" : "进行中").tag(TaskFilterTab.active)
-                        Text("已完成").tag(TaskFilterTab.completed)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
-
-                    let uncertain = journal.uncertainRows()
-                    let walUncertain = ReversibleWalStore.shared.uncertainRecords()
-                    let hasBanners = !missingBackupControls.isEmpty || !unverifiedAssetControls.isEmpty || !interruptedUndoControls.isEmpty || reconcileHint != nil || !uncertain.isEmpty || !walUncertain.isEmpty
-                    let isTabEmpty = (selectedTab == .active && activeCount == 0) || (selectedTab == .completed && completedRuns.isEmpty)
-
-                    if isTabEmpty && !hasBanners {
-                        ContentUnavailableView(
-                            selectedTab == .active ? "暂无进行中的任务" : "暂无已完成任务",
-                            systemImage: selectedTab == .active ? "bolt.circle" : "checkmark.circle",
-                            description: Text(selectedTab == .active
-                                              ? "在「云盘」扫描完成后，待执行任务会显示在这里。"
-                                              : "执行完成或已取消的任务记录会归档在这里，可随时查看日志与一键回滚。")
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(interruptedUndoControls) { control in
-                                    Button("撤销中断，继续处理（\(control.taskId)）") {
-                                        continueUndoPreservingAssets(control, resumeExisting: true)
-                                    }
-                                    .font(.footnote).padding(12)
-                                    .disabled(applyingAssetChoice || engine.isRollingBack)
-                                }
-                                ForEach(unverifiedAssetControls) { control in
-                                    Button("撤销暂停：\(control.unverifiedAssetIds.count) 项旧素材需确认转存") {
-                                        assetChoice = control
-                                    }
-                                    .font(.footnote).padding(12).disabled(applyingAssetChoice)
-                                }
-                                ForEach(missingBackupControls) { control in
-                                    Button("撤销暂停：\(control.missingBackupIds.count) 项备份缺失，选择处理方式") {
-                                        backupChoice = control
-                                    }
-                                    .font(.footnote)
-                                    .padding(12)
-                                }
-
-
-                                if let reconcileHint {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "info.circle.fill").foregroundStyle(MMTheme.accent)
-                                        Text(reconcileHint).font(.footnote)
-                                        Spacer()
-                                        Button("关闭") { self.reconcileHint = nil }
-                                            .font(.caption)
-                                            .foregroundStyle(MMTheme.accent)
-                                    }
-                                    .padding(12)
-                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                }
-
-                                if !uncertain.isEmpty || !walUncertain.isEmpty {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        Label("检测到 \(uncertain.count + walUncertain.count) 条未收口操作日志（可能因断网或中断导致）", systemImage: "exclamationmark.triangle.fill")
-                                            .font(.footnote.weight(.medium))
-                                            .foregroundStyle(.orange)
-                                        Button {
-                                            Task { await runReconcile() }
-                                        } label: {
-                                            HStack(spacing: 6) {
-                                                if reconciling { ProgressView().controlSize(.small) }
-                                                Text(reconciling ? "核实中…" : "核实云端真实状态")
-                                                    .font(.caption.weight(.semibold))
-                                            }
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(MMTheme.accent, in: Capsule())
-                                            .foregroundStyle(.white)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .disabled(reconciling)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(14)
-                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                }
-
-                                if selectedTab == .active {
-                                    activeTabContent
-                                } else {
-                                    completedTabContent
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 24)
+    private var taskPrimaryPresentation: some View {
+        taskPageContent
+        .navigationTitle("任务中心")
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.large)
+        .fullScreenCover(item: $previewPlan) { plan in
+            PreviewTabView(planId: plan.id, onStartExecution: {
+                previewPlan = nil
+                selectedTab = .active
+            })
+        }
+        .onChange(of: pendingPlans.map(\.id)) { old, new in
+            if new.contains(where: { !old.contains($0) }) { selectedTab = .active }
+        }
+        .alert("取消待执行任务？", isPresented: Binding(get: { pendingCancelPlan != nil }, set: { if !$0 { pendingCancelPlan = nil } }), presenting: pendingCancelPlan) { plan in
+            Button("取消任务", role: .destructive) {
+                store.cancelPendingPlan(id: plan.id)
+                pendingCancelPlan = nil
+            }
+            Button("继续保留", role: .cancel) { pendingCancelPlan = nil }
+        } message: { _ in Text("仅取消本地待执行计划，不修改云盘文件。") }
+        .sheet(item: $backupChoice) { control in
+            NavigationStack {
+                Form {
+                    Section {
+                        Text("原备份已缺失。继续后将尝试采用本任务当前生成的文件，或重新刮削补齐；这些文件不是原备份。无法核验的文件不会被覆盖。")
+                        ForEach(control.missingBackupIds, id: \.self) { actionId in
+                            let row = ReversibleWalStore.shared.find(taskId: control.taskId, actionId: actionId)
+                            Text(row?.before?.name ?? actionId)
                         }
                     }
-                }
-            }
-            .navigationTitle("任务中心")
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .navigationBarTitleDisplayMode(.large)
-            .fullScreenCover(item: $previewPlan) { plan in
-                PreviewTabView(planId: plan.id, onStartExecution: {
-                    previewPlan = nil
-                    selectedTab = .active
-                })
-            }
-            .onChange(of: pendingPlans.map(\.id)) { old, new in
-                if new.contains(where: { !old.contains($0) }) { selectedTab = .active }
-            }
-            .alert("取消待执行任务？", isPresented: Binding(get: { pendingCancelPlan != nil }, set: { if !$0 { pendingCancelPlan = nil } }), presenting: pendingCancelPlan) { plan in
-                Button("取消任务", role: .destructive) {
-                    store.cancelPendingPlan(id: plan.id)
-                    pendingCancelPlan = nil
-                }
-                Button("继续保留", role: .cancel) { pendingCancelPlan = nil }
-            } message: { _ in Text("仅取消本地待执行计划，不修改云盘文件。") }
-            .sheet(item: $backupChoice) { control in
-                NavigationStack {
-                    Form {
-                        Section {
-                            Text("原备份已缺失。继续后将尝试采用本任务当前生成的文件，或重新刮削补齐；这些文件不是原备份。无法核验的文件不会被覆盖。")
-                            ForEach(control.missingBackupIds, id: \.self) { actionId in
-                                let row = ReversibleWalStore.shared.find(taskId: control.taskId, actionId: actionId)
-                                Text(row?.before?.name ?? actionId)
-                            }
-                        }
-                        Button("同意以新文件补齐并继续撤销", role: .destructive) {
-                            continueUndoWithSubstitutions(control)
-                        }
+                    Button("同意以新文件补齐并继续撤销", role: .destructive) {
+                        continueUndoWithSubstitutions(control)
+                    }
+                    .disabled(applyingBackupChoice)
+                    Button("暂不处理，保留当前文件") { backupChoice = nil }
                         .disabled(applyingBackupChoice)
-                        Button("暂不处理，保留当前文件") { backupChoice = nil }
-                            .disabled(applyingBackupChoice)
-                    }
-                    .navigationTitle("缺失备份处理")
-                    .interactiveDismissDisabled(applyingBackupChoice)
                 }
+                .navigationTitle("缺失备份处理")
+                .interactiveDismissDisabled(applyingBackupChoice)
             }
-            .alert("确认转存旧素材？", isPresented: Binding(get: { assetChoice != nil }, set: { if !$0 { assetChoice = nil } }), presenting: assetChoice) { control in
-                Button("确认转存并继续撤销") { continueUndoPreservingAssets(control) }
-                Button("取消", role: .cancel) { assetChoice = nil }
-            } message: { control in
-                let rows = ReversibleWalStore.shared.rows(taskId: control.taskId)
-                let names = control.unverifiedAssetIds.map { id in rows.first(where: { $0.id == id })?.after?.name ?? id }
-                Text("以下旧素材缺少内容摘要，可能包含后续修改。确认后只将当前素材移动到可恢复的撤销保留区，不删除：\n" + names.joined(separator: "\n"))
-            }
-            .alert("停止当前任务？", isPresented: $showStopConfirm) {
-                Button("停止并保留已完成项") {
-                    let run = stoppingRun
-                    if let run {
-                        let acctId = !run.accountId.isEmpty ? run.accountId : (AccountStore.shared.activeAccount?.id ?? "")
-                        Task {
-                            if let ctrl = try? TaskCancellation.shared.request(taskId: run.id, accountId: acctId, undo: false) {
-                                _ = await TaskCancellation.shared.applyKeep(control: ctrl)
-                            } else {
-                                await engine.stopAndWait()
-                            }
-                            await MainActor.run { reconcileHint = "任务已停止并保留已完成项" }
-                        }
-                    } else {
-                        engine.stop()
-                    }
-                }
-                Button("停止并撤销已完成项", role: .destructive) {
-                    let run = stoppingRun
-                    if let run {
-                        let acct: DriveAccount? = !run.accountId.isEmpty
-                            ? AccountStore.shared.get(id: run.accountId)
-                            : AccountStore.shared.activeAccount
-                        if let acct, let drive = try? AccountStore.shared.buildDrive(for: acct) {
-                            Task {
-                                do {
-                                    let ctrl = try TaskCancellation.shared.request(taskId: run.id, accountId: acct.id, undo: true)
-                                    let done = await TaskCancellation.shared.apply(control: ctrl, drive: drive)
-                                    await MainActor.run {
-                                        if done.state == "completed" {
-                                            reconcileHint = "任务已停止并撤销已完成操作"
-                                        } else if done.state == "needs_asset_choice" {
-                                            reconcileHint = "撤销暂停：旧素材缺少摘要，请确认是否转存保留"
-                                        } else if done.state == "needs_backup_choice" {
-                                            reconcileHint = "撤销暂停：缺失备份 \(done.missingBackupIds.count) 项，请在任务中心选择处理方式"
-                                        } else {
-                                            reconcileHint = "撤销遇到冲突或待核实日志，请先点击「核实云端真实状态」"
-                                        }
-                                    }
-                                } catch {
-                                    await engine.stopAndWait()
-                                    await MainActor.run { reconcileHint = "停止撤销失败：\(error.localizedDescription)" }
-                                }
-                            }
+        }
+    }
+
+    private var taskFinalPresentation: some View {
+        taskPrimaryPresentation
+        .alert("确认转存旧素材？", isPresented: Binding(get: { assetChoice != nil }, set: { if !$0 { assetChoice = nil } }), presenting: assetChoice) { control in
+            Button("确认转存并继续撤销") { continueUndoPreservingAssets(control) }
+            Button("取消", role: .cancel) { assetChoice = nil }
+        } message: { control in
+            let rows = ReversibleWalStore.shared.rows(taskId: control.taskId)
+            let names = control.unverifiedAssetIds.map { id in rows.first(where: { $0.id == id })?.after?.name ?? id }
+            Text("以下旧素材缺少内容摘要，可能包含后续修改。确认后只将当前素材移动到可恢复的撤销保留区，不删除：\n" + names.joined(separator: "\n"))
+        }
+        .alert("停止当前任务？", isPresented: $showStopConfirm) {
+            Button("停止并保留已完成项") {
+                let run = stoppingRun
+                if let run {
+                    let acctId = !run.accountId.isEmpty ? run.accountId : (AccountStore.shared.activeAccount?.id ?? "")
+                    Task {
+                        if let ctrl = try? TaskCancellation.shared.request(taskId: run.id, accountId: acctId, undo: false) {
+                            _ = await TaskCancellation.shared.applyKeep(control: ctrl)
                         } else {
-                            engine.stop()
-                            reconcileHint = "原任务所属云盘账号已删除或不可用，无法撤销已完成操作"
+                            await engine.stopAndWait()
+                        }
+                        await MainActor.run { reconcileHint = "任务已停止并保留已完成项" }
+                    }
+                } else {
+                    engine.stop()
+                }
+            }
+            Button("停止并撤销已完成项", role: .destructive) {
+                let run = stoppingRun
+                if let run {
+                    let acct: DriveAccount? = !run.accountId.isEmpty
+                        ? AccountStore.shared.get(id: run.accountId)
+                        : AccountStore.shared.activeAccount
+                    if let acct, let drive = try? AccountStore.shared.buildDrive(for: acct) {
+                        Task {
+                            do {
+                                let ctrl = try TaskCancellation.shared.request(taskId: run.id, accountId: acct.id, undo: true)
+                                let done = await TaskCancellation.shared.apply(control: ctrl, drive: drive)
+                                await MainActor.run {
+                                    if done.state == "completed" {
+                                        reconcileHint = "任务已停止并撤销已完成操作"
+                                    } else if done.state == "needs_asset_choice" {
+                                        reconcileHint = "撤销暂停：旧素材缺少摘要，请确认是否转存保留"
+                                    } else if done.state == "needs_backup_choice" {
+                                        reconcileHint = "撤销暂停：缺失备份 \(done.missingBackupIds.count) 项，请在任务中心选择处理方式"
+                                    } else {
+                                        reconcileHint = "撤销遇到冲突或待核实日志，请先点击「核实云端真实状态」"
+                                    }
+                                }
+                            } catch {
+                                await engine.stopAndWait()
+                                await MainActor.run { reconcileHint = "停止撤销失败：\(error.localizedDescription)" }
+                            }
                         }
                     } else {
                         engine.stop()
+                        reconcileHint = "原任务所属云盘账号已删除或不可用，无法撤销已完成操作"
+                    }
+                } else {
+                    engine.stop()
+                }
+            }
+            Button("继续执行", role: .cancel) {}
+        } message: {
+            Text("选择停止方式：保留已完成项，或尝试把本轮已执行的云端操作逐条回滚。")
+        }
+        .alert(
+            "删除本次尝试记录？",
+            isPresented: Binding(get: { pendingDeleteRun != nil }, set: { if !$0 { pendingDeleteRun = nil } }),
+            presenting: pendingDeleteRun
+        ) { target in
+            Button("删除本次记录", role: .destructive) {
+                let isActive = engine.currentRun?.id == target.id && (engine.isRunning || engine.isPaused)
+                store.deleteTask(id: target.id, allowPaused: !isActive)
+                pendingDeleteRun = nil
+            }
+            Button("取消", role: .cancel) { pendingDeleteRun = nil }
+        } message: { _ in
+            Text("仅删除本次尝试的本地记录；其它尝试仍保留，较早的一次可能重新显示在任务中心。不影响网盘文件。若需要撤销本次操作，请保留此记录。")
+        }
+    }
+
+    private var isSelectedTabEmpty: Bool {
+        (selectedTab == .active && activeCount == 0)
+            || (selectedTab == .completed && completedRuns.isEmpty)
+    }
+
+    private var hasTaskBanners: Bool {
+        !missingBackupControls.isEmpty || !unverifiedAssetControls.isEmpty
+            || !interruptedUndoControls.isEmpty || reconcileHint != nil
+            || !journal.uncertainRows().isEmpty || !ReversibleWalStore.shared.uncertainRecords().isEmpty
+    }
+
+    private var taskPageContent: some View {
+        ZStack(alignment: .top) {
+            Color(.systemGroupedBackground).ignoresSafeArea()
+            TopAmbientGlow()
+
+            VStack(spacing: 0) {
+                taskStatePicker
+
+                if isSelectedTabEmpty && !hasTaskBanners {
+                    ContentUnavailableView(
+                        selectedTab == .active ? "暂无进行中的任务" : "暂无已完成任务",
+                        systemImage: selectedTab == .active ? "bolt.circle" : "checkmark.circle",
+                        description: Text(selectedTab == .active
+                                          ? "在「云盘」扫描完成后，待执行任务会显示在这里。"
+                                          : "执行完成或已取消的任务记录会归档在这里，可随时查看日志与一键回滚。")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            taskBanners
+                            if selectedTab == .active {
+                                activeTabContent
+                            } else {
+                                completedTabContent
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 24)
                     }
                 }
-                Button("继续执行", role: .cancel) {}
-            } message: {
-                Text("选择停止方式：保留已完成项，或尝试把本轮已执行的云端操作逐条回滚。")
             }
-            .alert(
-                "删除本次尝试记录？",
-                isPresented: Binding(get: { pendingDeleteRun != nil }, set: { if !$0 { pendingDeleteRun = nil } }),
-                presenting: pendingDeleteRun
-            ) { target in
-                Button("删除本次记录", role: .destructive) {
-                    let isActive = engine.currentRun?.id == target.id && (engine.isRunning || engine.isPaused)
-                    store.deleteTask(id: target.id, allowPaused: !isActive)
-                    pendingDeleteRun = nil
+        }
+    }
+
+    private var taskStatePicker: some View {
+        // 顶部双标签：进行中 (N) | 已完成
+        Picker("任务状态", selection: $selectedTab) {
+            Text(activeCount > 0 ? "进行中 (\(activeCount))" : "进行中").tag(TaskFilterTab.active)
+            Text("已完成").tag(TaskFilterTab.completed)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var taskBanners: some View {
+        let uncertain = journal.uncertainRows()
+        let walUncertain = ReversibleWalStore.shared.uncertainRecords()
+        ForEach(interruptedUndoControls) { control in
+            Button("撤销中断，继续处理（\(control.taskId)）") {
+                continueUndoPreservingAssets(control, resumeExisting: true)
+            }
+            .font(.footnote).padding(12)
+            .disabled(applyingAssetChoice || engine.isRollingBack)
+        }
+        ForEach(unverifiedAssetControls) { control in
+            Button("撤销暂停：\(control.unverifiedAssetIds.count) 项旧素材需确认转存") {
+                assetChoice = control
+            }
+            .font(.footnote).padding(12).disabled(applyingAssetChoice)
+        }
+        ForEach(missingBackupControls) { control in
+            Button("撤销暂停：\(control.missingBackupIds.count) 项备份缺失，选择处理方式") {
+                backupChoice = control
+            }
+            .font(.footnote)
+            .padding(12)
+        }
+
+
+        if let reconcileHint {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill").foregroundStyle(MMTheme.accent)
+                Text(reconcileHint).font(.footnote)
+                Spacer()
+                Button("关闭") { self.reconcileHint = nil }
+                    .font(.caption)
+                    .foregroundStyle(MMTheme.accent)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+
+        if !uncertain.isEmpty || !walUncertain.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("检测到 \(uncertain.count + walUncertain.count) 条未收口操作日志（可能因断网或中断导致）", systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.orange)
+                Button {
+                    Task { await runReconcile() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if reconciling { ProgressView().controlSize(.small) }
+                        Text(reconciling ? "核实中…" : "核实云端真实状态")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(MMTheme.accent, in: Capsule())
+                    .foregroundStyle(.white)
                 }
-                Button("取消", role: .cancel) { pendingDeleteRun = nil }
-            } message: { _ in
-                Text("仅删除本次尝试的本地记录；其它尝试仍保留，较早的一次可能重新显示在任务中心。不影响网盘文件。若需要撤销本次操作，请保留此记录。")
+                .buttonStyle(.plain)
+                .disabled(reconciling)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 

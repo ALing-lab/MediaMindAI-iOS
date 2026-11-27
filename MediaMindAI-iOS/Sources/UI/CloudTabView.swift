@@ -157,42 +157,7 @@ public struct CloudTabView: View {
 
     public var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                Color(.systemGroupedBackground).ignoresSafeArea()
-
-                // 顶部柔和渐变光晕
-                LinearGradient(
-                    colors: [
-                        MMTheme.accent.opacity(0.22),
-                        MMTheme.accent.opacity(0.06),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 170)
-                .ignoresSafeArea(edges: .top)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        // 「我的设备 / 我的收藏」下划线分段标签
-                        HStack(spacing: 24) {
-                            tabHeaderButton(title: "我的设备", tab: .devices)
-                            tabHeaderButton(title: "我的收藏", tab: .favorites)
-                            Spacer()
-                        }
-
-                        if activeTab == .devices {
-                            devicesSection
-                        } else {
-                            favoritesSection
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-                }
-            }
+            sourcePageContent
             .navigationTitle("文件来源")
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.large)
@@ -286,6 +251,45 @@ public struct CloudTabView: View {
             }
             .onAppear {
                 favorites = CloudFavoritesStore.load()
+            }
+        }
+    }
+
+    private var sourcePageContent: some View {
+        ZStack(alignment: .top) {
+            Color(.systemGroupedBackground).ignoresSafeArea()
+
+            // 顶部柔和渐变光晕
+            LinearGradient(
+                colors: [
+                    MMTheme.accent.opacity(0.22),
+                    MMTheme.accent.opacity(0.06),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 170)
+            .ignoresSafeArea(edges: .top)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    // 「我的设备 / 我的收藏」下划线分段标签
+                    HStack(spacing: 24) {
+                        tabHeaderButton(title: "我的设备", tab: .devices)
+                        tabHeaderButton(title: "我的收藏", tab: .favorites)
+                        Spacer()
+                    }
+
+                    if activeTab == .devices {
+                        devicesSection
+                    } else {
+                        favoritesSection
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
         }
     }

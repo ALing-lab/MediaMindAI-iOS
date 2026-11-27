@@ -42,69 +42,7 @@ public struct PreviewTabView: View {
 
     public var body: some View {
         NavigationStack {
-            Group {
-                if let plan = activePlan {
-                    let ready = plan.groups.filter { $0.kind != "unmatched" }
-                    let manual = plan.groups.filter { $0.kind == "unmatched" }
-                    let shown = PreviewFilter.apply(groups: manualTab ? manual : ready, kind: filterKind, query: searchQuery, plan: plan)
-                    let sections = PreviewSectionGrouping.sections(plan: plan, groups: shown, bySource: groupBySource)
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
-                            Section {
-                                let conflicts = ConflictDetector.detect(in: plan.actions)
-                                if !manualTab, let conflict = conflicts.first {
-                                    Label("检测到 \(conflicts.count) 处命名冲突（如：\(conflict.targetName)），请检查勾选", systemImage: "exclamationmark.triangle.fill")
-                                        .font(.caption).foregroundStyle(.orange).padding(.horizontal, 20)
-                                }
-                                if let errorMsg {
-                                    Text(errorMsg).font(.footnote).foregroundStyle(MMTheme.redErr).padding(.horizontal, 20)
-                                }
-                                if shown.isEmpty {
-                                    ContentUnavailableView(manualTab ? "没有待手动识别的项目" : "暂无匹配作品",
-                                        systemImage: manualTab ? "checkmark.circle" : "film")
-                                }
-                                resultCards(plan: plan, sections: sections)
-                            } header: {
-                                previewHeader(plan: plan, ready: ready, manual: manual)
-                            }
-                        }
-                        .padding(.bottom, 8)
-                    }
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if showSearch {
-                            searchKeyboardBar
-                        } else {
-                            bottomActions(plan: plan, manual: manual)
-                        }
-                    }
-                } else {
-                    ContentUnavailableView("暂无待执行内容", systemImage: "film",
-                        description: Text("任务可能已取消或已提交执行，请返回任务中心查看。"))
-                }
-            }
-            .background { previewSurface.ignoresSafeArea() }
-            .navigationTitle("识别结果")
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left").font(.headline)
-                            .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
-                    }
-                    .accessibilityLabel("返回任务中心")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        if showSearch { closeSearch() } else { showSearch = true }
-                    } label: {
-                        Image(systemName: "magnifyingglass").font(.headline)
-                            .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
-                    }
-                    .accessibilityLabel("搜索识别结果")
-                }
-            }
+            previewPageContent
             .onChange(of: manualTab) { _, _ in filterKind = .all; categoryToggleSelected = false }
             .sheet(isPresented: $showRematchSheet, onDismiss: {
                 rematchApplying = false
@@ -226,6 +164,72 @@ public struct PreviewTabView: View {
             }
         }
         .coordinateSpace(name: "recognitionViewport")
+    }
+
+    private var previewPageContent: some View {
+        Group {
+            if let plan = activePlan {
+                let ready = plan.groups.filter { $0.kind != "unmatched" }
+                let manual = plan.groups.filter { $0.kind == "unmatched" }
+                let shown = PreviewFilter.apply(groups: manualTab ? manual : ready, kind: filterKind, query: searchQuery, plan: plan)
+                let sections = PreviewSectionGrouping.sections(plan: plan, groups: shown, bySource: groupBySource)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
+                        Section {
+                            let conflicts = ConflictDetector.detect(in: plan.actions)
+                            if !manualTab, let conflict = conflicts.first {
+                                Label("检测到 \(conflicts.count) 处命名冲突（如：\(conflict.targetName)），请检查勾选", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption).foregroundStyle(.orange).padding(.horizontal, 20)
+                            }
+                            if let errorMsg {
+                                Text(errorMsg).font(.footnote).foregroundStyle(MMTheme.redErr).padding(.horizontal, 20)
+                            }
+                            if shown.isEmpty {
+                                ContentUnavailableView(manualTab ? "没有待手动识别的项目" : "暂无匹配作品",
+                                    systemImage: manualTab ? "checkmark.circle" : "film")
+                            }
+                            resultCards(plan: plan, sections: sections)
+                        } header: {
+                            previewHeader(plan: plan, ready: ready, manual: manual)
+                        }
+                    }
+                    .padding(.bottom, 8)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if showSearch {
+                        searchKeyboardBar
+                    } else {
+                        bottomActions(plan: plan, manual: manual)
+                    }
+                }
+            } else {
+                ContentUnavailableView("暂无待执行内容", systemImage: "film",
+                    description: Text("任务可能已取消或已提交执行，请返回任务中心查看。"))
+            }
+        }
+        .background { previewSurface.ignoresSafeArea() }
+        .navigationTitle("识别结果")
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left").font(.headline)
+                        .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("返回任务中心")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    if showSearch { closeSearch() } else { showSearch = true }
+                } label: {
+                    Image(systemName: "magnifyingglass").font(.headline)
+                        .frame(width: 36, height: 36).background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("搜索识别结果")
+            }
+        }
     }
 
     // 页面和置顶栏使用同一视口坐标的渐变切片；实色底层始终遮住作品内容。

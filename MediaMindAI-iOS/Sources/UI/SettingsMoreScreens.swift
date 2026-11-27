@@ -594,7 +594,7 @@ private struct AboutMonogram: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                silhouette([CGPoint(x: 135, y: 0), CGPoint(x: 220, y: 14), CGPoint(x: 312, y: 267), CGPoint(x: 453, y: 56), CGPoint(x: 548, y: 70), CGPoint(x: 602, y: 662), CGPoint(x: 501, y: 636), CGPoint(x: 470, y: 306), CGPoint(x: 353, y: 585), CGPoint(x: 312, y: 558), CGPoint(x: 175, y: 207), CGPoint(x: 180, y: 562), CGPoint(x: 77, y: 536)])
+                silhouette([CGPoint(x: 135, y: 0), CGPoint(x: 220, y: 14), CGPoint(x: 312, y: 267), CGPoint(x: 453, y: 56), CGPoint(x: 548, y: 70), CGPoint(x: 602, y: 662), CGPoint(x: 501, y: 636), CGPoint(x: 470, y: 306), CGPoint(x: 353, y: 585), CGPoint(x: 211, y: 260), CGPoint(x: 180, y: 562), CGPoint(x: 77, y: 536)])
                     .fill(Color(red: 1, green: 0.42, blue: 0.06))
                 silhouette([CGPoint(x: 61, y: 102), CGPoint(x: 148, y: 118), CGPoint(x: 249, y: 366), CGPoint(x: 363, y: 156), CGPoint(x: 461, y: 171), CGPoint(x: 510, y: 714), CGPoint(x: 390, y: 681), CGPoint(x: 369, y: 410), CGPoint(x: 246, y: 634), CGPoint(x: 135, y: 362), CGPoint(x: 103, y: 615), CGPoint(x: 0, y: 590)])
                     .fill(.primary)
