@@ -8,14 +8,99 @@ public struct SettingsTabView: View {
     @State private var retention = RetentionZoneStore.shared
     @State private var engineRetainedCount: Int = RetentionZoneEngine.shared.retainedRecords().count
     @State private var showClearConfirm = false
-    @State private var scrollOriginY: CGFloat?
-    @State private var topVeilOpacity: Double = 0
 
     public var body: some View {
         NavigationStack {
-            settingsPageContent
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                TopAmbientGlow()
+                List {
+                Section("外观主题") {
+                    Picker("外观主题", selection: $settings.themeMode) {
+                        ForEach(AppThemeMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+
+                Section("识别与网络") {
+                    NavigationLink {
+                        TmdbSettingsView()
+                    } label: {
+                        LabeledContent("TMDB 网络与密钥", value: KeychainStore.tmdbApiKey.isEmpty ? "未配置" : "已配置")
+                    }
+                    NavigationLink {
+                        AiSettingsView()
+                    } label: {
+                        LabeledContent("AI 智能识别", value: settings.aiEnabled ? AiProviderPreset.of(settings.aiProviderId).label : "关闭")
+                    }
+                    NavigationLink {
+                        AiDiagnosticsAndRulesView()
+                    } label: {
+                        Text("AI 蒸馏规则与识别诊断")
+                    }
+                }
+
+                Section("扫描与默认整理策略（第 1 层 · 全局）") {
+                    Toggle("自动防风控限速（AIMD）", isOn: $settings.scanAutomatic)
+                    NavigationLink {
+                        DefaultPolicyScreen(initialCategory: .organize)
+                    } label: {
+                        LabeledContent("整理与命名策略", value: settings.policies.organizeSummaryLabel)
+                    }
+                    NavigationLink {
+                        DefaultPolicyScreen(initialCategory: .scrape)
+                    } label: {
+                        LabeledContent("刮削与素材策略", value: settings.policies.fullScrape ? "完整刮削" : "只补缺失")
+                    }
+                    NavigationLink {
+                        DefaultPolicyScreen(initialCategory: .episode)
+                    } label: {
+                        LabeledContent("剧集与归并策略", value: settings.policies.mergeSeries ? "自动归并" : "不归并")
+                    }
+                }
+
+                Section("安全与数据") {
+                    NavigationLink {
+                        HistoryManageView()
+                    } label: {
+                        LabeledContent("历史记忆", value: settings.rememberHistory ? "已开启" : "已关闭")
+                    }
+                    NavigationLink {
+                        RetentionZoneView()
+                    } label: {
+                        LabeledContent("保留区（暂存待处理文件）", value: "\(retention.items.count + engineRetainedCount) 项")
+                    }
+                    NavigationLink {
+                        StorageCacheView()
+                    } label: {
+                        LabeledContent("存储与缓存", value: AppDirs.formatSize(AppDirs.sizeBytes()))
+                    }
+                    NavigationLink("影视库总览") {
+                        FilmLibraryView()
+                    }
+                    NavigationLink("诊断日志（已脱敏）") {
+                        DiagnosticLogView()
+                    }
+                    NavigationLink("崩溃日志") {
+                        CrashReportView()
+                    }
+                    Button("清除本地计划与缓存", role: .destructive) {
+                        showClearConfirm = true
+                    }
+                }
+
+                Section {
+                    NavigationLink("关于") { AboutView() }
+                }
+                }
+                .scrollContentBackground(.hidden)
+                .onAppear { engineRetainedCount = RetentionZoneEngine.shared.retainedRecords().count }
+            }
             .navigationTitle("设置")
-            .toolbarBackground(.hidden, for: .navigationBar)
             .confirmationDialog("清除全部本地计划、TMDB 与图片缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
                 Button("确认清除", role: .destructive) {
                     PlanAndTaskStore.shared.clearAllCache()
@@ -32,145 +117,6 @@ public struct SettingsTabView: View {
                 Button("取消", role: .cancel) {}
             }
         }
-    }
-
-    private var settingsPageContent: some View {
-        ZStack(alignment: .top) {
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            TopAmbientGlow()
-            List {
-            Section("外观主题") {
-                Picker("外观主题", selection: $settings.themeMode) {
-                    ForEach(AppThemeMode.allCases, id: \.self) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(key: SettingsScrollOriginKey.self,
-                            value: geometry.frame(in: .named("settingsViewport")).minY)
-                    }
-                }
-            }
-
-            Section("识别与网络") {
-                NavigationLink {
-                    TmdbSettingsView()
-                } label: {
-                    LabeledContent("TMDB 网络与密钥", value: KeychainStore.tmdbApiKey.isEmpty ? "未配置" : "已配置")
-                }
-                NavigationLink {
-                    AiSettingsView()
-                } label: {
-                    LabeledContent("AI 智能识别", value: settings.aiEnabled ? AiProviderPreset.of(settings.aiProviderId).label : "关闭")
-                }
-                NavigationLink {
-                    AiDiagnosticsAndRulesView()
-                } label: {
-                    Text("AI 蒸馏规则与识别诊断")
-                }
-            }
-
-            Section("扫描与默认整理策略（第 1 层 · 全局）") {
-                Toggle("自动防风控限速（AIMD）", isOn: $settings.scanAutomatic)
-                NavigationLink {
-                    DefaultPolicyScreen(initialCategory: .organize)
-                } label: {
-                    LabeledContent("整理与命名策略", value: settings.policies.organizeSummaryLabel)
-                }
-                NavigationLink {
-                    DefaultPolicyScreen(initialCategory: .scrape)
-                } label: {
-                    LabeledContent("刮削与素材策略", value: settings.policies.fullScrape ? "完整刮削" : "只补缺失")
-                }
-                NavigationLink {
-                    DefaultPolicyScreen(initialCategory: .episode)
-                } label: {
-                    LabeledContent("剧集与归并策略", value: settings.policies.mergeSeries ? "自动归并" : "不归并")
-                }
-            }
-
-            Section("安全与数据") {
-                NavigationLink {
-                    HistoryManageView()
-                } label: {
-                    LabeledContent("历史记忆", value: settings.rememberHistory ? "已开启" : "已关闭")
-                }
-                NavigationLink {
-                    RetentionZoneView()
-                } label: {
-                    LabeledContent("保留区（暂存待处理文件）", value: "\(retention.items.count + engineRetainedCount) 项")
-                }
-                NavigationLink {
-                    StorageCacheView()
-                } label: {
-                    LabeledContent("存储与缓存", value: AppDirs.formatSize(AppDirs.sizeBytes()))
-                }
-                NavigationLink("影视库总览") {
-                    FilmLibraryView()
-                }
-                NavigationLink("诊断日志（已脱敏）") {
-                    DiagnosticLogView()
-                }
-                NavigationLink("崩溃日志") {
-                    CrashReportView()
-                }
-                Button("清除本地计划与缓存", role: .destructive) {
-                    showClearConfirm = true
-                }
-            }
-
-            Section {
-                NavigationLink("关于") { AboutView() }
-            }
-            }
-            .scrollContentBackground(.hidden)
-            .onAppear { engineRetainedCount = RetentionZoneEngine.shared.retainedRecords().count }
-        }
-        .coordinateSpace(name: "settingsViewport")
-        .onPreferenceChange(SettingsScrollOriginKey.self) { y in
-            // 首行离开 List 的可见范围后保留遮罩，返回顶部时再连续淡出。
-            guard let y else { return }
-            if scrollOriginY == nil { scrollOriginY = y }
-            let distance = max(0, (scrollOriginY ?? y) - y)
-            topVeilOpacity = Double(min(1, distance / 64))
-        }
-        .overlay(alignment: .top) {
-            settingsTopVeil
-                .opacity(topVeilOpacity)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-    }
-
-    // Material 随透明渐变混合，不使用带硬底边的矩形导航栏背景。
-    private var settingsTopVeil: some View {
-        Rectangle()
-            .fill(.regularMaterial)
-            .overlay {
-                LinearGradient(colors: [MMTheme.accent.opacity(0.16), .clear],
-                    startPoint: .top, endPoint: .bottom)
-            }
-            .mask {
-                LinearGradient(stops: [
-                    .init(color: .black, location: 0),
-                    .init(color: .black, location: 0.35),
-                    .init(color: .black.opacity(0.65), location: 0.65),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .top, endPoint: .bottom)
-            }
-            .frame(height: 140)
-            .ignoresSafeArea(edges: .top)
-    }
-}
-
-private struct SettingsScrollOriginKey: PreferenceKey {
-    static let defaultValue: CGFloat? = nil
-    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
-        if let next = nextValue() { value = next }
     }
 }
 

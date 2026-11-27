@@ -433,10 +433,10 @@ public struct HistoryManageView: View {
     }
 }
 
+/// 1:1 复刻自 Android `UpdateChecker` 检查更新页（结构化 `UpdateResult` + 手动更新兜底链接）。
 /// 设置页的关于入口；更新结果就地展示，不再维护独立检查更新页面。
 public struct AboutView: View {
     @Environment(\.openURL) private var openURL
-    @Environment(\.dismiss) private var dismiss
     @State private var checking = false
     @State private var updateMessage = ""
     @State private var showUpdate = false
@@ -446,9 +446,7 @@ public struct AboutView: View {
 
     public var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
-                aboutHeader
-                ScrollView {
+            ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 14) {
                         AboutMonogram()
@@ -500,9 +498,9 @@ public struct AboutView: View {
                         .padding(16)
                         .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
                         VStack(spacing: 12) {
-                            NavigationLink("开源许可与组件声明") { LicensesView().toolbar(.visible, for: .navigationBar) }
-                            NavigationLink("开源协议") { AboutLicenseView().toolbar(.visible, for: .navigationBar) }
-                            NavigationLink("隐私政策") { AboutPrivacyView().toolbar(.visible, for: .navigationBar) }
+                            NavigationLink("开源许可与组件声明") { LicensesView() }
+                            NavigationLink("开源协议") { AboutLicenseView() }
+                            NavigationLink("隐私政策") { AboutPrivacyView() }
                         }
                         .font(.footnote).foregroundStyle(.blue)
                     }
@@ -510,11 +508,11 @@ public struct AboutView: View {
                 }
                 .frame(maxWidth: 520)
                 .padding(.horizontal, 28)
-                .frame(maxWidth: .infinity, minHeight: max(0, geometry.size.height - 60), alignment: .top)
-                }
-                // 固定页头下方裁切滚动内容，避免 Logo 透进标题／状态栏。
-                .clipped()
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
             }
+            // 内容不足一屏时不空滚动，避免回弹后导航栏保留滚动背景。
+            // 内容实际超出视口（小屏／横屏／大字体）时仍允许正常滚动与回弹。
+            .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         }
         .background {
             ZStack(alignment: .top) {
@@ -524,8 +522,16 @@ public struct AboutView: View {
         }
         .navigationTitle("关于")
         .navigationBarTitleDisplayMode(.inline)
-        // 仅本页替换系统导航栏，避免系统滚动边缘材质形成独立色带。
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { checking = true } label: {
+                    if checking { ProgressView() }
+                    else { Image(systemName: "arrow.triangle.2.circlepath") }
+                }
+                .disabled(checking)
+                .accessibilityLabel("检查更新")
+            }
+        }
         .task(id: checking) {
             guard checking else { return }
             release = nil
@@ -548,37 +554,6 @@ public struct AboutView: View {
             Button("关闭", role: .cancel) {}
         } message: { Text(updateMessage) }
     }
-
-    private var aboutHeader: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.headline)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .foregroundStyle(.primary)
-            .accessibilityLabel("返回设置")
-            Spacer()
-            Text("关于").font(.headline).accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button { checking = true } label: {
-                Group {
-                    if checking { ProgressView() }
-                    else { Image(systemName: "arrow.triangle.2.circlepath").font(.headline) }
-                }
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
-            }
-            .foregroundStyle(MMTheme.accent)
-            .disabled(checking)
-            .accessibilityLabel("检查更新")
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-    }
-
 }
 
 /// 沿用应用图标的双 M 轮廓，不携带图标背景；前景跟随系统主题。
