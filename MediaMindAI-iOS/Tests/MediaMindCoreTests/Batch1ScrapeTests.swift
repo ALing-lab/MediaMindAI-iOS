@@ -151,7 +151,7 @@ final class Batch1ScrapeTests: XCTestCase {
             newName: video.newName, destRef: mkdir.id, season: 1, episode: 1)
         var plan = episodeAssetPlan(actions: [video, mkdir, move])
         var global = DefaultPolicies(); global.episodeNfo = false; global.episodeThumb = false
-        plan.taskPolicy = PolicyOverride(fullScrape: true, downloadEpisodeThumb: true, episodeNfo: true)
+        plan.taskPolicy = PolicyOverride(fullScrape: true, episodeNfo: true, downloadEpisodeThumb: true)
         let enabled = PolicyResolver.applyOverrides(to: plan, global: global)
         let assets = enabled.actions.filter { $0.op == "artwork" }
         XCTAssertEqual(assets.count, 2)
@@ -163,7 +163,7 @@ final class Batch1ScrapeTests: XCTestCase {
         XCTAssertEqual(Set(repeated.groups[0].actionIds), Set(repeated.actions.map(\.id)))
 
         var scrapeOnly = enabled
-        scrapeOnly.taskPolicy = PolicyOverride(renameFiles: false, seasonFolders: false, downloadEpisodeThumb: true, episodeNfo: true)
+        scrapeOnly.taskPolicy = PolicyOverride(renameFiles: false, seasonFolders: false, episodeNfo: true, downloadEpisodeThumb: true)
         let originalLocation = PolicyResolver.applyOverrides(to: scrapeOnly, global: global)
         let sidecars = originalLocation.actions.filter { $0.op == "artwork" }
         XCTAssertEqual(sidecars.map(\.id), assets.map(\.id))

@@ -1134,7 +1134,7 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         var plan = try await Scanner.scan(roots: [PlanRoot(folderId: "show", name: "Show", parentId: "0")],
             drive: drive, tmdbProvider: provider, globalPolicies: off, persistResult: false)
         let group = try XCTUnwrap(plan.groups.first { $0.kind == "tv" })
-        plan.taskPolicy = PolicyOverride(downloadEpisodeThumb: true, episodeNfo: true)
+        plan.taskPolicy = PolicyOverride(episodeNfo: true, downloadEpisodeThumb: true)
         let other = PlanGroup(id: "unrelated", kind: "tv", tmdbId: 888, title: "Other", year: "", posterPath: nil,
             folderId: "other", folderName: "Other", folderNewName: nil, rating: nil, confidence: "高", note: nil, warn: nil, actionIds: ["other-file"])
         let otherAction = PlanAction(id: "other-file", op: "skip", groupId: other.id, fileId: "other-episode", parentId: "other",
