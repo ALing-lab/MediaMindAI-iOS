@@ -441,6 +441,8 @@ public struct AboutView: View {
     @State private var updateMessage = ""
     @State private var showUpdate = false
     @State private var release: ReleaseInfo?
+    @State private var aboutAtTop = true
+    @State private var aboutPortrait = true
 
     public init() {}
 
@@ -498,9 +500,9 @@ public struct AboutView: View {
                         .padding(16)
                         .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
                         VStack(spacing: 12) {
-                            NavigationLink("开源许可与组件声明") { LicensesView() }
-                            NavigationLink("开源协议") { AboutLicenseView() }
-                            NavigationLink("隐私政策") { AboutPrivacyView() }
+                            NavigationLink("开源许可与组件声明") { LicensesView().toolbarBackground(.automatic, for: .navigationBar) }
+                            NavigationLink("开源协议") { AboutLicenseView().toolbarBackground(.automatic, for: .navigationBar) }
+                            NavigationLink("隐私政策") { AboutPrivacyView().toolbarBackground(.automatic, for: .navigationBar) }
                         }
                         .font(.footnote).foregroundStyle(.blue)
                     }
@@ -509,10 +511,25 @@ public struct AboutView: View {
                 .frame(maxWidth: 520)
                 .padding(.horizontal, 28)
                 .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
+                .background {
+                    GeometryReader { content in
+                        Color.clear.preference(key: AboutScrollTopKey.self,
+                            value: content.frame(in: .named("aboutScrollViewport")).minY)
+                    }
+                }
             }
-            // 内容不足一屏时不空滚动，避免回弹后导航栏保留滚动背景。
-            // 内容实际超出视口（小屏／横屏／大字体）时仍允许正常滚动与回弹。
-            .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+            .coordinateSpace(name: "aboutScrollViewport")
+            .scrollBounceBehavior(aboutPortrait ? .always : .basedOnSize, axes: .vertical)
+            .onPreferenceChange(AboutScrollTopKey.self) { y in
+                guard let y else { return }
+                // 容许像素舍入误差；回弹结束不沿用系统残留的滚动态材质。
+                let atTop = y >= -1
+                if aboutAtTop != atTop { aboutAtTop = atTop }
+            }
+            .onAppear { aboutPortrait = geometry.size.height > geometry.size.width }
+            .onChange(of: geometry.size) { _, size in
+                aboutPortrait = size.height > size.width
+            }
         }
         .background {
             ZStack(alignment: .top) {
@@ -522,6 +539,8 @@ public struct AboutView: View {
         }
         .navigationTitle("关于")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(aboutPortrait && aboutAtTop ? Visibility.hidden : Visibility.automatic,
+            for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { checking = true } label: {
@@ -556,25 +575,102 @@ public struct AboutView: View {
     }
 }
 
-/// 沿用应用图标的双 M 轮廓，不携带图标背景；前景跟随系统主题。
+private struct AboutScrollTopKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
+/// 按原应用图标逐段描摹可见轮廓，保留圆角、斜率与遮挡关系；不绘制方框背景。
 private struct AboutMonogram: View {
-    private func silhouette(_ points: [CGPoint]) -> Path {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var orangePath: Path {
         Path { path in
-            guard let first = points.first else { return }
-            path.move(to: first)
-            for point in points.dropFirst() { path.addLine(to: point) }
+            path.move(to: CGPoint(x: 136, y: 368))
+            path.addLine(to: CGPoint(x: 114, y: 547))
+            path.addLine(to: CGPoint(x: 161, y: 559))
+            path.addLine(to: CGPoint(x: 175, y: 560))
+            path.addLine(to: CGPoint(x: 179, y: 556))
+            path.addLine(to: CGPoint(x: 187, y: 495))
+            path.closeSubpath()
+            path.move(to: CGPoint(x: 138, y: 1))
+            path.addLine(to: CGPoint(x: 134, y: 6))
+            path.addLine(to: CGPoint(x: 119, y: 110))
+            path.addLine(to: CGPoint(x: 149, y: 117))
+            path.addLine(to: CGPoint(x: 250, y: 363))
+            path.addLine(to: CGPoint(x: 299, y: 273))
+            path.addLine(to: CGPoint(x: 313, y: 243))
+            path.addLine(to: CGPoint(x: 221, y: 17))
+            path.addLine(to: CGPoint(x: 214, y: 13))
+            path.closeSubpath()
+            path.move(to: CGPoint(x: 367, y: 414))
+            path.addLine(to: CGPoint(x: 301, y: 536))
+            path.addLine(to: CGPoint(x: 301, y: 540))
+            path.addLine(to: CGPoint(x: 318, y: 577))
+            path.addLine(to: CGPoint(x: 326, y: 582))
+            path.addLine(to: CGPoint(x: 334, y: 578))
+            path.addLine(to: CGPoint(x: 375, y: 503))
+            path.closeSubpath()
+            path.move(to: CGPoint(x: 458, y: 56))
+            path.addLine(to: CGPoint(x: 451, y: 61))
+            path.addLine(to: CGPoint(x: 399, y: 160))
+            path.addLine(to: CGPoint(x: 460, y: 171))
+            path.addLine(to: CGPoint(x: 462, y: 176))
+            path.addLine(to: CGPoint(x: 504, y: 640))
+            path.addLine(to: CGPoint(x: 581, y: 659))
+            path.addLine(to: CGPoint(x: 596, y: 660))
+            path.addLine(to: CGPoint(x: 600, y: 655))
+            path.addLine(to: CGPoint(x: 549, y: 81))
+            path.addLine(to: CGPoint(x: 546, y: 74))
+            path.addLine(to: CGPoint(x: 539, y: 70))
             path.closeSubpath()
         }
     }
+
+    private var foregroundPath: Path {
+        Path { path in
+            path.move(to: CGPoint(x: 62, y: 102))
+            path.addLine(to: CGPoint(x: 1, y: 587))
+            path.addLine(to: CGPoint(x: 103, y: 613))
+            path.addLine(to: CGPoint(x: 128, y: 408))
+            path.addLine(to: CGPoint(x: 130, y: 405))
+            path.addLine(to: CGPoint(x: 132, y: 373))
+            path.addLine(to: CGPoint(x: 135, y: 362))
+            path.addLine(to: CGPoint(x: 195, y: 510))
+            path.addLine(to: CGPoint(x: 247, y: 630))
+            path.addLine(to: CGPoint(x: 334, y: 473))
+            path.addLine(to: CGPoint(x: 365, y: 411))
+            path.addLine(to: CGPoint(x: 368, y: 410))
+            path.addLine(to: CGPoint(x: 394, y: 681))
+            path.addLine(to: CGPoint(x: 397, y: 685))
+            path.addLine(to: CGPoint(x: 509, y: 712))
+            path.addLine(to: CGPoint(x: 491, y: 533))
+            path.addLine(to: CGPoint(x: 486, y: 462))
+            path.addLine(to: CGPoint(x: 479, y: 407))
+            path.addLine(to: CGPoint(x: 459, y: 173))
+            path.addLine(to: CGPoint(x: 363, y: 156))
+            path.addLine(to: CGPoint(x: 291, y: 293))
+            path.addLine(to: CGPoint(x: 249, y: 367))
+            path.addLine(to: CGPoint(x: 147, y: 118))
+            path.closeSubpath()
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
+            let scale = min(proxy.size.width / 602, proxy.size.height / 714)
+            let transform = CGAffineTransform(scaleX: scale, y: scale)
+                .concatenating(CGAffineTransform(
+                    translationX: (proxy.size.width - 602 * scale) / 2,
+                    y: (proxy.size.height - 714 * scale) / 2))
             ZStack {
-                silhouette([CGPoint(x: 135, y: 0), CGPoint(x: 220, y: 14), CGPoint(x: 312, y: 267), CGPoint(x: 453, y: 56), CGPoint(x: 548, y: 70), CGPoint(x: 602, y: 662), CGPoint(x: 501, y: 636), CGPoint(x: 470, y: 306), CGPoint(x: 353, y: 585), CGPoint(x: 211, y: 260), CGPoint(x: 180, y: 562), CGPoint(x: 77, y: 536)])
-                    .fill(Color(red: 1, green: 0.42, blue: 0.06))
-                silhouette([CGPoint(x: 61, y: 102), CGPoint(x: 148, y: 118), CGPoint(x: 249, y: 366), CGPoint(x: 363, y: 156), CGPoint(x: 461, y: 171), CGPoint(x: 510, y: 714), CGPoint(x: 390, y: 681), CGPoint(x: 369, y: 410), CGPoint(x: 246, y: 634), CGPoint(x: 135, y: 362), CGPoint(x: 103, y: 615), CGPoint(x: 0, y: 590)])
-                    .fill(.primary)
+                orangePath.applying(transform)
+                    .fill(Color(red: 251.0 / 255, green: 102.0 / 255, blue: 19.0 / 255))
+                foregroundPath.applying(transform)
+                    .fill(colorScheme == .dark ? Color.white : Color(white: 34.0 / 255))
             }
-            .scaleEffect(x: proxy.size.width / 602, y: proxy.size.height / 714, anchor: .topLeading)
         }
     }
 }
