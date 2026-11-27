@@ -34,8 +34,8 @@ public enum UpdateResult: Equatable, Sendable {
 
 public enum UpdateChecker {
     public static let currentVersion: String = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.5.79"
-    public static let releasesPageUrl = "https://github.com/tamu-dev/MediaMind-AI/releases"
-    public static let defaultLatestUrl = "https://api.github.com/repos/tamu-dev/MediaMind-AI/releases/latest"
+    public static let releasesPageUrl = "https://github.com/ALing-lab/MediaMindAI-iOS/releases"
+    public static let defaultLatestUrl = "https://api.github.com/repos/ALing-lab/MediaMindAI-iOS/releases/latest"
 
     /// 1:1 复刻 Android `UpdateChecker.compare`：`1.2.10 > 1.2.9`，自动忽略 `v`/`V` 前缀及 `-beta`/`+build` 后缀。
     public static func compare(_ a: String, _ b: String) -> Int {

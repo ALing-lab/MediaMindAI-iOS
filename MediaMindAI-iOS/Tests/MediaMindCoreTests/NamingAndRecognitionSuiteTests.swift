@@ -18,10 +18,12 @@ private final class AssetReadProtocol: URLProtocol, @unchecked Sendable {
         let body: Data
         let status: Int
         if request.httpMethod == "PROPFIND" {
+            // Depth: 1 的成功集合响应包含集合自身，供驱动确认目标目录状态。
+            let collection = "<d:response><d:href>/dav/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
             let responses = ["asset.nfo", "short.nfo", "long.nfo", "denied.nfo"].map {
                 "<d:response><d:href>/dav/\($0)</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>3</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
             }.joined()
-            body = Data("<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\">\(responses)</d:multistatus>".utf8)
+            body = Data("<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\">\(collection)\(responses)</d:multistatus>".utf8)
             status = 207
         } else {
             body = Data((url.lastPathComponent == "short.nfo" ? "ab" : (url.lastPathComponent == "long.nfo" ? "abcd" : "abc")).utf8)
@@ -37,19 +39,288 @@ private final class AssetReadProtocol: URLProtocol, @unchecked Sendable {
 
 final class NamingAndRecognitionSuiteTests: XCTestCase {
 
+    private final class AutomaticReadCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var reads = 0
+        func record() { lock.withLock { reads += 1 } }
+        var count: Int { lock.withLock { reads } }
+    }
+
     private struct AssetMetadataDrive: CloudDrive {
         let kind: ProviderKind
         let accountId = "asset-test"
         let entries: [CloudEntry]
         let listings: [String: [CloudEntry]]?
-        init(entries: [CloudEntry] = [], listings: [String: [CloudEntry]]? = nil, kind: ProviderKind = .p123) {
+        let unreadable: Set<String>
+        let assetDigest: String?
+        let digestReadFails: Bool
+        let counter: AutomaticReadCounter?
+        let backgroundState: PendingOperationState
+        init(entries: [CloudEntry] = [], listings: [String: [CloudEntry]]? = nil, kind: ProviderKind = .p123,
+             unreadable: Set<String> = [], assetDigest: String? = nil, digestReadFails: Bool = false, counter: AutomaticReadCounter? = nil, backgroundState: PendingOperationState = .processing) {
             self.entries = entries; self.listings = listings; self.kind = kind
+            self.unreadable = unreadable; self.assetDigest = assetDigest; self.digestReadFails = digestReadFails; self.counter = counter
+            self.backgroundState = backgroundState
         }
-        func list(folderId: String) async throws -> [CloudEntry] { listings.map { $0[folderId] ?? [] } ?? entries }
+        func pendingOperationState(taskId: String, operation: String) async throws -> PendingOperationState { backgroundState }
+        func list(folderId: String) async throws -> [CloudEntry] {
+            counter?.record()
+            if unreadable.contains(folderId) { throw DriveError.network("read failed") }
+            return listings.map { $0[folderId] ?? [] } ?? entries
+        }
+        func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String? {
+            let matches = try await list(folderId: parentId).filter { $0.fileId == fileId }
+            guard matches.count == 1, let entry = matches.first, !entry.isDir, entry.size == expectedSize else { return nil }
+            if digestReadFails { throw DriveError.network("checksum read failed") }
+            if let assetDigest { return assetDigest }
+            return ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash).flatMap { $0.algorithm == "MD5" ? $0.digest : nil }
+        }
         func rename(fileId: String, newName: String) async throws -> String { throw DriveError.unsupported("test") }
         func mkdir(parentId: String, name: String) async throws -> String { throw DriveError.unsupported("test") }
         func move(fileId: String, destParentId: String) async throws -> String { throw DriveError.unsupported("test") }
         func upload(parentId: String, name: String, data: Data) async throws -> String { throw DriveError.unsupported("test") }
+    }
+
+    func testAutomaticStableRenameConfirmsAppliedOrUnchangedWithoutWriting() async throws {
+        for landed in [true, false] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-rename-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let before = RemoteSnapshot(id: "file", parent: "folder", name: "old.mkv", directory: false, size: 10, etag: "tag")
+            let row = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "rename", operation: "rename", before: before, after: before.with(name: "new.mkv"))
+            try wal.change(row, state: "uncertain")
+            let current = CloudEntry(fileId: before.id, fileName: landed ? "new.mkv" : "old.mkv", isDir: false, size: 10, etag: "tag")
+            let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: AssetMetadataDrive(entries: [current]), wal: wal)
+            XCTAssertEqual(report.confirmedApplied, landed ? 1 : 0)
+            XCTAssertEqual(report.confirmedNotApplied, landed ? 0 : 1)
+            XCTAssertEqual(report.stillUncertain, 0)
+            let saved = ReversibleWalStore(storageURL: url).find(taskId: "auto", actionId: "rename")
+            XCTAssertEqual(saved?.state, landed ? "applied" : "not_applied")
+            XCTAssertEqual(saved?.before, before)
+        }
+    }
+
+    func testAutomaticRenameKeepsForeignChangedAndAmbiguousTargetsUncertain() async throws {
+        let before = RemoteSnapshot(id: "file", parent: "folder", name: "old.mkv", directory: false, size: 10, etag: "tag")
+        let good = CloudEntry(fileId: "file", fileName: "new.mkv", isDir: false, size: 10, etag: "tag")
+        let cases: [[CloudEntry]] = [
+            [],
+            [CloudEntry(fileId: "other", fileName: "new.mkv", isDir: false, size: 10, etag: "tag")],
+            [CloudEntry(fileId: "file", fileName: "new.mkv", isDir: false, size: 11, etag: "tag")],
+            [CloudEntry(fileId: "file", fileName: "new.mkv", isDir: true, size: 10, etag: "tag")],
+            [CloudEntry(fileId: "file", fileName: "new.mkv", isDir: false, size: 10, etag: "changed")],
+            [good, good],
+            [good, CloudEntry(fileId: "file", fileName: "old.mkv", isDir: false, size: 10, etag: "tag")],
+            [CloudEntry(fileId: "file", fileName: "old.mkv", isDir: false, size: 10, etag: "changed")]
+        ]
+        for entries in cases {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-foreign-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let row = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "rename", operation: "rename", before: before, after: before.with(name: "new.mkv"))
+            try wal.change(row, state: "uncertain")
+            let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: AssetMetadataDrive(entries: entries), wal: wal)
+            XCTAssertEqual(report.stillUncertain, 1)
+            XCTAssertEqual(wal.find(taskId: "auto", actionId: "rename")?.state, "uncertain")
+        }
+    }
+
+    func testAutomaticStableMoveConfirmsOnlyExactSourceOrDestination() async throws {
+        for landed in [true, false] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-move-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let before = RemoteSnapshot(id: "file", parent: "source", name: "movie.mkv", directory: false, size: 10)
+            _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "move", operation: "move", before: before, after: before.with(parent: "target"))
+            let entry = CloudEntry(fileId: "file", fileName: before.name, isDir: false, size: 10)
+            let drive = AssetMetadataDrive(listings: ["source": landed ? [] : [entry], "target": landed ? [entry] : []])
+            let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: drive, wal: wal)
+            XCTAssertEqual(report.confirmedApplied, landed ? 1 : 0)
+            XCTAssertEqual(report.confirmedNotApplied, landed ? 0 : 1)
+            XCTAssertEqual(report.stillUncertain, 0)
+        }
+    }
+
+    func testAutomaticWebDavRenameRequiresStrongIdentityEvidence() async throws {
+        let expected = "900150983cd24fb0d6963f7d28e17f72"
+        for evidence in ["none", "weak", "etag", "md5", "mismatch"] {
+            for landed in [true, false] {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-path-\(UUID().uuidString).json")
+                defer { try? FileManager.default.removeItem(at: url) }
+                let wal = ReversibleWalStore(storageURL: url)
+                let etag: String? = evidence == "etag" ? "tag" : (evidence == "weak" ? "W/tag" : nil)
+                let checksum: String? = ["md5", "mismatch"].contains(evidence) ? expected : nil
+                let before = RemoteSnapshot(id: "/source/old.mkv", parent: "/source", name: "old.mkv", directory: false, size: 3, etag: etag, contentMD5: checksum)
+                _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "rename", operation: "rename", before: before, after: before.with(parent: "/target", name: "new.mkv"))
+                let entry = CloudEntry(fileId: landed ? "/target/new.mkv" : before.id, fileName: landed ? "new.mkv" : before.name, isDir: false, size: 3, etag: etag,
+                    contentHash: evidence == "mismatch" ? String(repeating: "a", count: 32) : checksum, hashAlgorithm: checksum == nil ? nil : "MD5")
+                let drive = AssetMetadataDrive(listings: ["/source": landed ? [] : [entry], "/target": landed ? [entry] : []], kind: .webdav)
+                let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: drive, wal: wal)
+                let proven = evidence == "etag" || evidence == "md5"
+                XCTAssertEqual(report.confirmedApplied, proven && landed ? 1 : 0)
+                XCTAssertEqual(report.confirmedNotApplied, proven && !landed ? 1 : 0)
+                XCTAssertEqual(report.stillUncertain, proven ? 0 : 1)
+            }
+        }
+    }
+
+    func testAutomaticUploadRequiresLocalDigestAndRejectsUnavailableOrChangedContent() async throws {
+        let expected = "900150983cd24fb0d6963f7d28e17f72"
+        for mode in ["typed", "read", "unknown", "read-error", "mismatch", "no-local"] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-upload-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "upload", operation: "upload", before: nil,
+                after: RemoteSnapshot(id: "", parent: "folder", name: "asset.nfo", directory: false, size: 3, contentMD5: mode == "no-local" ? nil : expected))
+            let typed = mode == "typed" || mode == "mismatch"
+            let entry = CloudEntry(fileId: "new", fileName: "asset.nfo", isDir: false, size: 3,
+                contentHash: typed ? (mode == "mismatch" ? String(repeating: "a", count: 32) : expected) : nil, hashAlgorithm: typed ? "MD5" : nil)
+            let drive = AssetMetadataDrive(entries: [entry], assetDigest: mode == "read" ? expected : nil, digestReadFails: mode == "read-error")
+            let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: drive, wal: wal)
+            let proven = mode == "typed" || mode == "read"
+            XCTAssertEqual(report.confirmedApplied, proven ? 1 : 0)
+            XCTAssertEqual(report.stillUncertain, proven ? 0 : 1)
+            if proven { XCTAssertEqual(wal.find(taskId: "auto", actionId: "upload")?.after?.contentMD5, expected) }
+        }
+    }
+
+    func testAutomaticPrivateMkdirAndMissingUploadAreBoundedByOwnershipEvidence() async throws {
+        for privateName in [true, false] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-mkdir-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let name = privateName ? ".PanScraper.New-\(UUID().uuidString.lowercased())" : "Season 01"
+            _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "mkdir", operation: "mkdir", before: nil,
+                after: RemoteSnapshot(id: "", parent: "folder", name: name, directory: true))
+            let entry = CloudEntry(fileId: "new-dir", fileName: name, isDir: true)
+            let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: AssetMetadataDrive(entries: [entry]), wal: wal)
+            XCTAssertEqual(report.confirmedApplied, privateName ? 1 : 0)
+            XCTAssertEqual(report.stillUncertain, privateName ? 0 : 1)
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-missing-upload-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "upload", operation: "upload", before: nil,
+            after: RemoteSnapshot(id: "", parent: "folder", name: "asset.nfo", directory: false, size: 3))
+        let missing = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: AssetMetadataDrive(entries: []), wal: wal)
+        XCTAssertEqual(missing.confirmedNotApplied, 1)
+    }
+
+    func testAutomaticRecoveryIgnoresUndoAndOtherRunsAndKeepsUnreadableRowsUncertain() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-scope-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let after = RemoteSnapshot(id: "", parent: "folder", name: "asset.nfo", directory: false, size: 3)
+        let undo = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "undo", operation: "upload", before: nil, after: after)
+        try wal.change(undo, state: "undo_prepared")
+        _ = try wal.prepare(taskId: "other", accountId: "asset-test", actionId: "other", operation: "upload", before: nil, after: after)
+        _ = try wal.prepare(taskId: "auto", accountId: "wrong-account", actionId: "wrong", operation: "upload", before: nil, after: after)
+        _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "unreadable", operation: "upload", before: nil, after: after)
+        let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: AssetMetadataDrive(unreadable: ["folder"]), wal: wal)
+        XCTAssertEqual(report.stillUncertain, 2)
+        XCTAssertEqual(report.entries.count, 2)
+        XCTAssertEqual(wal.find(taskId: "auto", actionId: "undo")?.state, "undo_prepared")
+        XCTAssertEqual(wal.find(taskId: "other", actionId: "other")?.state, "prepared")
+        XCTAssertEqual(wal.find(taskId: "auto", actionId: "unreadable")?.state, "prepared")
+    }
+
+    func testAutomaticReconcileCannotOverwriteANewerTerminalOrChangedSnapshot() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-conditional-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let before = RemoteSnapshot(id: "f", parent: "0", name: "old", directory: false, size: 3)
+        let row = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "a", operation: "rename", before: before, after: before.with(name: "new"))
+        try wal.change(row, state: "applied")
+        XCTAssertFalse(try wal.reconcileForwardIfPending(row, state: "not_applied"))
+        XCTAssertEqual(wal.find(taskId: "auto", actionId: "a")?.state, "applied")
+        let other = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "b", operation: "rename", before: before, after: before.with(name: "new"))
+        try wal.change(other, state: "uncertain", after: before.with(name: "newer"))
+        XCTAssertFalse(try wal.reconcileForwardIfPending(other, state: "not_applied"))
+        XCTAssertEqual(wal.find(taskId: "auto", actionId: "b")?.after?.name, "newer")
+    }
+
+    func testAcceptedBackgroundJobCanOnlyBeConfirmedAppliedWhileResultIsPending() async throws {
+        for operation in ["move", "upload"] {
+            for landed in [false, true] {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-background-\(UUID().uuidString).json")
+                defer { try? FileManager.default.removeItem(at: url) }
+                let wal = ReversibleWalStore(storageURL: url)
+                let digest = "900150983cd24fb0d6963f7d28e17f72"
+                let before = RemoteSnapshot(id: "f", parent: "source", name: "asset.nfo", directory: false, size: 3, etag: "tag", contentMD5: digest)
+                let after = before.with(parent: "destination")
+                let row = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "job", operation: operation,
+                    before: operation == "upload" ? nil : before, after: after)
+                try wal.change(row, state: "uncertain", mayStillComplete: true)
+                let source = CloudEntry(fileId: "f", fileName: "asset.nfo", isDir: false, size: 3, etag: "tag", contentHash: digest, hashAlgorithm: "MD5")
+                let drive = AssetMetadataDrive(listings: ["source": landed || operation == "upload" ? [] : [source], "destination": landed ? [source] : []], kind: .guangya)
+                let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: drive, wal: wal)
+                XCTAssertEqual(report.confirmedApplied, landed ? 1 : 0)
+                XCTAssertEqual(report.confirmedNotApplied, 0)
+                XCTAssertEqual(report.stillUncertain, landed ? 0 : 1)
+                XCTAssertEqual(wal.find(taskId: "auto", actionId: "job")?.state, landed ? "applied" : "uncertain")
+                if !landed {
+                    let manual = await JournalReconciler.reconcileReversibleWal(taskId: "auto", drive: drive, wal: wal)
+                    XCTAssertEqual(manual.confirmedNotApplied, 0, "手动入口也不能绕过后台仍可能落地的证据")
+                    XCTAssertEqual(wal.find(taskId: "auto", actionId: "job")?.state, "uncertain")
+                }
+            }
+        }
+    }
+
+    func testBackgroundTerminalFailureReleasesOnlyAnUnchangedUnappliedSource() async throws {
+        for serverState in [PendingOperationState.processing, .succeeded, .failed] {
+            for manual in [false, true] {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("background-terminal-\(UUID().uuidString).json")
+                defer { try? FileManager.default.removeItem(at: url) }
+                let wal = ReversibleWalStore(storageURL: url)
+                let before = RemoteSnapshot(id: "f", parent: "source", name: "asset.nfo", directory: false, size: 3, etag: "tag")
+                let row = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "move", operation: "move", before: before, after: before.with(parent: "destination"))
+                try wal.change(row, state: "uncertain", mayStillComplete: true, backgroundTaskId: "accepted-task", backgroundOperation: "move")
+                let entry = CloudEntry(fileId: "f", fileName: "asset.nfo", isDir: false, size: 3, etag: "tag")
+                let drive = AssetMetadataDrive(listings: ["source": [entry], "destination": []], kind: .guangya, backgroundState: serverState)
+                let report = manual
+                    ? await JournalReconciler.reconcileReversibleWal(taskId: "auto", drive: drive, wal: wal)
+                    : await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: drive, wal: wal)
+                XCTAssertEqual(report.confirmedNotApplied, serverState == .failed ? 1 : 0)
+                let saved = try XCTUnwrap(ReversibleWalStore(storageURL: url).find(taskId: "auto", actionId: "move"))
+                XCTAssertEqual(saved.state, serverState == .failed ? "not_applied" : "uncertain")
+                XCTAssertEqual(saved.mayStillComplete, serverState == .failed ? false : true)
+                XCTAssertEqual(saved.backgroundTaskId, "accepted-task")
+            }
+        }
+    }
+
+    func testManualFallbackDoesNotBypassPendingUploadContentProof() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("pending-manual-proof-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let after = RemoteSnapshot(id: "", parent: "destination", name: "asset.nfo", directory: false, size: 3,
+            contentMD5: String(repeating: "a", count: 32))
+        let row = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: "upload", operation: "upload", before: nil, after: after)
+        try wal.change(row, state: "uncertain", mayStillComplete: true, backgroundTaskId: "accepted", backgroundOperation: "upload")
+        let foreign = CloudEntry(fileId: "foreign", fileName: "asset.nfo", isDir: false, size: 3)
+        let drive = AssetMetadataDrive(listings: ["destination": [foreign]], kind: .guangya, assetDigest: String(repeating: "b", count: 32))
+        let result = await JournalReconciler.reconcileReversibleWal(taskId: "auto", drive: drive, wal: wal)
+        XCTAssertEqual(result.confirmedApplied, 0)
+        XCTAssertEqual(result.confirmedNotApplied, 0)
+        XCTAssertEqual(result.stillUncertain, 1)
+        XCTAssertEqual(wal.find(taskId: "auto", actionId: "upload")?.state, "uncertain")
+    }
+
+    func testAutomaticRecoveryCachesOneListingForSameParentAcrossRows() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("auto-cache-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        var entries: [CloudEntry] = []
+        for name in ["a", "b"] {
+            let before = RemoteSnapshot(id: name, parent: "folder", name: name + ".old", directory: false, size: 10)
+            _ = try wal.prepare(taskId: "auto", accountId: "asset-test", actionId: name, operation: "rename", before: before, after: before.with(name: name + ".new"))
+            entries.append(CloudEntry(fileId: name, fileName: name + ".new", isDir: false, size: 10))
+        }
+        let counter = AutomaticReadCounter()
+        let report = await JournalReconciler.reconcileForwardAutomatically(taskId: "auto", drive: AssetMetadataDrive(entries: entries, counter: counter), wal: wal)
+        XCTAssertEqual(report.confirmedApplied, 2)
+        XCTAssertEqual(counter.count, 1)
     }
 
     func testAssetMD5RequiresExactIdentitySizeAndMD5Algorithm() async throws {
@@ -201,6 +472,9 @@ final class NamingAndRecognitionSuiteTests: XCTestCase {
         let session = URLSession(configuration: config)
         defer { session.invalidateAndCancel() }
         let drive = try WebDavDrive(accountId: "dav-test", baseUrl: "https://asset.test/dav", username: "", password: "", session: session)
+        let entries = try await drive.list(folderId: "/")
+        XCTAssertEqual(Set(entries.map(\.fileId)), Set(["/asset.nfo", "/short.nfo", "/long.nfo", "/denied.nfo"]))
+        XCTAssertTrue(entries.allSatisfy { !$0.isDir }, "集合自身用于核实，不应作为子文件返回")
         let actual = try await drive.assetMD5(fileId: "/asset.nfo", parentId: "/", expectedSize: 3)
         XCTAssertEqual(actual, "900150983cd24fb0d6963f7d28e17f72")
         for name in ["short.nfo", "long.nfo", "denied.nfo"] {

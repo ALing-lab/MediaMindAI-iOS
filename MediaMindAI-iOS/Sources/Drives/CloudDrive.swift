@@ -121,6 +121,11 @@ public enum DriveError: LocalizedError, Sendable {
     }
 }
 
+/// 后台已受理操作的单次只读查询结果；未知状态继续按处理中保护。
+public enum PendingOperationState: String, Sendable {
+    case processing, succeeded, failed
+}
+
 /// 统一网盘读写协议（对标 Android CloudDrive）。
 public protocol CloudDrive: Sendable {
     var kind: ProviderKind { get }
@@ -141,6 +146,7 @@ public protocol CloudDrive: Sendable {
     func trash(fileId: String) async throws -> String
     func parentIdOf(fileId: String) async throws -> String?
     func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String?
+    func pendingOperationState(taskId: String, operation: String) async throws -> PendingOperationState
     func exists(parentId: String, name: String) async throws -> Bool
     func ping() async -> Bool
 }
@@ -175,6 +181,9 @@ public extension CloudDrive {
               digest.algorithm == "MD5" else { return nil }
         return digest.digest
     }
+
+    /// 驱动未提供后台状态能力时，不推断后台操作已经结束。
+    func pendingOperationState(taskId: String, operation: String) async throws -> PendingOperationState { .processing }
 
     func exists(parentId: String, name: String) async throws -> Bool {
         try await list(folderId: parentId).contains { $0.fileName.caseInsensitiveCompare(name) == .orderedSame }

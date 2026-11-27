@@ -1106,6 +1106,46 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         XCTAssertTrue(flags.isEmpty)
     }
 
+    func testScannerCreatesEnabledEpisodeAssetsFromPolicyWithoutManualConfiguration() async throws {
+        let video = CloudEntry(fileId: "episode", fileName: "Show.S01E01.mkv", isDir: false, size: 100, parentFileId: "show")
+        let provider = MockScannerTmdb(movies: [:], shows: ["show": MatchInfo(kind: "tv", id: 777, title: "Show")], seasonCounts: [777: [1: 10]])
+        for enabled in [true, false] {
+            var policies = DefaultPolicies(); policies.episodeNfo = enabled; policies.episodeThumb = enabled
+            let plan = try await Scanner.scan(roots: [PlanRoot(folderId: "show", name: "Show", parentId: "0")],
+                drive: MockScrapeDrive(tree: ["show": [video]]), tmdbProvider: provider, globalPolicies: policies, persistResult: false)
+            let assets = plan.actions.filter { $0.kind == "episode_nfo" || ($0.kind == "image" && $0.episode != nil) }
+            XCTAssertEqual(assets.count, enabled ? 2 : 0)
+            XCTAssertTrue(assets.allSatisfy { $0.enabled && $0.selected && $0.episode == 1 && $0.tmdbId == 777 })
+            if enabled {
+                let file = try XCTUnwrap(plan.actions.first { $0.kind == "file" && $0.fileId == video.fileId && $0.op != "move" })
+                let stem = MediaParser.splitNameExt(file.newName).0
+                XCTAssertEqual(Set(assets.map(\.newName)), [stem + ".nfo", stem + "-thumb.jpg"])
+                XCTAssertTrue(assets.allSatisfy { $0.destRef != nil || $0.destParentId != nil })
+            }
+        }
+    }
+
+    func testManualReplanCreatesEpisodeAssetsWithoutChangingUnrelatedGroup() async throws {
+        let video = CloudEntry(fileId: "episode", fileName: "Show.S01E01.mkv", isDir: false, size: 100, parentFileId: "show")
+        let show = MatchInfo(kind: "tv", id: 777, title: "Show")
+        let provider = MockScannerTmdb(movies: [:], shows: ["show": show], seasonCounts: [777: [1: 10]])
+        let drive = MockScrapeDrive(tree: ["show": [video]])
+        var off = DefaultPolicies(); off.episodeNfo = false; off.episodeThumb = false
+        var plan = try await Scanner.scan(roots: [PlanRoot(folderId: "show", name: "Show", parentId: "0")],
+            drive: drive, tmdbProvider: provider, globalPolicies: off, persistResult: false)
+        let group = try XCTUnwrap(plan.groups.first { $0.kind == "tv" })
+        plan.taskPolicy = PolicyOverride(downloadEpisodeThumb: true, episodeNfo: true)
+        let other = PlanGroup(id: "unrelated", kind: "tv", tmdbId: 888, title: "Other", year: "", posterPath: nil,
+            folderId: "other", folderName: "Other", folderNewName: nil, rating: nil, confidence: "高", note: nil, warn: nil, actionIds: ["other-file"])
+        let otherAction = PlanAction(id: "other-file", op: "skip", groupId: other.id, fileId: "other-episode", parentId: "other",
+            oldName: "Other.S01E01.mkv", newName: "Other.S01E01.mkv", destParentId: nil, destRef: nil, kind: "file", mediaKind: "tv",
+            tmdbId: 888, season: 1, episode: 1, artworkUrl: nil, selected: false, done: false, error: nil, note: nil)
+        plan.groups.append(other); plan.actions.append(otherAction)
+        let updated = try await Scanner.replanGroup(plan: plan, groupId: group.id, info: show, drive: drive, tmdbProvider: provider)
+        XCTAssertEqual(updated.actions.filter { $0.groupId == group.id && ($0.kind == "episode_nfo" || ($0.kind == "image" && $0.episode != nil)) }.count, 2)
+        XCTAssertEqual(updated.actions.filter { $0.groupId == other.id }, [otherAction])
+    }
+
     // MARK: - Mock CloudDrive & Mock ScannerTmdbProvider
 
     private final class MockScrapeDrive: CloudDrive, @unchecked Sendable {

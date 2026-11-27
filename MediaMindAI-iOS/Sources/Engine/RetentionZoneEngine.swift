@@ -341,6 +341,24 @@ public final class RetentionZoneEngine: @unchecked Sendable {
         return intent
     }
 
+    /// 云端已由 WAL 确认移入保留区时，仅补齐本地登记，不再次建目录或移动文件。
+    public func confirmAppliedMove(taskId: String, actionId: String, accountId: String) throws -> Record {
+        lock.lock(); defer { lock.unlock() }
+        guard let row = wal.find(taskId: taskId, actionId: actionId), row.accountId == accountId,
+              row.operation == "retention_move", row.state == "applied", let after = row.after,
+              let original = try loadRecordsLocked().first(where: { $0.recordId == "\(taskId):\(actionId)" }),
+              original.accountId == accountId, original.status == Self.statusRetained,
+              original.retentionParentId == after.parent, original.originalName == after.name,
+              original.size == after.size, !after.id.isEmpty else {
+            throw DriveError.invalidInput("保留区移入登记与已核实日志不匹配，请核实后再处理")
+        }
+        var confirmed = original
+        confirmed.retentionFileId = after.id
+        confirmed.updatedAt = Int64(Date().timeIntervalSince1970 * 1000)
+        try upsert(confirmed)
+        return confirmed
+    }
+
     public func markRestored(taskId: String, actionId: String) {
         lock.lock(); defer { lock.unlock() }
         guard let cur = try? loadRecordsLocked() else { return }

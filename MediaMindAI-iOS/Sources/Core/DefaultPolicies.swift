@@ -15,6 +15,28 @@ public struct MediaDefaults: Codable, Hashable, Sendable {
         self.fanart = fanart
         self.logo = logo
     }
+
+    func applying(_ override: MediaPolicyOverride?) -> MediaDefaults {
+        MediaDefaults(nfo: override?.nfo ?? nfo, poster: override?.poster ?? poster,
+                      fanart: override?.fanart ?? fanart, logo: override?.logo ?? logo)
+    }
+
+    func diffOverride(from base: MediaDefaults) -> MediaPolicyOverride {
+        MediaPolicyOverride(nfo: nfo != base.nfo ? nfo : nil, poster: poster != base.poster ? poster : nil,
+                            fanart: fanart != base.fanart ? fanart : nil, logo: logo != base.logo ? logo : nil)
+    }
+}
+
+/// 电影与剧集分别保存差量；未修改的素材开关继续继承上层。
+public struct MediaPolicyOverride: Codable, Hashable, Sendable {
+    public var nfo: Bool?
+    public var poster: Bool?
+    public var fanart: Bool?
+    public var logo: Bool?
+
+    public init(nfo: Bool? = nil, poster: Bool? = nil, fanart: Bool? = nil, logo: Bool? = nil) {
+        self.nfo = nfo; self.poster = poster; self.fanart = fanart; self.logo = logo
+    }
 }
 
 /// 单类影视（电影 / 剧集）的文件与文件夹命名偏好；默认值严格对齐 Android 定版命名规范。
@@ -277,6 +299,8 @@ public extension DefaultPolicies {
         if let v = ov.downloadPoster { out.movie.poster = v; out.tv.poster = v }
         if let v = ov.downloadFanart { out.movie.fanart = v; out.tv.fanart = v }
         if let v = ov.downloadClearlogo { out.movie.logo = v; out.tv.logo = v }
+        out.movie = out.movie.applying(ov.movieAssets)
+        out.tv = out.tv.applying(ov.tvAssets)
         if let v = ov.seasonPoster { out.seasonPoster = v }
         if let v = ov.episodeNfo { out.episodeNfo = v }
         if let v = ov.downloadEpisodeThumb { out.episodeThumb = v }
@@ -303,14 +327,10 @@ public extension DefaultPolicies {
         if imageQuality != base.imageQuality { ov.imageQuality = imageQuality }
         if movieNaming != base.movieNaming { ov.movieNaming = movieNaming }
         if tvNaming != base.tvNaming { ov.tvNaming = tvNaming }
-        if movie.nfo != base.movie.nfo { ov.writeNfo = movie.nfo }
-        else if tv.nfo != base.tv.nfo { ov.writeNfo = tv.nfo }
-        if movie.poster != base.movie.poster { ov.downloadPoster = movie.poster }
-        else if tv.poster != base.tv.poster { ov.downloadPoster = tv.poster }
-        if movie.fanart != base.movie.fanart { ov.downloadFanart = movie.fanart }
-        else if tv.fanart != base.tv.fanart { ov.downloadFanart = tv.fanart }
-        if movie.logo != base.movie.logo { ov.downloadClearlogo = movie.logo }
-        else if tv.logo != base.tv.logo { ov.downloadClearlogo = tv.logo }
+        let movieDiff = movie.diffOverride(from: base.movie)
+        let tvDiff = tv.diffOverride(from: base.tv)
+        if movieDiff != MediaPolicyOverride() { ov.movieAssets = movieDiff }
+        if tvDiff != MediaPolicyOverride() { ov.tvAssets = tvDiff }
         if seasonPoster != base.seasonPoster { ov.seasonPoster = seasonPoster }
         if episodeNfo != base.episodeNfo { ov.episodeNfo = episodeNfo }
         if episodeThumb != base.episodeThumb { ov.downloadEpisodeThumb = episodeThumb }
@@ -349,6 +369,8 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
     public var adaptiveTargetDirId: String?
     public var adaptiveTargetDirPath: String?
     public var autoMoveConfirmedDuplicates: Bool?
+    public var movieAssets: MediaPolicyOverride?
+    public var tvAssets: MediaPolicyOverride?
 
     public init(
         organizeEnabled: Bool? = nil,
@@ -374,7 +396,9 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         adaptiveDirectory: Bool? = nil,
         adaptiveTargetDirId: String? = nil,
         adaptiveTargetDirPath: String? = nil,
-        autoMoveConfirmedDuplicates: Bool? = nil
+        autoMoveConfirmedDuplicates: Bool? = nil,
+        movieAssets: MediaPolicyOverride? = nil,
+        tvAssets: MediaPolicyOverride? = nil
     ) {
         self.organizeEnabled = organizeEnabled
         self.scrapeEnabled = scrapeEnabled
@@ -400,6 +424,8 @@ public struct PolicyOverride: Codable, Hashable, Sendable {
         self.adaptiveTargetDirId = adaptiveTargetDirId
         self.adaptiveTargetDirPath = adaptiveTargetDirPath
         self.autoMoveConfirmedDuplicates = autoMoveConfirmedDuplicates
+        self.movieAssets = movieAssets
+        self.tvAssets = tvAssets
     }
 }
 
@@ -438,6 +464,8 @@ public enum PolicyResolver {
         let baseNaming = isTv ? global.tvNaming : global.movieNaming
         let taskNaming = isTv ? task?.tvNaming : task?.movieNaming
         let filmNaming = isTv ? film?.tvNaming : film?.movieNaming
+        let taskMedia = isTv ? task?.tvAssets : task?.movieAssets
+        let filmMedia = isTv ? film?.tvAssets : film?.movieAssets
 
         let sourceLayer: String
         if film != nil { sourceLayer = "影片策略" }
@@ -456,10 +484,10 @@ public enum PolicyResolver {
             fullScrape: film?.fullScrape ?? task?.fullScrape ?? global.fullScrape,
             imageQuality: film?.imageQuality ?? task?.imageQuality ?? global.imageQuality,
             naming: filmNaming ?? taskNaming ?? baseNaming,
-            writeNfo: film?.writeNfo ?? task?.writeNfo ?? baseMedia.nfo,
-            downloadPoster: film?.downloadPoster ?? task?.downloadPoster ?? baseMedia.poster,
-            downloadFanart: film?.downloadFanart ?? task?.downloadFanart ?? baseMedia.fanart,
-            downloadClearlogo: film?.downloadClearlogo ?? task?.downloadClearlogo ?? baseMedia.logo,
+            writeNfo: filmMedia?.nfo ?? film?.writeNfo ?? taskMedia?.nfo ?? task?.writeNfo ?? baseMedia.nfo,
+            downloadPoster: filmMedia?.poster ?? film?.downloadPoster ?? taskMedia?.poster ?? task?.downloadPoster ?? baseMedia.poster,
+            downloadFanart: filmMedia?.fanart ?? film?.downloadFanart ?? taskMedia?.fanart ?? task?.downloadFanart ?? baseMedia.fanart,
+            downloadClearlogo: filmMedia?.logo ?? film?.downloadClearlogo ?? taskMedia?.logo ?? task?.downloadClearlogo ?? baseMedia.logo,
             downloadEpisodeThumb: film?.downloadEpisodeThumb ?? task?.downloadEpisodeThumb ?? global.episodeThumb,
             seasonPoster: film?.seasonPoster ?? task?.seasonPoster ?? global.seasonPoster,
             episodeNfo: film?.episodeNfo ?? task?.episodeNfo ?? global.episodeNfo,
@@ -470,6 +498,7 @@ public enum PolicyResolver {
     /// 当用户在预览页修改「任务策略」或单部「影片策略」后，按三级优先级即时重算计划中对应分组的文件名与开关状态。
     public static func applyOverrides(to plan: ScrapePlan, global: DefaultPolicies) -> ScrapePlan {
         var out = plan
+        let reserved = Set(plan.submittedActionIds ?? [])
         for gIdx in out.groups.indices {
             let group = out.groups[gIdx]
             guard group.kind == "movie" || group.kind == "tv" || group.kind == "collection" else { continue }
@@ -494,7 +523,7 @@ public enum PolicyResolver {
             })
             var disabledMkdirIds: [String] = []
             var disabledSeasonIds: [String] = []
-            for aIdx in out.actions.indices where out.actions[aIdx].groupId == group.id && !out.actions[aIdx].done {
+            for aIdx in out.actions.indices where out.actions[aIdx].groupId == group.id && !out.actions[aIdx].done && !reserved.contains(out.actions[aIdx].id) {
                 let act = out.actions[aIdx]
                 if isCollection && hasCollectionMkdir && act.op == "mkdir" && act.mediaKind == "collection" {
                     out.actions[aIdx].newName = targetFolder
@@ -579,7 +608,7 @@ public enum PolicyResolver {
                 out = PlanSelection.setEnabled(plan: out, ids: cascadeDisable, enabled: false)
             }
         }
-        return out
+        return EpisodeAssets.applyingPolicies(to: out, global: global)
     }
 }
 

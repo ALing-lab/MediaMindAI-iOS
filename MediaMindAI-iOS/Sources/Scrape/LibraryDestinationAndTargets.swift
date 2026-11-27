@@ -148,32 +148,82 @@ public enum EpisodeAssets {
         guard group.kind == "tv", let tmdbId = group.tmdbId else {
             throw DriveError.invalidInput("请先匹配剧集信息")
         }
-        guard !plan.actions.contains(where: { $0.groupId == groupId && $0.done }) else {
-            throw DriveError.invalidInput("该影片已有完成操作，请重新扫描后设置单集素材")
+        let reserved = Set(plan.submittedActionIds ?? [])
+        let groupActions = plan.actions.filter { $0.groupId == groupId }
+        func sourceMove(_ file: PlanAction, includeHistory: Bool = false) -> PlanAction? {
+            groupActions.first {
+                $0.fileId == file.fileId && $0.op == "move" && $0.kind == "file"
+                    && (($0.enabled && $0.selected && $0.blocked == nil && !$0.done && !reserved.contains($0.id))
+                        || (includeHistory && ($0.done || reserved.contains($0.id))))
+            }
         }
-
-        let existing = plan.actions.filter { $0.groupId == groupId && isSidecar($0) }
-        let fileActs = plan.actions.filter { $0.groupId == groupId && $0.kind == "file" && $0.fileId != nil && $0.season != nil && ($0.episode ?? 0) > 0 }
-        let byFile = Dictionary(grouping: fileActs) { $0.fileId ?? "" }
-        let candidates: [PlanAction] = byFile.values.compactMap { list in
-            list.first(where: { $0.op == "rename" }) ?? list.first(where: { $0.op == "skip" }) ?? list.first
-        }
-        guard !candidates.isEmpty || (!nfo && !thumbnails) else {
-            throw DriveError.invalidInput("没有可识别的单集，请先纠错")
-        }
-
-        var output = plan.actions.filter { !($0.groupId == groupId && isSidecar($0)) }
-        for file in candidates {
-            let move = plan.actions.first(where: { $0.groupId == groupId && $0.fileId == file.fileId && $0.op == "move" && $0.kind == "file" })
+        func sameSource(_ asset: PlanAction, _ file: PlanAction) -> Bool {
+            guard asset.season == file.season && asset.episode == file.episode else { return false }
+            if asset.id == "episode-\(file.id)-nfo" || asset.id == "episode-\(file.id)-thumb" { return true }
+            // 新身份已有来源关联，不能再凭同名套到另一目录／版本。
+            if asset.id.hasSuffix("-nfo") || asset.id.hasSuffix("-thumb") { return false }
+            let move = sourceMove(file, includeHistory: true)
             let parent = move?.destParentId ?? (move?.destRef == nil ? file.parentId : nil)
-            let name = MediaParser.splitNameExt((file.op == "rename" && file.enabled) ? file.newName : file.oldName).0
+            guard asset.parentId == parent && asset.destRef == move?.destRef else { return false }
+            return [file.oldName, file.newName].contains { name in
+                let stem = MediaParser.splitNameExt(name).0
+                return asset.newName == stem + ".nfo" || asset.newName == stem + "-thumb.jpg"
+            }
+        }
+        let retainedSources = Set(groupActions.filter {
+            $0.kind == DuplicateRetentionPlanner.kindRetentionDuplicate && $0.enabled && $0.selected
+        }.compactMap(\.fileId))
+        let frozenFiles = groupActions.filter { $0.kind == "file" && ($0.done || reserved.contains($0.id)) }
+        var frozenSources = Set(frozenFiles.compactMap(\.fileId))
+        let frozenAssets = groupActions.filter { isSidecar($0) && ($0.done || reserved.contains($0.id)) }
+        for file in groupActions where file.kind == "file" {
+            if frozenAssets.contains(where: { sameSource($0, file) }), let id = file.fileId { frozenSources.insert(id) }
+        }
+        func frozen(_ action: PlanAction) -> Bool {
+            if action.done || reserved.contains(action.id) { return true }
+            // 分集素材没有 fileId，按源文件两个已知名字识别其历史侧车，不能重新规划已提交范围。
+            return groupActions.contains { file in
+                guard file.kind == "file", file.fileId.map({ frozenSources.contains($0) }) == true else { return false }
+                return sameSource(action, file)
+            }
+        }
+        let existing = groupActions.filter { isSidecar($0) && !frozen($0) }
+        let fileActs = groupActions.filter {
+            $0.kind == "file" && $0.fileId != nil && !frozenSources.contains($0.fileId ?? "") && !retainedSources.contains($0.fileId ?? "")
+                && !$0.done && !reserved.contains($0.id) && ["rename", "skip", "move"].contains($0.op)
+                && $0.season != nil && ($0.episode ?? 0) > 0
+        }
+        var seenFiles = Set<String>()
+        let candidates = fileActs.compactMap { action -> PlanAction? in
+            guard let id = action.fileId, seenFiles.insert(id).inserted else { return nil }
+            let sameFile = fileActs.filter { $0.fileId == id }
+            return sameFile.first(where: { $0.op == "rename" }) ?? sameFile.first(where: { $0.op == "skip" }) ?? action
+        }
+        guard !candidates.isEmpty || (!nfo && !thumbnails) || !retainedSources.isEmpty else {
+            throw DriveError.invalidInput("没有可识别的未提交单集，请先纠错或重新扫描")
+        }
+
+        var output = plan.actions.filter { !($0.groupId == groupId && isSidecar($0)) || frozen($0) }
+        var usedExisting = Set<String>()
+        for file in candidates {
+            let move = sourceMove(file)
+            let parent = move?.destParentId ?? (move?.destRef == nil ? file.parentId : nil)
+            let name = MediaParser.splitNameExt((file.op == "rename" && file.enabled && file.selected && file.blocked == nil) ? file.newName : file.oldName).0
             let specs: [(Bool, String, String)] = [(nfo, ".nfo", "episode_nfo"), (thumbnails, "-thumb.jpg", "image")]
             for (enabled, suffix, kind) in specs {
                 let targetName = name + suffix
-                let old = existing.first(where: { $0.newName == targetName && $0.parentId == parent && $0.destRef == move?.destRef })
+                let stableId = "episode-\(file.id)-\(kind == "episode_nfo" ? "nfo" : "thumb")"
+                let matching = existing.filter { !usedExisting.contains($0.id) && $0.kind == kind && $0.season == file.season && $0.episode == file.episode }
+                let old = matching.first(where: { $0.id == stableId })
+                    ?? matching.first(where: { $0.newName == targetName && $0.parentId == parent && $0.destRef == move?.destRef })
+                    ?? (matching.count == 1 && candidates.filter { $0.season == file.season && $0.episode == file.episode }.count == 1 ? matching.first : nil)
+                if let old { usedExisting.insert(old.id) }
                 if !enabled && old == nil { continue }
+                // 同名的多版本视频共用同一路径的侧车，不生成两条互相覆盖的上传。
+                if output.contains(where: { $0.groupId == groupId && isSidecar($0) && $0.newName.caseInsensitiveCompare(targetName) == .orderedSame && $0.parentId == parent && $0.destRef == move?.destRef }) { continue }
+                let sourceSelected = (file.op == "skip" || !file.enabled || file.selected) && (move?.selected ?? true)
                 output.append(PlanAction(
-                    id: old?.id ?? "episode-\(UUID().uuidString.prefix(8).lowercased())",
+                    id: old?.id ?? stableId,
                     op: "artwork",
                     groupId: groupId,
                     fileId: nil,
@@ -189,8 +239,9 @@ public enum EpisodeAssets {
                     season: file.season,
                     episode: file.episode,
                     artworkUrl: nil,
-                    selected: enabled && (old?.enabled == true ? (old?.selected ?? true) : true),
+                    selected: enabled && !group.confirmRequired && sourceSelected && (old?.enabled == true ? (old?.selected ?? true) : true),
                     enabled: enabled,
+                    blocked: file.blocked ?? move?.blocked,
                     done: false,
                     error: nil,
                     note: kind == "episode_nfo" ? "写入单集 NFO" : "下载单集剧照",
@@ -207,6 +258,21 @@ public enum EpisodeAssets {
         }
         return out
     }
+
+    /// 扫描、策略调整与手动识别共用的分集素材生成入口；没有分集编号时不猜测。
+    public static func applyingPolicies(to plan: ScrapePlan, global: DefaultPolicies, groupIds: Set<String>? = nil) -> ScrapePlan {
+        var result = plan
+        for group in plan.groups where group.kind == "tv" && group.tmdbId != nil && (groupIds?.contains(group.id) ?? true) {
+            let effective = PolicyResolver.resolve(isTv: true, global: global, task: plan.taskPolicy, film: group.policyOverride)
+            if let updated = try? configure(plan: result, groupId: group.id,
+                nfo: effective.scrapeEnabled && effective.episodeNfo,
+                thumbnails: effective.scrapeEnabled && effective.downloadEpisodeThumb, fullScrape: effective.fullScrape) {
+                result = updated
+            }
+        }
+        return result
+    }
+
 }
 
 

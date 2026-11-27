@@ -93,14 +93,8 @@ public struct SettingsTabView: View {
                     }
                 }
 
-                Section("关于 MediaMind AI") {
-                    LabeledContent("版本", value: "\(UpdateChecker.currentVersion) (iOS)")
-                    NavigationLink("开源许可与组件声明") {
-                        LicensesView()
-                    }
-                    NavigationLink("检查版本更新") {
-                        UpdateCheckView()
-                    }
+                Section {
+                    NavigationLink("关于") { AboutView() }
                 }
                 }
                 .scrollContentBackground(.hidden)

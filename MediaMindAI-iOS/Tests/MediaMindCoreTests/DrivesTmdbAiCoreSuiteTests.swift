@@ -10,7 +10,176 @@ import Observation
 /// 覆盖 Drives（GuangyaDrive / WebDavDrive / WebDavAddress / Pan123Drive / ContentDigest / CertPinning / IdRemap / AccountBinding）、
 /// TMDB（TmdbNet / TmdbRequestPacer / TmdbClient.connectHelp）、
 /// AI（AiResponseParser 全链路容错解析）以及 Core（NetLog / HistoryStore / UpdateChecker / HostMatch / AppDirs）。
+private final class GuangyaRefusalProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool {
+        let host = request.url?.host ?? ""
+        return ["gy-recovery.test", "gy-pending.test", "gy-failed.test"].contains(host)
+            || (host.hasPrefix("gy-status-") && host.hasSuffix(".test"))
+            || ["gy-malformed.test", "gy-malformed-empty.test"].contains(host)
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url, let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil) else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let payload: String
+        if url.host == "gy-malformed.test" { payload = #"{"code":0,"data":{"taskId":"accepted-no-sts"}}"# }
+        else if url.host == "gy-malformed-empty.test" { payload = #"{"code":0,"data":{}}"# }
+        else if url.host?.hasPrefix("gy-status-") == true {
+            if url.path.hasSuffix("/get_task_status") {
+                switch url.host {
+                case "gy-status-done.test": payload = #"{"code":0,"data":{"status":2}}"#
+                case "gy-status-failed.test": payload = #"{"code":0,"data":{"status":3}}"#
+                case "gy-status-negative.test": payload = #"{"code":0,"data":{"status":-1}}"#
+                case "gy-status-busy.test": payload = #"{"code":0,"data":{"status":1}}"#
+                default: payload = #"{"code":0,"data":{}}"#
+                }
+            } else if url.path.hasSuffix("/get_info_by_task_id") {
+                switch url.host {
+                case "gy-status-done.test": payload = #"{"code":0,"data":{"fileId":"uploaded-file"}}"#
+                case "gy-status-busy.test": payload = #"{"code":145,"msg":"processing"}"#
+                case "gy-status-failed.test": payload = #"{"code":999,"msg":"unknown upload error"}"#
+                default: payload = #"{"code":0,"data":{}}"#
+                }
+            } else { payload = #"{"code":999,"msg":"unexpected endpoint"}"# }
+        }
+        else if ["gy-pending.test", "gy-failed.test"].contains(url.host ?? ""), url.path.hasSuffix("/move_file") { payload = #"{"code":0,"data":{"taskId":"background-move"}}"# }
+        else if url.host == "gy-failed.test", url.path.hasSuffix("/get_task_status") { payload = #"{"code":0,"data":{"status":3}}"# }
+        else if url.host == "gy-pending.test", url.path.hasSuffix("/get_res_center_token") { payload = #"{"code":156,"data":{"taskId":"background-upload"}}"# }
+        else { payload = #"{"code":127,"msg":"操作过于频繁"}"# }
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
 final class DrivesTmdbAiCoreSuiteTests: XCTestCase {
+
+    func testGuangyaRenameMarksOnlyItsOwn127ResponseAsExplicitRefusal() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [GuangyaRefusalProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let drive = GuangyaDrive(accountId: "gy-refusal", initialCreds: GyCreds(accessToken: "test"), session: session,
+            apiBase: "https://gy-recovery.test", pathIntervalMs: 0, retryDelaysMs: [])
+        do {
+            _ = try await drive.rename(fileId: "f", newName: "new.mkv")
+            XCTFail("服务端拒绝应抛错")
+        } catch let DriveError.rateLimited(code, _) { XCTAssertEqual(code, 127) }
+        catch { XCTFail("改名明确拒绝未保留类型：\(error)") }
+        do {
+            _ = try await drive.list(folderId: "0")
+            XCTFail("读取限流应抛错")
+        } catch let DriveError.api(code, _) { XCTAssertEqual(code, 127) }
+        catch { XCTFail("读取限流不能误标为改名写请求被拒绝：\(error)") }
+    }
+
+    func testGuangyaAcceptedBackgroundJobsPreservePendingStateOnPollingFailure() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [GuangyaRefusalProtocol.self]
+        let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
+        let drive = GuangyaDrive(accountId: "pending", initialCreds: GyCreds(accessToken: "test"), session: session,
+            apiBase: "https://gy-pending.test", pathIntervalMs: 0, pollIntervalMs: 0, maxPolls: 1, retryDelaysMs: [])
+        do {
+            _ = try await drive.moveBatch(fileIds: ["f"], destParentId: "destination")
+            XCTFail("查询失败不能将已受理移动当作未提交")
+        } catch let error as GuangyaPendingOperationError {
+            XCTAssertTrue(RateLimitDetector.isRateLimitError(error))
+            XCTAssertEqual(error.taskId, "background-move"); XCTAssertEqual(error.operation, "move")
+        }
+        catch { XCTFail("缺少后台受理证据：\(error)") }
+        do {
+            _ = try await drive.upload(parentId: "0", name: "asset.nfo", data: Data("abc".utf8))
+            XCTFail("秒传后处理查询失败应保留受理状态")
+        } catch let error as GuangyaPendingOperationError {
+            XCTAssertTrue(RateLimitDetector.isRateLimitError(error))
+            XCTAssertEqual(error.taskId, "background-upload"); XCTAssertEqual(error.operation, "upload")
+        }
+        catch { XCTFail("缺少上传受理证据：\(error)") }
+    }
+
+    func testGuangyaExplicitBackgroundFailureDoesNotPermanentlyClaimItMayStillComplete() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [GuangyaRefusalProtocol.self]
+        let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
+        let drive = GuangyaDrive(accountId: "failed", initialCreds: GyCreds(accessToken: "test"), session: session,
+            apiBase: "https://gy-failed.test", pathIntervalMs: 0, pollIntervalMs: 0, maxPolls: 1, retryDelaysMs: [])
+        do {
+            _ = try await drive.moveBatch(fileIds: ["f"], destParentId: "destination")
+            XCTFail("明确失败不能报告成功")
+        } catch let DriveError.api(code, _) { XCTAssertEqual(code, -2) }
+        catch { XCTFail("明确终态失败不应永久标为后台待处理：\(error)") }
+    }
+
+    private struct DefaultBackgroundDrive: CloudDrive {
+        let kind: ProviderKind = .webdav
+        let accountId = "default-background"
+        func list(folderId: String) async throws -> [CloudEntry] { throw DriveError.unsupported("not used") }
+        func rename(fileId: String, newName: String) async throws -> String { throw DriveError.unsupported("not used") }
+        func mkdir(parentId: String, name: String) async throws -> String { throw DriveError.unsupported("not used") }
+        func move(fileId: String, destParentId: String) async throws -> String { throw DriveError.unsupported("not used") }
+        func upload(parentId: String, name: String, data: Data) async throws -> String { throw DriveError.unsupported("not used") }
+    }
+
+    private struct BackgroundDelegateDrive: CloudDrive {
+        let kind: ProviderKind = .webdav
+        let accountId = "background-delegate"
+        func list(folderId: String) async throws -> [CloudEntry] { throw DriveError.unsupported("not used") }
+        func rename(fileId: String, newName: String) async throws -> String { throw DriveError.unsupported("not used") }
+        func mkdir(parentId: String, name: String) async throws -> String { throw DriveError.unsupported("not used") }
+        func move(fileId: String, destParentId: String) async throws -> String { throw DriveError.unsupported("not used") }
+        func upload(parentId: String, name: String, data: Data) async throws -> String { throw DriveError.unsupported("not used") }
+        func pendingOperationState(taskId: String, operation: String) async throws -> PendingOperationState {
+            guard taskId == "task" && operation == "move" else { throw DriveError.invalidInput("delegate arguments lost") }
+            return .failed
+        }
+    }
+
+    func testBackgroundStatusDefaultsToProcessingAndPacedDriveDelegates() async throws {
+        let unsupported: any CloudDrive = DefaultBackgroundDrive()
+        let unknown = try await unsupported.pendingOperationState(taskId: "task", operation: "move")
+        XCTAssertEqual(unknown, .processing)
+        let paced: any CloudDrive = PacedDrive(delegate: BackgroundDelegateDrive())
+        let delegated = try await paced.pendingOperationState(taskId: "task", operation: "move")
+        XCTAssertEqual(delegated, .failed)
+    }
+
+    func testGuangyaBackgroundStatusQueriesOnlyKnownTerminalEvidence() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [GuangyaRefusalProtocol.self]
+        let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
+        let cases: [(String, PendingOperationState)] = [("done", .succeeded), ("failed", .failed), ("negative", .failed), ("busy", .processing), ("unknown", .processing)]
+        for (host, expected) in cases {
+            let drive: any CloudDrive = GuangyaDrive(accountId: "status", initialCreds: GyCreds(accessToken: "test"), session: session,
+                apiBase: "https://gy-status-\(host).test", pathIntervalMs: 0, retryDelaysMs: [])
+            let state = try await drive.pendingOperationState(taskId: "task", operation: "move")
+            XCTAssertEqual(state, expected)
+            let ignored = try await drive.pendingOperationState(taskId: "task", operation: "unrecognized")
+            XCTAssertEqual(ignored, .processing)
+            if host == "failed" {
+                do {
+                    _ = try await drive.pendingOperationState(taskId: "task", operation: "upload")
+                    XCTFail("未知上传错误不能被推断成终态失败")
+                } catch let DriveError.api(code, _) { XCTAssertEqual(code, 999) }
+                catch { XCTFail("应保留原始查询错误：\(error)") }
+            } else {
+                let upload = try await drive.pendingOperationState(taskId: "task", operation: "upload")
+                XCTAssertEqual(upload, host == "done" ? .succeeded : .processing)
+            }
+        }
+    }
+
+    func testGuangyaMalformedAcceptedUploadDoesNotBecomeAPlainUnappliedFailure() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [GuangyaRefusalProtocol.self]
+        let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
+        for host in ["gy-malformed.test", "gy-malformed-empty.test"] {
+            let drive = GuangyaDrive(accountId: "malformed", initialCreds: GyCreds(accessToken: "test"), session: session,
+                apiBase: "https://" + host, pathIntervalMs: 0, pollIntervalMs: 0, maxPolls: 1, retryDelaysMs: [])
+            do {
+                _ = try await drive.upload(parentId: "0", name: "asset.nfo", data: Data("abc".utf8))
+                XCTFail("已受理但凭证不全，不能确认上传未执行")
+            } catch let pending as GuangyaPendingOperationError {
+                XCTAssertEqual(pending.operation, "upload")
+                XCTAssertEqual(pending.taskId, host == "gy-malformed.test" ? "accepted-no-sts" : nil)
+            } catch { XCTFail("受理证据丢失：\(error)") }
+        }
+    }
 
     func testTaskLogNormalSkipKeepsExplanationWithoutFailure() {
         for reason in ["已存在", "已存在，未覆盖", "TMDB 暂无该集剧照，已跳过", "没有可用的图片 URL：poster.jpg", "批量移动回退逐条执行"] {
@@ -315,6 +484,8 @@ final class DrivesTmdbAiCoreSuiteTests: XCTestCase {
         let info = try UpdateChecker.parse(data: Data(json.utf8))
         XCTAssertEqual(info.version, "0.6.1")
         XCTAssertEqual(info.releaseNotes, "Bug fixes")
+        XCTAssertEqual(UpdateChecker.defaultLatestUrl, "https://api.github.com/repos/ALing-lab/MediaMindAI-iOS/releases/latest")
+        XCTAssertEqual(UpdateChecker.releasesPageUrl, "https://github.com/ALing-lab/MediaMindAI-iOS/releases")
 
         XCTAssertTrue(HostMatch.isOrSubdomainOf(host: "api.themoviedb.org", domain: "themoviedb.org"))
         XCTAssertTrue(HostMatch.isOrSubdomainOf(host: "themoviedb.org", domain: "themoviedb.org"))

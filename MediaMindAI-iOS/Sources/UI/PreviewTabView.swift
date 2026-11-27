@@ -82,7 +82,12 @@ public struct PreviewTabView: View {
                         description: Text("任务可能已取消或已提交执行，请返回任务中心查看。"))
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background {
+                ZStack(alignment: .top) {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+                    TopAmbientGlow()
+                }
+            }
             .navigationTitle("识别结果")
             .navigationBarTitleDisplayMode(.large)
             .toolbar(.hidden, for: .tabBar)

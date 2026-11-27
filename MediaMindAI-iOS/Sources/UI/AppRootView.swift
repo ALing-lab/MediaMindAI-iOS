@@ -59,7 +59,19 @@ public struct AppRootView: View {
                         Label(tab.label, systemImage: tab.icon).tag(tab)
                     }
                 }
-                .navigationTitle("MediaMind AI")
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        (Text("Media").foregroundColor(.primary)
+                         + Text("M").foregroundColor(MMTheme.accent)
+                         + Text("ind AI").foregroundColor(.primary))
+                            .font(.system(size: 25, weight: .heavy, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .accessibilityLabel("MediaMind AI")
+                    }
+                }
             } detail: { tabContent(selectedTab) }
         } else {
             TabView(selection: $selectedTab) {

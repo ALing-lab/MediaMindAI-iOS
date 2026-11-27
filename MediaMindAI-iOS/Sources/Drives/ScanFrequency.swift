@@ -324,6 +324,13 @@ public final class PacedDrive: CloudDrive, @unchecked Sendable {
         }
     }
 
+    public func pendingOperationState(taskId: String, operation: String) async throws -> PendingOperationState {
+        try await validateBinding()
+        return try await pacedRead {
+            try await delegate.pendingOperationState(taskId: taskId, operation: operation)
+        }
+    }
+
     public func rename(fileId: String, newName: String) async throws -> String {
         try await validateBinding()
         return try await delegate.rename(fileId: fileId, newName: newName)

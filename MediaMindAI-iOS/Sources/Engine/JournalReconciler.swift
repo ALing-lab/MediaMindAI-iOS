@@ -5,6 +5,13 @@ import Foundation
 /// - 正向中断（prepared / uncertain）：目标态存在且原态消失 → `applied`；目标态不存在且原态仍在 → `skipped`（未生效）；双态并存或多同名 → 保持 `uncertain` 绝不猜测。
 /// - 撤销中断（undo_prepared，M-6）：逆向判定——原态恢复且目标态消失 → `undone`（已撤销）；目标态仍在且原态缺失 → 恢复为 `applied` 供继续撤销；双态不明 → 保持 `uncertain`。
 public enum JournalReconciler {
+    private static func manualCheckBlocked(taskId: String) async -> Bool {
+        await MainActor.run {
+            ExecutionEngine.shared.isRollingBack
+                || (ExecutionEngine.shared.isRunning && ExecutionEngine.shared.currentRun?.id == taskId)
+        }
+    }
+
     public struct ReconcileEntry: Identifiable, Hashable, Sendable {
         public let id: String
         public let actionId: String
@@ -52,6 +59,12 @@ public enum JournalReconciler {
     ) async -> ReconcileReport {
         let store = await MainActor.run { journal ?? OperationJournal.shared }
         let pending = await MainActor.run { uncertainRows(runId: runId, journal: store) }
+        if await manualCheckBlocked(taskId: runId) {
+            return ReconcileReport(confirmedApplied: 0, confirmedNotApplied: 0, confirmedReverted: 0,
+                stillUncertain: pending.count, entries: pending.map { row in
+                    ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.op, outcome: "uncertain", detail: "任务仍在执行／撤销，未核实在途请求")
+                })
+        }
         guard !pending.isEmpty else {
             return ReconcileReport(confirmedApplied: 0, confirmedNotApplied: 0, confirmedReverted: 0, stillUncertain: 0, entries: [])
         }
@@ -157,16 +170,31 @@ public enum JournalReconciler {
         drive: any CloudDrive,
         wal: ReversibleWalStore = .shared
     ) async -> ReconcileReport {
-        let pending = wal.uncertainRecords().filter { $0.taskId == taskId }
-        guard !pending.isEmpty else {
-            return ReconcileReport(confirmedApplied: 0, confirmedNotApplied: 0, confirmedReverted: 0, stillUncertain: 0, entries: [])
+        if await manualCheckBlocked(taskId: taskId) {
+            let pending = wal.uncertainRecords().filter { $0.taskId == taskId }
+            return ReconcileReport(confirmedApplied: 0, confirmedNotApplied: 0, confirmedReverted: 0,
+                stillUncertain: pending.count, entries: pending.map { row in
+                    ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "任务仍在执行／撤销，未核实在途请求")
+                })
         }
-        var applied = 0, notApplied = 0, reverted = 0, still = 0
-        var entries: [ReconcileEntry] = []
+        let preliminary: ReconcileReport
+        if wal.uncertainRecords().contains(where: { $0.taskId == taskId && $0.mayStillComplete == true }) {
+            preliminary = await reconcileForwardAutomatically(taskId: taskId, drive: drive, wal: wal)
+        } else { preliminary = ReconcileReport(confirmedApplied: 0, confirmedNotApplied: 0, confirmedReverted: 0, stillUncertain: 0, entries: []) }
+        let pending = wal.uncertainRecords().filter { $0.taskId == taskId }
+        guard !pending.isEmpty else { return preliminary }
+        var applied = preliminary.confirmedApplied, notApplied = preliminary.confirmedNotApplied, reverted = 0, still = 0
+        var entries = preliminary.entries.filter { $0.outcome != "uncertain" }
         for row in pending {
             guard row.accountId == drive.accountId else {
                 still += 1
                 entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "日志账号与当前网盘不匹配，跳过核实"))
+                continue
+            }
+            if row.mayStillComplete == true && (row.state == "prepared" || row.state == "uncertain") {
+                still += 1
+                entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain",
+                    detail: "已受理操作的身份或结果尚未确认，保留待核实状态"))
                 continue
             }
             let beforeList = row.before != nil ? (try? await drive.list(folderId: row.before!.parent)) : nil
@@ -291,7 +319,7 @@ public enum JournalReconciler {
                         try wal.change(row, state: "applied", after: reconciledSnapshot(afterMatches[0], intended: after))
                         applied += 1
                         entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "核实确认远端操作已生效"))
-                    } else if afterMatches.isEmpty && (row.before == nil || beforeMatches.count == 1) {
+                    } else if afterMatches.isEmpty && (row.before == nil || beforeMatches.count == 1) && row.mayStillComplete != true {
                         try wal.change(row, state: "not_applied", error: "核实确认远端未发生变化")
                         notApplied += 1
                         entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "not_applied", detail: "核实确认远端未发生变化"))
@@ -307,4 +335,170 @@ public enum JournalReconciler {
         }
         return ReconcileReport(confirmedApplied: applied, confirmedNotApplied: notApplied, confirmedReverted: reverted, stillUncertain: still, entries: entries)
     }
+    /// 自动恢复仅核实本次正向事务；不猜测路径身份，不触碰撤销日志，也不执行云端写入。
+    public static func reconcileForwardAutomatically(
+        taskId: String,
+        drive: any CloudDrive,
+        wal: ReversibleWalStore = .shared
+    ) async -> ReconcileReport {
+        let pending = wal.uncertainRecords().filter {
+            $0.taskId == taskId && ($0.state == "prepared" || $0.state == "uncertain")
+        }
+        var applied = 0, notApplied = 0, still = 0
+        var entries: [ReconcileEntry] = []
+        var listings: [String: [CloudEntry]] = [:]
+        var unreadable = Set<String>()
+        var digests: [String: String] = [:]
+        var digestRequested = Set<String>()
+
+        var backgroundStates: [String: PendingOperationState] = [:]
+        func jobKey(_ row: ReversibleWalRecord) -> String? {
+            guard let id = row.backgroundTaskId, !id.isEmpty, let operation = row.backgroundOperation,
+                  operation == "move" || operation == "upload" else { return nil }
+            return operation + "\u{0}" + id
+        }
+        // 先获得后台终态，再读取目录，避免用后台结束前的旧目录快照判定未生效。
+        for row in pending where row.accountId == drive.accountId && row.mayStillComplete == true {
+            guard !Task.isCancelled else { break }
+            guard let key = jobKey(row), backgroundStates[key] == nil,
+                  let id = row.backgroundTaskId, let operation = row.backgroundOperation else { continue }
+            do { backgroundStates[key] = try await drive.pendingOperationState(taskId: id, operation: operation) }
+            catch { backgroundStates[key] = .processing }
+        }
+
+        func list(_ parent: String) async -> [CloudEntry]? {
+            if let cached = listings[parent] { return cached }
+            guard !Task.isCancelled && !unreadable.contains(parent) else { return nil }
+            do {
+                let result = try await drive.list(folderId: parent)
+                listings[parent] = result
+                return result
+            } catch {
+                unreadable.insert(parent)
+                return nil
+            }
+        }
+        func md5(_ entry: CloudEntry, parent: String) async -> String? {
+            if let known = ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash), known.algorithm == "MD5" {
+                return known.digest
+            }
+            let key = parent + "\u{0}" + entry.fileId
+            if digestRequested.contains(key) { return digests[key] }
+            guard !Task.isCancelled else { return nil }
+            digestRequested.insert(key)
+            guard let value = try? await drive.assetMD5(fileId: entry.fileId, parentId: parent, expectedSize: entry.size),
+                  let normalized = ContentDigest.parseMd5OrNull(value)?.digest else { return nil }
+            digests[key] = normalized
+            return normalized
+        }
+        func strongEtag(_ value: String?) -> Bool {
+            guard let value, !value.isEmpty else { return false }
+            return !value.lowercased().hasPrefix("w/")
+        }
+        func matches(_ entry: CloudEntry, snapshot: RemoteSnapshot, expectedId: String) async -> Bool {
+            guard entry.fileName == snapshot.name, entry.isDir == snapshot.directory,
+                  !expectedId.isEmpty, entry.fileId == expectedId else { return false }
+            if !snapshot.directory {
+                guard entry.size == snapshot.size else { return false }
+                if let etag = snapshot.etag, !etag.isEmpty, entry.etag != etag { return false }
+                if let expected = snapshot.contentMD5 {
+                    guard let actual = await md5(entry, parent: snapshot.parent), actual == expected else { return false }
+                }
+            }
+            return true
+        }
+        func unresolved(_ row: ReversibleWalRecord, _ reason: String) {
+            still += 1
+            entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation,
+                outcome: "uncertain", detail: reason))
+        }
+
+        let supported: Set<String> = ["rename", "move", "backup", "quarantine", "retention_move", "mkdir", "upload"]
+        for row in pending {
+            guard !Task.isCancelled else { unresolved(row, "自动核实已取消，未改写日志"); continue }
+            guard row.accountId == drive.accountId else { unresolved(row, "任务账号与当前网盘不匹配，未自动核实"); continue }
+            guard supported.contains(row.operation), let after = row.after else {
+                unresolved(row, "缺少可安全自动核实的正向快照"); continue
+            }
+            guard let destination = await list(after.parent) else {
+                unresolved(row, "目标目录读取失败，保留待核实状态"); continue
+            }
+            var source: [CloudEntry] = []
+            if let before = row.before {
+                guard let result = await list(before.parent) else {
+                    unresolved(row, "源目录读取失败，保留待核实状态"); continue
+                }
+                source = result.filter { $0.fileName.caseInsensitiveCompare(before.name) == .orderedSame }
+            }
+            let target = destination.filter { $0.fileName.caseInsensitiveCompare(after.name) == .orderedSame }
+            guard target.count <= 1, source.count <= 1 else {
+                unresolved(row, "源或目标存在同名歧义，未自动判定"); continue
+            }
+            let targetId = drive.kind.idsArePaths ? DrivePaths.join(parent: after.parent, name: after.name) : after.id
+            var outcome: String?
+            var confirmed: RemoteSnapshot?
+            if let entry = target.first, source.isEmpty {
+                var proven = false
+                if row.operation == "upload", row.before == nil, !after.directory, let expected = after.contentMD5 {
+                    // 上传意图尚未获得稳定 ID 时，也必须以本地上传字节摘要证明内容。
+                    let identityMatches = targetId.isEmpty || entry.fileId == targetId
+                    let etagMatches = after.etag?.isEmpty != false || entry.etag == after.etag
+                    if identityMatches && entry.fileName == after.name && !entry.isDir && entry.size == after.size && etagMatches,
+                       let actual = await md5(entry, parent: after.parent), actual == expected { proven = true }
+                } else if row.before == nil, row.operation == "mkdir", after.directory,
+                          after.name.hasPrefix(".PanScraper.New-"),
+                          UUID(uuidString: String(after.name.dropFirst(".PanScraper.New-".count))) != nil {
+                    proven = entry.fileName == after.name && entry.isDir && (targetId.isEmpty || entry.fileId == targetId)
+                } else if let before = row.before {
+                    proven = await matches(entry, snapshot: after, expectedId: targetId)
+                    if proven && drive.kind.idsArePaths {
+                        let etagProof = strongEtag(before.etag) && entry.etag == before.etag
+                        let digestProof: Bool
+                        if let expected = before.contentMD5, !entry.isDir {
+                            digestProof = await md5(entry, parent: after.parent) == expected
+                        } else { digestProof = false }
+                        proven = etagProof || digestProof
+                    }
+                }
+                if proven {
+                    outcome = "applied"
+                    confirmed = RemoteSnapshot.from(entry, parent: after.parent, workLabel: after.workLabel)
+                        .with(contentMD5: after.contentMD5)
+                }
+            } else if target.isEmpty {
+                if let before = row.before, let entry = source.first {
+                    var unchanged = await matches(entry, snapshot: before, expectedId: before.id)
+                    if unchanged && drive.kind.idsArePaths {
+                        let etagProof = strongEtag(before.etag) && entry.etag == before.etag
+                        let digestProof: Bool
+                        if let expected = before.contentMD5, !entry.isDir {
+                            digestProof = await md5(entry, parent: before.parent) == expected
+                        } else { digestProof = false }
+                        unchanged = etagProof || digestProof
+                    }
+                    if unchanged { outcome = "not_applied" }
+                } else if row.before == nil {
+                    // 获得过对象 ID 时，改名后出现于同一父目录不等于“从未写入”。
+                    let idStillPresent = !after.id.isEmpty && destination.contains { $0.fileId == after.id }
+                    if !idStillPresent && (row.operation == "upload" || row.operation == "mkdir") { outcome = "not_applied" }
+                }
+            }
+            let backgroundFailed = jobKey(row).map { backgroundStates[$0] == .failed } ?? false
+            if outcome == "not_applied", row.mayStillComplete == true && !backgroundFailed { outcome = nil }
+            guard !Task.isCancelled else { unresolved(row, "自动核实已取消，未改写日志"); continue }
+            guard let outcome else {
+                unresolved(row, "身份、内容或位置证据不足／存在冲突，保留待核实状态"); continue
+            }
+            do {
+                // 读取期间若其他收口已更改该行，绝不覆盖其终态。
+                guard try wal.reconcileForwardIfPending(row, state: outcome, after: confirmed,
+                    error: outcome == "not_applied" ? "自动核实确认未生效" : nil, backgroundTaskFailed: backgroundFailed) else { continue }
+                if outcome == "applied" { applied += 1 } else { notApplied += 1 }
+                entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation,
+                    outcome: outcome, detail: outcome == "applied" ? "自动核实确认已生效" : "自动核实确认未生效，可安全重试"))
+            } catch { unresolved(row, "核实结果写盘失败，未继续执行") }
+        }
+        return ReconcileReport(confirmedApplied: applied, confirmedNotApplied: notApplied, confirmedReverted: 0, stillUncertain: still, entries: entries)
+    }
+
 }

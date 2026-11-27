@@ -434,65 +434,175 @@ public struct HistoryManageView: View {
 }
 
 /// 1:1 复刻自 Android `UpdateChecker` 检查更新页（结构化 `UpdateResult` + 手动更新兜底链接）。
-public struct UpdateCheckView: View {
+/// 设置页的关于入口；更新结果就地展示，不再维护独立检查更新页面。
+public struct AboutView: View {
+    @Environment(\.openURL) private var openURL
     @State private var checking = false
-    @State private var status = "当前版本：\(UpdateChecker.currentVersion)"
-    @State private var isError = false
+    @State private var updateMessage = ""
+    @State private var showUpdate = false
     @State private var release: ReleaseInfo?
 
     public init() {}
 
     public var body: some View {
-        Form {
-            Section {
-                Text(status)
-                    .font(.subheadline)
-                    .foregroundStyle(isError ? MMTheme.redErr : .primary)
-                Button {
-                    Task { await check() }
-                } label: {
-                    HStack {
-                        if checking { ProgressView().padding(.trailing, 6) }
-                        Text(checking ? "正在检查 GitHub Release…" : "立即检查更新")
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: 14) {
+                        AboutMonogram()
+                            .frame(width: 140, height: 166)
+                            .accessibilityHidden(true)
+                        (Text("Media").foregroundColor(.primary)
+                         + Text("M").foregroundColor(MMTheme.accent)
+                         + Text("ind AI").foregroundColor(.primary))
+                            .font(.system(size: 34, weight: .heavy, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Text("版本号 \(UpdateChecker.currentVersion)")
+                            .font(.subheadline).foregroundStyle(.secondary)
                     }
+                    .padding(.top, 36).padding(.bottom, 38)
+
+                    VStack(spacing: 0) {
+                        Link(destination: URL(string: "mailto:65646589@qq.com")!) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("联系开发者").font(.headline).foregroundStyle(.primary)
+                                    Text("65646589@qq.com").foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "envelope").foregroundStyle(.secondary)
+                            }.padding(.vertical, 18)
+                        }
+                        Divider()
+                        Link(destination: URL(string: "https://github.com/ALing-lab/MediaMindAI-iOS")!) {
+                            HStack {
+                                Text("GitHub 仓库").font(.headline).foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                            }.padding(.vertical, 22)
+                        }
+                        Divider()
+                    }
+                    Spacer(minLength: 64)
+                    VStack(spacing: 24) {
+                        HStack(spacing: 14) {
+                            Image("TMDBAttribution")
+                                .resizable().scaledToFit()
+                                .frame(width: 48, height: 48)
+                                .accessibilityLabel("TMDB")
+                            Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(16)
+                        .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+                        VStack(spacing: 12) {
+                            NavigationLink("开源许可与组件声明") { LicensesView() }
+                            NavigationLink("开源协议") { AboutLicenseView() }
+                            NavigationLink("隐私政策") { AboutPrivacyView() }
+                        }
+                        .font(.footnote).foregroundStyle(.blue)
+                    }
+                    .padding(.bottom, 30)
+                }
+                .frame(maxWidth: 520)
+                .padding(.horizontal, 28)
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
+            }
+        }
+        .background {
+            ZStack(alignment: .top) {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                TopAmbientGlow()
+            }
+        }
+        .navigationTitle("关于")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { checking = true } label: {
+                    if checking { ProgressView() }
+                    else { Image(systemName: "arrow.triangle.2.circlepath") }
                 }
                 .disabled(checking)
-
-                if let url = URL(string: UpdateChecker.releasesPageUrl) {
-                    Link("手动更新（前往 GitHub 发布页）", destination: url)
-                }
-            }
-
-            if let rel = release {
-                Section("发现新版本：\(rel.tagName)") {
-                    if !rel.releaseNotes.isEmpty {
-                        Text(rel.releaseNotes).font(.caption)
-                    }
-                    if let url = URL(string: rel.htmlUrl) {
-                        Link("前往此版本发布页", destination: url)
-                    }
-                }
+                .accessibilityLabel("检查更新")
             }
         }
-        .navigationTitle("检查更新")
-        .navigationBarTitleDisplayMode(.inline)
+        .task(id: checking) {
+            guard checking else { return }
+            release = nil
+            defer { checking = false }
+            let result = await UpdateChecker.check()
+            guard !Task.isCancelled else { return }
+            switch result {
+            case .available(let info):
+                release = info
+                updateMessage = "发现新版本：\(info.tagName)\n\(info.releaseNotes)"
+            case .upToDate: updateMessage = "当前已是最新版本。"
+            case .error(let message): updateMessage = message
+            }
+            showUpdate = true
+        }
+        .alert("检查更新", isPresented: $showUpdate) {
+            if let url = URL(string: release?.htmlUrl ?? UpdateChecker.releasesPageUrl) {
+                Button(release == nil ? "打开发布页" : "前往更新") { openURL(url) }
+            }
+            Button("关闭", role: .cancel) {}
+        } message: { Text(updateMessage) }
     }
+}
 
-    private func check() async {
-        checking = true
-        isError = false
-        release = nil
-        defer { checking = false }
-        let res = await UpdateChecker.check()
-        switch res {
-        case .available(let info):
-            release = info
-            status = "发现新版本：\(info.tagName)（当前 \(UpdateChecker.currentVersion)）"
-        case .upToDate(let latest):
-            status = "已是最新版本（当前 \(UpdateChecker.currentVersion)，最新 \(latest)）"
-        case .error(let msg):
-            isError = true
-            status = msg
+/// 沿用应用图标的双 M 轮廓，不携带图标背景；前景跟随系统主题。
+private struct AboutMonogram: View {
+    private func silhouette(_ points: [CGPoint]) -> Path {
+        Path { path in
+            guard let first = points.first else { return }
+            path.move(to: first)
+            for point in points.dropFirst() { path.addLine(to: point) }
+            path.closeSubpath()
         }
+    }
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                silhouette([CGPoint(x: 135, y: 0), CGPoint(x: 220, y: 14), CGPoint(x: 312, y: 267), CGPoint(x: 453, y: 56), CGPoint(x: 548, y: 70), CGPoint(x: 602, y: 662), CGPoint(x: 501, y: 636), CGPoint(x: 470, y: 306), CGPoint(x: 353, y: 585), CGPoint(x: 312, y: 558), CGPoint(x: 175, y: 207), CGPoint(x: 180, y: 562), CGPoint(x: 77, y: 536)])
+                    .fill(Color(red: 1, green: 0.42, blue: 0.06))
+                silhouette([CGPoint(x: 61, y: 102), CGPoint(x: 148, y: 118), CGPoint(x: 249, y: 366), CGPoint(x: 363, y: 156), CGPoint(x: 461, y: 171), CGPoint(x: 510, y: 714), CGPoint(x: 390, y: 681), CGPoint(x: 369, y: 410), CGPoint(x: 246, y: 634), CGPoint(x: 135, y: 362), CGPoint(x: 103, y: 615), CGPoint(x: 0, y: 590)])
+                    .fill(.primary)
+            }
+            .scaleEffect(x: proxy.size.width / 602, y: proxy.size.height / 714, anchor: .topLeading)
+        }
+    }
+}
+
+private struct AboutLicenseView: View {
+    var body: some View {
+        ScrollView {
+            Text(license).font(.caption.monospaced()).textSelection(.enabled).padding()
+        }
+        .navigationTitle("开源协议").navigationBarTitleDisplayMode(.inline)
+    }
+    private var license: String {
+        guard let url = Bundle.main.resourceURL?.appendingPathComponent("licenses/gpl-3.0-app.txt"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return "MediaMind AI 基于 GNU GPL v3.0 或更新版本发布。完整协议请查看仓库中的许可证。"
+        }
+        return text
+    }
+}
+
+private struct AboutPrivacyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("隐私政策").font(.title2.bold())
+                Text("账号配置、扫描计划、任务记录与缓存保存在设备中。使用云盘、TMDB 或 AI 识别时，应用会向你配置的相应服务发送完成该功能所需的请求；文件名、搜索词及相关元数据可能包含在请求中。")
+                Text("云盘服务、TMDB、AI 服务及 GitHub 分别按各自的隐私政策处理请求。请勿在文件名或识别输入中包含不必要的个人敏感信息。")
+                Text("你可以在设置中清除本地计划与缓存，并管理或移除账号配置。清除缓存不会撤销已在云盘执行的操作。")
+                Text("如有隐私相关问题，请联系 65646589@qq.com。")
+            }.font(.body).padding(24)
+        }
+        .navigationTitle("隐私政策").navigationBarTitleDisplayMode(.inline)
     }
 }

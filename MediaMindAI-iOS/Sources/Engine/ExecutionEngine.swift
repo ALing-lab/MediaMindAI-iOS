@@ -90,6 +90,11 @@ public actor AdaptiveConcurrencyGate {
         // 策略：命中真实风控后只降不升，成功不主动回升避免二次触发频控。
     }
 
+    /// 与写请求共用冷却时间；自动核实也等待此窗口，避免再次触发限流。
+    public func postpone(backoffMs: UInt64) {
+        backoffUntilNs = max(backoffUntilNs, DispatchTime.now().uptimeNanoseconds &+ backoffMs * 1_000_000)
+    }
+
     @discardableResult
     public func onRateLimited(backoffMs: UInt64 = 1500, minStepDownGapNs: UInt64 = 1_500_000_000) -> Int {
         let now = DispatchTime.now().uptimeNanoseconds
@@ -129,6 +134,7 @@ public final class ExecutionEngine {
     public nonisolated static let maxConsecutiveFails = 5
     public nonisolated static let settleDelayNs: UInt64 = 1_200_000_000
     public nonisolated static let uploadRetryDelaysNs: [UInt64] = [2_000_000_000, 5_000_000_000]
+    public nonisolated static let recoveryRetryDelaysMs: [UInt64] = [2_000, 5_000]
     public nonisolated static let deleteTooBigMessage = "文件夹太大，未检查完，已跳过删除"
 
     private nonisolated static let sequentialMoveKinds: Set<String> = [
@@ -196,7 +202,14 @@ public final class ExecutionEngine {
         guard !runIds.isEmpty else { return [] }
         let rows = wal.appliedRecords(accountId: plan.accountId, actionIds: Set(plan.actions.map(\.id)), taskIds: runIds)
         let scannedHistory = Set(plan.scanPriorRunIds ?? [])
-        return Set(rows.filter { !scannedHistory.contains($0.taskId) && $0.operation == "mkdir" && $0.after?.id.isEmpty == false }.map(\.actionId))
+        return Set(rows.filter { row in
+            guard !scannedHistory.contains(row.taskId), row.operation == "mkdir", row.after?.id.isEmpty == false else { return false }
+            // 两阶段建目录尚未改成最终名时，临时目录不能作为已完成前置复用。
+            if row.state != "skipped", row.after?.name.hasPrefix(".PanScraper.New-") == true {
+                return rows.contains { $0.taskId == row.taskId && $0.actionId == row.actionId + ":finalize" && $0.state == "applied" }
+            }
+            return true
+        }.map(\.actionId))
     }
 
     /// 仅补齐所选动作的 mkdir 前置步骤；未生效的历史目录可重建，历史影片操作不扩大。
@@ -586,6 +599,7 @@ public final class ExecutionEngine {
             var streak = 0
             var stoppedOnFails = false
             var stoppedEarly = false
+            var recoveryPauseReason: String?
 
             @MainActor func syncPlanAction(_ id: String, done: Bool, error: String?, note: String? = nil, recordInHistory: Bool = true) {
                 if var a = planActions[id] {
@@ -805,6 +819,90 @@ public final class ExecutionEngine {
                 }
             }
 
+            // 已确认完整终态只补本地映射／登记；停止或其他项暂停后也不能漏计真实成功。
+            @MainActor func confirmedOutcome(_ act: PlanAction) -> (resultId: String?, note: String?)? {
+                guard let row = ReversibleWalStore.shared.find(taskId: runId, actionId: act.id),
+                      row.accountId == drive.accountId, ["applied", "skipped"].contains(row.state), var after = row.after else { return nil }
+                if act.op == "mkdir", row.state != "skipped" {
+                    guard let finalized = ReversibleWalStore.shared.find(taskId: runId, actionId: act.id + ":finalize"),
+                          finalized.state == "applied", let final = finalized.after else { return nil }
+                    after = final
+                }
+                guard !after.id.isEmpty else { return nil }
+                if act.kind == DuplicateRetentionPlanner.kindRetentionDuplicate {
+                    do { _ = try RetentionZoneEngine.shared.confirmAppliedMove(taskId: runId, actionId: act.id, accountId: drive.accountId) }
+                    catch {
+                        recoveryPauseReason = "云端移动已确认，保留区登记尚未完成，任务已暂停：" + error.localizedDescription
+                        return nil
+                    }
+                }
+                if act.op == "mkdir" {
+                    mkdirRefs["action:\(act.id)"] = after.id
+                    mkdirRefs[act.id] = after.id
+                    mkdirRefs["\(act.parentId ?? drive.rootId):\(act.newName)"] = after.id
+                } else if act.op != "artwork" {
+                    if let before = row.before { idRemap.record(old: before.id, new: after.id) }
+                    if let original = act.fileId { idRemap.record(old: original, new: after.id) }
+                }
+                return (act.op == "artwork" ? nil : after.id, row.state == "skipped" ? "已存在" : nil)
+            }
+
+            // 只在单项退出或整个波次已收齐后进入；此时本 run 没有在途写请求。
+            @MainActor func recover<T>(initial: Result<T, Error>, label: String, requiresIntent: String? = nil,
+                                        operation: @MainActor () async throws -> T) async -> Result<T, Error> {
+                var outcome = initial
+                func recoverable(_ error: Error) -> Bool {
+                    if error is CancellationError || error is ArtworkUnavailableError { return false }
+                    if RateLimitDetector.isRateLimitError(error) || ReversibleWalStore.shared.hasUncertain(taskId: runId) { return true }
+                    if case DriveError.network = error { return true }
+                    return (error as NSError).domain == NSURLErrorDomain
+                }
+                // 保留区旧目录准备会直接调用网盘：尚无可逆意图时不能猜测重发整个组合操作。
+                if case .failure(let error) = outcome, recoverable(error), let id = requiresIntent,
+                   ReversibleWalStore.shared.find(taskId: runId, actionId: id) == nil {
+                    recoveryPauseReason = "保留区目录准备结果尚无法核实，任务已暂停，请检查日志后继续"
+                    return outcome
+                }
+                for (index, delay) in Self.recoveryRetryDelaysMs.enumerated() {
+                    guard case .failure(let error) = outcome, recoverable(error),
+                          !stopRequested && !Task.isCancelled && recoveryPauseReason == nil else { return outcome }
+                    let delayMs = skipDelaysForTest ? 0 : delay
+                    if RateLimitDetector.isRateLimitError(error) {
+                        let limit = await gate.onRateLimited(backoffMs: delayMs)
+                        run.message = "云盘限流，已降至 \(limit) 并发，等待后恢复（\(index + 1)/2）· \(label)"
+                    } else {
+                        await gate.postpone(backoffMs: delayMs)
+                        run.message = "等待后自动核实云端状态（\(index + 1)/2）· \(label)"
+                    }
+                    currentRun = run
+                    do {
+                        if ReversibleWalStore.shared.hasUncertain(taskId: runId) {
+                            _ = try await gate.withPermit(skipBackoff: skipDelaysForTest) {
+                                guard !self.stopRequested && !Task.isCancelled, await waitIfPaused() else { throw CancellationError() }
+                                return await JournalReconciler.reconcileForwardAutomatically(taskId: runId, drive: drive)
+                            }
+                            guard !stopRequested && !Task.isCancelled else { return .failure(CancellationError()) }
+                            if ReversibleWalStore.shared.hasUncertain(taskId: runId) { continue }
+                        }
+                        guard !stopRequested && !Task.isCancelled else { return .failure(CancellationError()) }
+                        run.message = "正在恢复操作（\(index + 1)/2）· \(label)"
+                        currentRun = run
+                        // 完整入口回放已生效子步骤，补齐 mkdirRefs / idRemap；仅未生效步骤会重新写入。
+                        let result = try await gate.withPermit(skipBackoff: skipDelaysForTest) {
+                            guard !self.stopRequested && !Task.isCancelled, await waitIfPaused() else { throw CancellationError() }
+                            return try await operation()
+                        }
+                        return .success(result)
+                    } catch { outcome = .failure(error) }
+                }
+                if case .failure(let error) = outcome, recoverable(error), !stopRequested && !Task.isCancelled {
+                    recoveryPauseReason = ReversibleWalStore.shared.hasUncertain(taskId: runId)
+                        ? "自动核实两次后仍无法确认云端状态，任务已暂停，请检查相关日志"
+                        : "等待并重试两次后仍未恢复，任务已暂停，可稍后继续"
+                }
+                return outcome
+            }
+
             @MainActor func runSingleAction(_ id: String) async {
                 guard !stopRequested && !Task.isCancelled else { return }
                 guard let act = planActions[id] else {
@@ -845,20 +943,12 @@ public final class ExecutionEngine {
                     outcome = .failure(error)
                 }
 
-                // 命中真实限流（429 / 频控）：自动降档并重试一次
-                if case .failure(let err) = outcome, RateLimitDetector.isRateLimitError(err), !stopRequested {
-                    let nextLimit = await gate.onRateLimited(backoffMs: skipDelaysForTest ? 0 : 1500)
-                    run.message = "触发限流，已自动降为 \(nextLimit) 并发并重试…"
-                    currentRun = run
-                    do {
-                        let r = try await gate.withPermit(skipBackoff: skipDelaysForTest) {
-                            try await executeOne(act)
-                        }
-                        outcome = .success(r)
-                    } catch {
-                        outcome = .failure(error)
-                    }
+                if case .failure = outcome, let confirmed = confirmedOutcome(act) { outcome = .success(confirmed) }
+                outcome = await recover(initial: outcome, label: Self.labelOf(act),
+                    requiresIntent: act.kind == DuplicateRetentionPlanner.kindRetentionDuplicate ? act.id : nil) {
+                    try await executeOne(act)
                 }
+                if case .failure = outcome, let confirmed = confirmedOutcome(act) { outcome = .success(confirmed) }
 
                 // 数据源确实无此素材（如 TMDB 暂无单集剧照）：记为跳过，标已完成但不计入历史、不重试、不计失败
                 if case .failure(let err) = outcome, err is ArtworkUnavailableError {
@@ -869,7 +959,7 @@ public final class ExecutionEngine {
                 }
 
                 // 海报 / NFO 上传失败退避重试（2s -> 5s）；若 WAL 已存在 uncertain/prepared 行则严禁重试
-                if case .failure = outcome, act.op == "artwork", !stopRequested,
+                if case .failure = outcome, act.op == "artwork", !stopRequested, recoveryPauseReason == nil,
                    !ReversibleWalStore.shared.hasUncertain(taskId: runId) {
                     for (idx, waitNs) in Self.uploadRetryDelaysNs.enumerated() {
                         if stopRequested || Task.isCancelled || ReversibleWalStore.shared.hasUncertain(taskId: runId) { break }
@@ -878,7 +968,8 @@ public final class ExecutionEngine {
                         if !skipDelaysForTest { try? await Task.sleep(nanoseconds: waitNs) }
                         do {
                             let r = try await gate.withPermit(skipBackoff: skipDelaysForTest) {
-                                try await executeOne(act)
+                                guard !self.stopRequested && !Task.isCancelled, await waitIfPaused() else { throw CancellationError() }
+                                return try await executeOne(act)
                             }
                             outcome = .success(r)
                             break
@@ -905,9 +996,8 @@ public final class ExecutionEngine {
                         || ReversibleWalStore.shared.hasUncertain(taskId: runId)
                     if isUncertain {
                         journal.markUncertain(rowId: row.id, error: errStr)
-                        stopRequested = true
-                        stoppedEarly = true
-                        run.message = "云盘操作结果待核实，已停止避免重复写入"
+                        recoveryPauseReason = recoveryPauseReason ?? "云盘操作结果待核实，任务已暂停"
+                        run.message = recoveryPauseReason ?? "云盘操作结果待核实"
                         recordOutcome(actionId: act.id, ok: false, err: errStr)
                         return
                     }
@@ -927,7 +1017,7 @@ public final class ExecutionEngine {
 
                     streak += 1
                     recordOutcome(actionId: act.id, ok: false, err: errStr)
-                    if streak >= Self.maxConsecutiveFails && !stopRequested {
+                    if streak >= Self.maxConsecutiveFails && !stopRequested && recoveryPauseReason == nil {
                         stoppedOnFails = true
                         isPaused = true
                         run.status = "paused"
@@ -944,6 +1034,7 @@ public final class ExecutionEngine {
                     stopRequested = true
                 }
                 if stopRequested || Task.isCancelled { stoppedEarly = true; break }
+                if recoveryPauseReason != nil { break }
                 if !(await waitIfPaused()) { break }
 
                 let id = ordered[cursor]
@@ -960,6 +1051,9 @@ public final class ExecutionEngine {
                         try? await Task.sleep(nanoseconds: Self.settleDelayNs)
                     }
                 }
+
+                // 等待后台落盘期间也可能收到暂停／停止，派发新请求前重新校验。
+                if !(await waitIfPaused()) { break }
 
                 // 稳定 ID 云盘（123 / 光鸭）：连续 2..100 条同目标 move 打包为一次 moveBatch
                 if let action, action.op == "move",
@@ -1014,9 +1108,16 @@ public final class ExecutionEngine {
                                 }
                                 batchItems.append(BatchMoveItem(action: b.id, id: resolvedFid, parent: resolvedParent))
                             }
-                            let movedByAction = try await gate.withPermit(skipBackoff: skipDelaysForTest) {
+                            let initial: Result<[String: String], Error>
+                            do {
+                                initial = .success(try await gate.withPermit(skipBackoff: skipDelaysForTest) {
+                                    try await tx.moveBatch(items: batchItems, dest: firstDest)
+                                })
+                            } catch { initial = .failure(error) }
+                            let recovered = await recover(initial: initial, label: "批量移动 \(batchItems.count) 项") {
                                 try await tx.moveBatch(items: batchItems, dest: firstDest)
                             }
+                            let movedByAction = try recovered.get()
                             await gate.onSuccess()
                             for (idx, b) in batch.enumerated() {
                                 let fid = batchItems[idx].id
@@ -1029,17 +1130,25 @@ public final class ExecutionEngine {
                             cursor = look
                             continue
                         } catch {
-                            if RateLimitDetector.isRateLimitError(error) {
-                                _ = await gate.onRateLimited(backoffMs: skipDelaysForTest ? 0 : 1500)
-                            }
-                            let isUncertain = (error as NSError).domain == NSURLErrorDomain
-                                || ReversibleWalStore.shared.hasUncertain(taskId: runId)
-                            if isUncertain {
-                                for r in rows { journal.markUncertain(rowId: r.id, error: error.localizedDescription) }
-                                for b in batch { recordOutcome(actionId: b.id, ok: false, err: error.localizedDescription) }
-                                stopRequested = true
-                                stoppedEarly = true
-                                run.message = "批量移动结果待核实，已停止避免重复写入"
+                            let isUncertain = ReversibleWalStore.shared.hasUncertain(taskId: runId)
+                            if isUncertain || recoveryPauseReason != nil || stopRequested || Task.isCancelled {
+                                for (index, b) in batch.enumerated() {
+                                    let saved = ReversibleWalStore.shared.find(taskId: runId, actionId: b.id)
+                                    if saved?.state == "applied", let after = saved?.after {
+                                        if let original = b.fileId { idRemap.record(old: original, new: after.id) }
+                                        journal.markApplied(rowId: rows[index].id, createdId: after.id)
+                                        recordOutcome(actionId: b.id, ok: true, err: nil)
+                                    } else {
+                                        if isUncertain { journal.markUncertain(rowId: rows[index].id, error: error.localizedDescription) }
+                                        else { journal.markSkipped(rowId: rows[index].id, error: error.localizedDescription) }
+                                        if stopRequested || Task.isCancelled {
+                                            syncPlanAction(b.id, done: false, error: error.localizedDescription)
+                                        } else { recordOutcome(actionId: b.id, ok: false, err: error.localizedDescription) }
+                                    }
+                                }
+                                if !stopRequested && !Task.isCancelled {
+                                    recoveryPauseReason = recoveryPauseReason ?? "批量移动结果待核实，任务已暂停"
+                                }
                                 break
                             } else {
                                 // 无不确定 WAL 行：退回逐条执行精确定位失败项
@@ -1082,11 +1191,12 @@ public final class ExecutionEngine {
                         await runSingleAction(waveIds[0])
                         var processed = 1
                         let rest = Array(waveIds.dropFirst())
-                        if !stopRequested && !Task.isCancelled && !rest.isEmpty {
+                        if !stopRequested && !Task.isCancelled && recoveryPauseReason == nil && !rest.isEmpty {
                             if await waitIfPaused() {
                                 var idx = 0
                                 while idx < rest.count {
                                     if stopRequested || Task.isCancelled { stoppedEarly = true; break }
+                                    if recoveryPauseReason != nil { break }
                                     if isPaused, !(await waitIfPaused()) { break }
                                     let width = max(1, await gate.currentLimit)
                                     let end = min(idx + width, rest.count)
@@ -1116,7 +1226,8 @@ public final class ExecutionEngine {
                                         prepared.append((act, row))
                                     }
                                     let refsSnapshot = mkdirRefs
-                                    let results = await withTaskGroup(of: (PlanAction, JournalRow, Result<(String?, String?), Error>).self) { tg in
+                                    typealias WaveResult = (PlanAction, JournalRow, Result<(String?, String?), Error>)
+                                    let results = await withTaskGroup(of: WaveResult.self) { tg in
                                         for item in prepared {
                                             let act = item.act
                                             let row = item.row
@@ -1135,11 +1246,25 @@ public final class ExecutionEngine {
                                                 }
                                             }
                                         }
-                                        var collected: [(PlanAction, JournalRow, Result<(String?, String?), Error>)] = []
+                                        var collected: [WaveResult] = []
                                         for await r in tg { collected.append(r) }
                                         return collected
                                     }
-                                    for (act, row, res) in results {
+                                    let successes = results.filter { if case .success = $0.2 { return true }; return false }
+                                    let failures = results.filter { if case .failure = $0.2 { return true }; return false }
+                                    for (act, row, initial) in successes + failures {
+                                        var res: Result<(String?, String?), Error>
+                                        if case .failure = initial, let confirmed = confirmedOutcome(act) {
+                                            res = .success((confirmed.resultId, confirmed.note))
+                                        } else if case .failure = initial {
+                                            res = await recover(initial: initial, label: Self.labelOf(act)) {
+                                                let pair = try await executeOne(act)
+                                                return (pair.resultId, pair.note)
+                                            }
+                                        } else { res = initial }
+                                        if case .failure = res, let confirmed = confirmedOutcome(act) {
+                                            res = .success((confirmed.resultId, confirmed.note))
+                                        }
                                         switch res {
                                         case .success(let pair):
                                             await gate.onSuccess()
@@ -1166,8 +1291,7 @@ public final class ExecutionEngine {
                                                 || actWalState == "prepared" || actWalState == "uncertain" || actWalState == "undo_prepared" 
                                             if isUncertain {
                                                 journal.markUncertain(rowId: row.id, error: errStr)
-                                                stopRequested = true
-                                                stoppedEarly = true
+                                                recoveryPauseReason = recoveryPauseReason ?? "云盘操作结果待核实，任务已暂停"
                                                 recordOutcome(actionId: act.id, ok: false, err: errStr)
                                             } else {
                                                 journal.markSkipped(rowId: row.id, error: errStr)
@@ -1181,7 +1305,7 @@ public final class ExecutionEngine {
                                                 } else {
                                                     streak += 1
                                                     recordOutcome(actionId: act.id, ok: false, err: errStr)
-                                                    if streak >= Self.maxConsecutiveFails && !stopRequested {
+                                                    if streak >= Self.maxConsecutiveFails && !stopRequested && recoveryPauseReason == nil {
                                                         stoppedOnFails = true
                                                         isPaused = true
                                                         run.status = "paused"
@@ -1211,7 +1335,13 @@ public final class ExecutionEngine {
             lastConcurrencyLimit = await gate.currentLimit
 
             let pausedForConflicts = !stoppedEarly && !stopRequested && !Task.isCancelled && !deferredConflicts.isEmpty
-            if pausedForConflicts {
+            let pausedForRecovery = recoveryPauseReason != nil && !stopRequested && !Task.isCancelled
+            if pausedForRecovery {
+                run.status = "paused"
+                run.finishedAt = nil
+                run.message = recoveryPauseReason ?? "任务已暂停，等待恢复"
+                isPaused = true
+            } else if pausedForConflicts {
                 run.status = "paused"
                 run.finishedAt = nil
                 let depPart = deferredByDep.isEmpty ? "" : "（连带 \(deferredByDep.count) 项）"
@@ -1266,11 +1396,11 @@ public final class ExecutionEngine {
 
             activeTask = nil
             isRunning = false
-            if !pausedForConflicts { isPaused = false }
+            if !pausedForConflicts && !pausedForRecovery { isPaused = false }
             BackgroundTaskManager.shared.end()
 
             // 自动拉起排队中的下一个可执行任务（先 peek 校验，跳过无效项后再 pop 启动，杜绝误丢队首或阻断后续队列）
-            if !Task.isCancelled && !stopRequested && !pausedForConflicts, let resolver = driveResolver {
+            if !Task.isCancelled && !stopRequested && !pausedForConflicts && !pausedForRecovery, let resolver = driveResolver {
                 while let candidate = TaskQueue.shared.peekNext() {
                     guard let nextPlan = PlanAndTaskStore.shared.plans.first(where: { $0.id == candidate.planId }),
                           let nextDrive = resolver(candidate.accountId) else {

@@ -1,6 +1,19 @@
 import Foundation
 import CryptoKit
 
+/// 已获得后台任务／上传受理，查询失败不代表请求未生效。
+public struct GuangyaPendingOperationError: LocalizedError, Sendable {
+    public let message: String
+    public let taskId: String?
+    public let operation: String?
+    public init(_ cause: Error, taskId: String? = nil, operation: String? = nil) {
+        message = "光鸭后台操作可能仍在处理：" + cause.localizedDescription
+        self.taskId = taskId
+        self.operation = operation
+    }
+    public var errorDescription: String? { message }
+}
+
 /// 光鸭云盘登录后保存的凭据（1:1 复刻 Android `GyCreds`，`description` 自动脱敏绝不泄露令牌）。
 public struct GyCreds: Codable, Hashable, Sendable, CustomStringConvertible {
     public var accessToken: String
@@ -794,7 +807,12 @@ public actor GuangyaDrive: CloudDrive {
     // MARK: - 4. 写操作（改名、建目录竞态回退、100项分片移动与任务轮询、秒传+OSS分片上传、回收站）
 
     public func rename(fileId: String, newName: String) async throws -> String {
-        _ = try await api("/v1/file/rename", body: ["fileId": fileId, "newName": newName])
+        do {
+            _ = try await api("/v1/file/rename", body: ["fileId": fileId, "newName": newName])
+        } catch let DriveError.api(code, message) where code == 127 {
+            // 此入口只有一次改名请求；127 是服务端明确拒绝，区别于写后查询／轮询限流。
+            throw DriveError.rateLimited(code: code, message: message)
+        }
         return fileId
     }
 
@@ -841,11 +859,38 @@ public actor GuangyaDrive: CloudDrive {
                 "parentId": destParentId,
             ])
             if let taskId = (o["data"] as? [String: Any])?["taskId"] as? String, !taskId.isEmpty {
-                try await waitTask(taskId: taskId, what: chunk.count > 1 ? "批量移动" : "移动")
+                let what = chunk.count > 1 ? "批量移动" : "移动"
+                do { try await waitTask(taskId: taskId, what: what) }
+                catch let DriveError.api(code, message) where code == -2 && message == "光鸭后台\(what)任务失败" {
+                    // 服务端明确报告终态失败，已结束的后台任务可按快照核实未生效成员。
+                    throw DriveError.api(code: code, message: message)
+                } catch { throw GuangyaPendingOperationError(error, taskId: taskId, operation: "move") }
             }
             idx = end
         }
         return Dictionary(fileIds.map { ($0, $0) }, uniquingKeysWith: { _, last in last })
+    }
+
+    /// 只查一次既有状态接口，不在自动核实入口内启动另一轮轮询或写入。
+    public func pendingOperationState(taskId: String, operation: String) async throws -> PendingOperationState {
+        guard !taskId.isEmpty else { return .processing }
+        switch operation {
+        case "move":
+            let response = try await api("/v1/get_task_status", body: ["taskId": taskId], idempotent: true)
+            switch Self.jsonInt(response["data"] as? [String: Any], "status") ?? 0 {
+            case 2: return .succeeded
+            case 3, -1: return .failed
+            default: return .processing
+            }
+        case "upload":
+            let response = try await api("/v1/file/get_info_by_task_id", body: ["taskId": taskId], allowCodes: Self.uploadProcessingCodes, idempotent: true)
+            let code = Self.jsonInt(response, "code") ?? 0
+            if Self.uploadProcessingCodes.contains(code) { return .processing }
+            if let fileId = Self.jsonStr(response["data"] as? [String: Any], "fileId"), !fileId.isEmpty { return .succeeded }
+            return .processing
+        default:
+            return .processing
+        }
     }
 
     public func waitTask(taskId: String, what: String) async throws {
@@ -874,22 +919,23 @@ public actor GuangyaDrive: CloudDrive {
         ], allowCodes: [Self.codeUploadDone])
 
         guard let d = o["data"] as? [String: Any] else {
-            throw DriveError.api(code: -1, message: "光鸭上传凭证为空")
+            throw GuangyaPendingOperationError(DriveError.api(code: -1, message: "光鸭上传凭证为空"), operation: "upload")
         }
         guard let taskId = d["taskId"] as? String, !taskId.isEmpty else {
-            throw DriveError.api(code: -1, message: "光鸭上传凭证缺少 taskId")
+            throw GuangyaPendingOperationError(DriveError.api(code: -1, message: "光鸭上传凭证缺少 taskId"), operation: "upload")
         }
         let code = Self.jsonInt(o, "code") ?? 0
         let msg = (o["msg"] as? String) ?? ""
         if code == Self.codeUploadDone || msg.contains("秒传") || msg.contains("上传已完成") {
-            return try await waitUploaded(taskId: taskId)
+            do { return try await waitUploaded(taskId: taskId) }
+            catch { throw GuangyaPendingOperationError(error, taskId: taskId, operation: "upload") }
         }
 
         let dKeys = d.keys.sorted().joined(separator: ",")
         let cKeys = (d["creds"] as? [String: Any])?.keys.sorted().joined(separator: ",") ?? "无"
         await NetLog.shared.line(Self.tag, "上传凭证字段：\(dKeys) · creds=\(cKeys)")
         guard let ossCreds = d["creds"] as? [String: Any] else {
-            throw DriveError.api(code: -1, message: "光鸭上传凭证缺少 STS")
+            throw GuangyaPendingOperationError(DriveError.api(code: -1, message: "光鸭上传凭证缺少 STS"), taskId: taskId, operation: "upload")
         }
         let target = GuangyaOssTarget(
             bucket: (d["bucketName"] as? String) ?? "",
@@ -900,10 +946,12 @@ public actor GuangyaDrive: CloudDrive {
             sts: (ossCreds["sessionToken"] as? String) ?? ""
         )
         guard !target.bucket.isEmpty, !target.objectPath.isEmpty, !target.ak.isEmpty else {
-            throw DriveError.api(code: -1, message: "光鸭上传凭证不完整")
+            throw GuangyaPendingOperationError(DriveError.api(code: -1, message: "光鸭上传凭证不完整"), taskId: taskId, operation: "upload")
         }
-        try await ossMultipartUpload(target: target, data: data)
-        return try await waitUploaded(taskId: taskId)
+        do {
+            try await ossMultipartUpload(target: target, data: data)
+            return try await waitUploaded(taskId: taskId)
+        } catch { throw GuangyaPendingOperationError(error, taskId: taskId, operation: "upload") }
     }
 
     private func waitUploaded(taskId: String) async throws -> String {

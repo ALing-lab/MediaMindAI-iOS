@@ -37,6 +37,23 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         private var nodes: [String: Node] = [:]
         var trashedIds: [String] = []
         var truncateUploadsForTest = false
+        var renameErrorBeforeWriteForTest: Error?
+        var listErrorAfterRenameForTest: Error?
+        var moveMutationForTest: ((inout Node) -> Void)?
+        private var pendingListErrorForTest: Error?
+        private var renameCallCountForTest = 0
+        private var moveCallCountForTest = 0
+
+        var renameCallsForTest: Int { lock.withLock { renameCallCountForTest } }
+        var moveCallsForTest: Int { lock.withLock { moveCallCountForTest } }
+
+        func mutateNodeForTest(id: String, update: (inout Node) -> Void) {
+            lock.withLock {
+                guard var node = nodes[id] else { return }
+                update(&node)
+                nodes[id] = node
+            }
+        }
 
         init(
             kind: ProviderKind = .p123,
@@ -107,8 +124,12 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         }
 
         func list(folderId: String) async throws -> [CloudEntry] {
-            lock.withLock {
-                nodes.values
+            try lock.withLock {
+                if let failure = pendingListErrorForTest {
+                    pendingListErrorForTest = nil
+                    throw failure
+                }
+                return nodes.values
                     .filter { $0.parentId == folderId && $0.id != folderId }
                     .sorted { $0.name < $1.name }
                     .map {
@@ -128,11 +149,14 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
 
         func rename(fileId: String, newName: String) async throws -> String {
             try lock.withLock {
+                renameCallCountForTest += 1
+                if let failure = renameErrorBeforeWriteForTest { throw failure }
                 guard var n = nodes[fileId] else { throw DriveError.invalidInput("not found: \(fileId)") }
                 let conflict = nodes.values.contains { $0.parentId == n.parentId && $0.id != fileId && $0.name.caseInsensitiveCompare(newName) == .orderedSame }
                 if conflict { throw DriveError.api(code: 409, message: "目标目录已有同名对象") }
                 n.name = newName
                 nodes[fileId] = n
+                pendingListErrorForTest = listErrorAfterRenameForTest
                 return fileId
             }
         }
@@ -150,10 +174,12 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
 
         func move(fileId: String, destParentId: String) async throws -> String {
             try lock.withLock {
+                moveCallCountForTest += 1
                 guard var n = nodes[fileId] else { throw DriveError.invalidInput("not found: \(fileId)") }
                 let conflict = nodes.values.contains { $0.parentId == destParentId && $0.id != fileId && $0.name.caseInsensitiveCompare(n.name) == .orderedSame }
                 if conflict { throw DriveError.api(code: 409, message: "目标目录已有同名对象") }
                 n.parentId = destParentId
+                moveMutationForTest?(&n)
                 nodes[fileId] = n
                 return fileId
             }
@@ -410,6 +436,172 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         }
     }
 
+    func testWriteFailureRemainsUncertainUntilReadOnlyReconciliation() async throws {
+        let cases: [(before: Error?, after: Error?, landed: Bool)] = [
+            (DriveError.api(code: 127, message: "操作过于频繁"), nil, false),
+            (nil, DriveError.api(code: 127, message: "操作过于频繁"), true),
+            (nil, URLError(.networkConnectionLost), true),
+        ]
+        for scenario in cases {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("write-state-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let drive = InMemoryCloudDrive()
+            let fileId = drive.seedFile(id: "video", parentId: "0", name: "original.mkv", size: 100)
+            drive.renameErrorBeforeWriteForTest = scenario.before
+            drive.listErrorAfterRenameForTest = scenario.after
+            let tx = ReversibleTransaction(taskId: "write-state", drive: drive, wal: wal)
+            do {
+                _ = try await tx.rename(action: "rename", id: fileId, parent: "0", name: "renamed.mkv")
+                XCTFail("模拟的写入／读取异常应继续上报")
+            } catch { }
+            let row = try XCTUnwrap(wal.find(taskId: "write-state", actionId: "rename"))
+            XCTAssertEqual(row.state, "uncertain", "即使是127，也不能仅凭错误认定未写入")
+            XCTAssertEqual(row.mayStillComplete == true, scenario.landed, "写请求已返回成功后，查询失败不能允许仅凭暂时不可见重发")
+            XCTAssertEqual(row.before?.name, "original.mkv")
+            XCTAssertEqual(row.before?.id, fileId)
+            XCTAssertEqual(row.after?.name, "renamed.mkv")
+            XCTAssertEqual(drive.node(id: fileId)?.name, scenario.landed ? "renamed.mkv" : "original.mkv")
+            XCTAssertEqual(drive.renameCallsForTest, 1)
+            let reloaded = ReversibleWalStore(storageURL: url)
+            XCTAssertEqual(reloaded.find(taskId: "write-state", actionId: "rename"), row)
+            do {
+                _ = try await tx.rename(action: "rename", id: fileId, parent: "0", name: "renamed.mkv")
+                XCTFail("未核实日志不能直接重新写入")
+            } catch { }
+            XCTAssertEqual(drive.renameCallsForTest, 1)
+            XCTAssertEqual(wal.rows(taskId: "write-state").count, 1)
+        }
+    }
+
+    func testOnlyExplicitGuangyaRenameRefusalCanBeRetriedWithoutReconciliation() async throws {
+        for afterWrite in [false, true] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("explicit-refusal-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let drive = InMemoryCloudDrive(kind: .guangya, rootId: "")
+            let fileId = drive.seedFile(id: "video", parentId: "", name: "original.mkv", size: 100)
+            let refused = DriveError.rateLimited(code: 127, message: "操作过于频繁")
+            if afterWrite { drive.listErrorAfterRenameForTest = refused }
+            else { drive.renameErrorBeforeWriteForTest = refused }
+            let tx = ReversibleTransaction(taskId: "refusal", drive: drive, wal: wal)
+            do {
+                _ = try await tx.rename(action: "rename", id: fileId, parent: "", name: "renamed.mkv")
+                XCTFail("模拟限流应上报")
+            } catch { }
+            XCTAssertEqual(wal.find(taskId: "refusal", actionId: "rename")?.state, afterWrite ? "uncertain" : "not_applied")
+            XCTAssertEqual(wal.find(taskId: "refusal", actionId: "rename")?.before?.name, "original.mkv")
+            XCTAssertEqual(drive.renameCallsForTest, 1)
+            drive.renameErrorBeforeWriteForTest = nil
+            drive.listErrorAfterRenameForTest = nil
+            if afterWrite {
+                do {
+                    _ = try await tx.rename(action: "rename", id: fileId, parent: "", name: "renamed.mkv")
+                    XCTFail("写后限流仍应等待核实")
+                } catch { }
+                XCTAssertEqual(drive.renameCallsForTest, 1)
+            } else {
+                _ = try await tx.rename(action: "rename", id: fileId, parent: "", name: "renamed.mkv")
+                XCTAssertEqual(drive.renameCallsForTest, 2)
+                XCTAssertEqual(wal.find(taskId: "refusal", actionId: "rename")?.before?.name, "original.mkv")
+                XCTAssertEqual(wal.find(taskId: "refusal", actionId: "rename")?.state, "applied")
+            }
+        }
+    }
+
+    func testRetryDoesNotReplaceOriginalSourceSnapshotAfterExternalModification() async throws {
+        for operation in ["rename", "move", "batch"] {
+            for changedField in ["name", "size", "etag", "md5"] {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("retry-source-\(UUID().uuidString).json")
+                defer { try? FileManager.default.removeItem(at: url) }
+                let wal = ReversibleWalStore(storageURL: url)
+                let drive = InMemoryCloudDrive()
+                let dest = drive.seedDir(id: "dest", parentId: "0", name: "Dest")
+                let fileId = drive.seedFile(id: "video", parentId: "0", name: "original.mkv", size: 100,
+                    contentHash: String(repeating: "a", count: 32), hashAlgorithm: "MD5")
+                let companion = drive.seedFile(id: "other", parentId: "0", name: "other.mkv", size: 200)
+                let listing = try await drive.list(folderId: "0")
+                let original = RemoteSnapshot.from(try XCTUnwrap(listing.first { $0.fileId == fileId }), parent: "0")
+                let row = try wal.prepare(taskId: "retry-source", accountId: drive.accountId, actionId: "one", operation: operation == "rename" ? "rename" : "move",
+                    before: original, after: operation == "rename" ? original.with(name: "renamed.mkv") : original.with(parent: dest))
+                try wal.change(row, state: "not_applied")
+                if operation == "batch" {
+                    let other = RemoteSnapshot.from(try XCTUnwrap(listing.first { $0.fileId == companion }), parent: "0")
+                    let otherRow = try wal.prepare(taskId: "retry-source", accountId: drive.accountId, actionId: "two", operation: "move", before: other, after: other.with(parent: dest))
+                    try wal.change(otherRow, state: "not_applied")
+                }
+                drive.mutateNodeForTest(id: fileId) { node in
+                    switch changedField {
+                    case "name": node.name = "externally-renamed.mkv"
+                    case "size": node.size = 101
+                    case "etag": node.etag = "changed-etag"
+                    default: node.contentHash = String(repeating: "b", count: 32)
+                    }
+                }
+                let tx = ReversibleTransaction(taskId: "retry-source", drive: drive, wal: wal)
+                do {
+                    switch operation {
+                    case "rename": _ = try await tx.rename(action: "one", id: fileId, parent: "0", name: "renamed.mkv")
+                    case "move": _ = try await tx.move(action: "one", id: fileId, parent: "0", dest: dest)
+                    default: _ = try await tx.moveBatch(items: [BatchMoveItem(action: "one", id: fileId, parent: "0"), BatchMoveItem(action: "two", id: companion, parent: "0")], dest: dest)
+                    }
+                    XCTFail("等待重试期间改动了\(changedField)，必须在发送请求前拒绝")
+                } catch { }
+                XCTAssertEqual(drive.renameCallsForTest, 0)
+                XCTAssertEqual(drive.moveCallsForTest, 0)
+                XCTAssertEqual(drive.node(id: fileId)?.parentId, "0")
+                XCTAssertEqual(drive.node(id: companion)?.parentId, "0")
+                XCTAssertEqual(wal.find(taskId: "retry-source", actionId: "one")?.before, original)
+                XCTAssertEqual(wal.find(taskId: "retry-source", actionId: "one")?.state, "not_applied")
+            }
+        }
+    }
+
+    func testBatchMoveDoesNotConfirmAnObjectThatChangedDuringWrite() async throws {
+        let changes: [(inout InMemoryCloudDrive.Node) -> Void] = [
+            { $0.size += 1 },
+            { $0.isDir = true },
+            { $0.etag = "changed-after-move" },
+            { $0.contentHash = String(repeating: "b", count: 32) },
+        ]
+        for change in changes {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("batch-changed-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let drive = InMemoryCloudDrive()
+            let dest = drive.seedDir(id: "dest", parentId: "0", name: "Dest")
+            let one = drive.seedFile(id: "one", parentId: "0", name: "one.mkv", size: 100, contentHash: String(repeating: "a", count: 32), hashAlgorithm: "MD5")
+            let two = drive.seedFile(id: "two", parentId: "0", name: "two.mkv", size: 200, contentHash: String(repeating: "a", count: 32), hashAlgorithm: "MD5")
+            drive.moveMutationForTest = change
+            let tx = ReversibleTransaction(taskId: "batch-changed", drive: drive, wal: wal)
+            do {
+                _ = try await tx.moveBatch(items: [BatchMoveItem(action: "one", id: one, parent: "0"), BatchMoveItem(action: "two", id: two, parent: "0")], dest: dest)
+                XCTFail("已变更的移动结果不能标为成功")
+            } catch { }
+            XCTAssertEqual(wal.find(taskId: "batch-changed", actionId: "one")?.state, "uncertain")
+            XCTAssertEqual(wal.find(taskId: "batch-changed", actionId: "two")?.state, "uncertain")
+            XCTAssertEqual(wal.find(taskId: "batch-changed", actionId: "one")?.before?.size, 100)
+            XCTAssertEqual(wal.find(taskId: "batch-changed", actionId: "two")?.before?.size, 200)
+            XCTAssertEqual(drive.moveCallsForTest, 2, "事务层不自动重发移动")
+        }
+    }
+
+    func testCancellationBeforeWriteKeepsNotAppliedWithoutSendingRequest() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("cancel-before-write-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let drive = InMemoryCloudDrive()
+        let fileId = drive.seedFile(id: "video", parentId: "0", name: "original.mkv", size: 100)
+        let tx = ReversibleTransaction(taskId: "cancel-before-write", drive: drive, wal: wal, cancellationCheck: { true })
+        do {
+            _ = try await tx.rename(action: "rename", id: fileId, parent: "0", name: "renamed.mkv")
+            XCTFail("发送前取消应阻止写请求")
+        } catch { }
+        XCTAssertEqual(wal.find(taskId: "cancel-before-write", actionId: "rename")?.state, "not_applied")
+        XCTAssertEqual(drive.node(id: fileId)?.name, "original.mkv")
+        XCTAssertEqual(drive.renameCallsForTest, 0)
+    }
+
     func testTruncatedUploadRemainsUncertain() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("upload-wal-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -422,6 +614,7 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
             XCTFail("截断上传不能标记为成功")
         } catch {
             XCTAssertEqual(wal.find(taskId: "truncated", actionId: "poster")?.state, "uncertain")
+            XCTAssertEqual(wal.find(taskId: "truncated", actionId: "poster")?.mayStillComplete, true)
         }
         let report = await JournalReconciler.reconcileReversibleWal(taskId: "truncated", drive: drive, wal: wal)
         XCTAssertEqual(report.stillUncertain, 1)
@@ -614,6 +807,30 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
     // MARK: - 5. RetentionZoneEngine 保留区移入、恢复、保护期与清理核验
 
     @MainActor
+    func testConfirmedRetentionMoveCompletesLocalIntentWithoutAnotherCloudOperation() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("retention-confirm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let wal = ReversibleWalStore(storageURL: folder.appendingPathComponent("wal.json"))
+        let before = RemoteSnapshot(id: "file", parent: "source", name: "video.mkv", directory: false, size: 10)
+        let row = try wal.prepare(taskId: "run", accountId: "a", actionId: "move", operation: "retention_move", before: before, after: before.with(parent: "slot"))
+        try wal.change(row, state: "applied")
+        let intent = RetentionZoneEngine.Record(recordId: "run:move", accountId: "a", provider: "guangya", taskId: "run", actionId: "move",
+            workTitle: "Show", category: RetentionZoneEngine.catConfirmed, reason: "duplicate", originalFileId: "file",
+            originalParentId: "source", originalPath: "/source/video.mkv", originalName: "video.mkv", size: 10,
+            retentionFileId: "", retentionParentId: "slot", retentionPath: "/retention/video.mkv")
+        let records = try JSONSerialization.jsonObject(with: JSONEncoder().encode([intent]))
+        let registryURL = folder.appendingPathComponent("registry.json")
+        try JSONSerialization.data(withJSONObject: ["version": 1, "records": records]).write(to: registryURL)
+        let retention = RetentionZoneEngine(registryURL: registryURL, wal: wal)
+        let confirmed = try retention.confirmAppliedMove(taskId: "run", actionId: "move", accountId: "a")
+        XCTAssertEqual(confirmed.retentionFileId, "file")
+        XCTAssertEqual(confirmed.originalParentId, "source")
+        XCTAssertEqual(RetentionZoneEngine(registryURL: registryURL, wal: wal).allRecords().first?.retentionFileId, "file")
+        XCTAssertEqual(wal.rows(taskId: "run").count, 1)
+        XCTAssertThrowsError(try retention.confirmAppliedMove(taskId: "run", actionId: "move", accountId: "another-account"))
+    }
+
     func testRetentionZoneMoveRestoreProtectAndCleanup() async throws {
         let tmp = FileManager.default.temporaryDirectory
         let wal = ReversibleWalStore(storageURL: tmp.appendingPathComponent("ret_wal_\(UUID().uuidString).json"))

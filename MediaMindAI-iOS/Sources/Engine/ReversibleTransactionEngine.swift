@@ -153,6 +153,10 @@ public struct ReversibleWalRecord: Identifiable, Codable, Hashable, Sendable {
     public var undoResult: RemoteSnapshot?
     /// 撤销前落盘的旧素材转存意图，供移动成功但终态未落盘时核实。
     public var preserveUnverifiedAsset: Bool? = nil
+    /// 服务端已受理的后台操作仍可能稍后落地；不能凭目标暂时为空自动重发。
+    public var mayStillComplete: Bool? = nil
+    public var backgroundTaskId: String? = nil
+    public var backgroundOperation: String? = nil
     public var error: String?
 
     public init(
@@ -344,12 +348,37 @@ public final class ReversibleWalStore: @unchecked Sendable {
         }
     }
 
-    public func change(_ rec: ReversibleWalRecord, state: String, after: RemoteSnapshot? = nil, error: String? = nil) throws {
+    public func change(_ rec: ReversibleWalRecord, state: String, after: RemoteSnapshot? = nil, error: String? = nil, mayStillComplete: Bool? = nil, backgroundTaskId: String? = nil, backgroundOperation: String? = nil) throws {
         try update(rec) {
             $0.state = state
             if let after { $0.after = after }
             $0.error = error
+            if let mayStillComplete { $0.mayStillComplete = mayStillComplete }
+            if let backgroundTaskId { $0.backgroundTaskId = backgroundTaskId }
+            if let backgroundOperation { $0.backgroundOperation = backgroundOperation }
         }
+    }
+
+    /// 自动只读核实的条件提交：核对与落盘在同一锁内，不能覆盖人工核实／撤销的新状态。
+    @discardableResult
+    public func reconcileForwardIfPending(_ observed: ReversibleWalRecord, state: String, after: RemoteSnapshot? = nil, error: String? = nil, backgroundTaskFailed: Bool = false) throws -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard state == "applied" || state == "not_applied",
+              let current = records.first(where: { $0.id == observed.id }),
+              current.taskId == observed.taskId, current.accountId == observed.accountId,
+              current.state == "prepared" || current.state == "uncertain",
+              current.before == observed.before, current.after == observed.after,
+              current.mayStillComplete == observed.mayStillComplete,
+              current.backgroundTaskId == observed.backgroundTaskId, current.backgroundOperation == observed.backgroundOperation,
+              !(state == "not_applied" && current.mayStillComplete == true
+                  && !(backgroundTaskFailed && current.backgroundTaskId?.isEmpty == false)) else { return false }
+        try update(current) {
+            $0.state = state
+            if let after { $0.after = after }
+            $0.error = error
+            $0.mayStillComplete = false
+        }
+        return true
     }
 
     public func prepareUndo(_ rec: ReversibleWalRecord, destination: RemoteSnapshot, preserving: Bool) throws {
@@ -482,8 +511,10 @@ public final class ReversibleTransaction: @unchecked Sendable {
             try wal.change(row, state: "not_applied", error: "任务已取消，未发送写请求")
             throw DriveError.invalidInput("任务已取消，未发送写请求")
         }
+        var blockReturned = false
         do {
             let id = try await block()
+            blockReturned = true
             guard let intended = row.after else { throw DriveError.invalidInput("日志缺少预期状态") }
             var after = try await snapshot(id: id, parent: intended.parent).with(workLabel: intended.workLabel)
             guard after.name == intended.name && after.directory == intended.directory
@@ -499,20 +530,46 @@ public final class ReversibleTransaction: @unchecked Sendable {
             try wal.change(row, state: "applied", after: after)
             return id
         } catch is CancellationError {
-            try? wal.change(row, state: "uncertain", error: "请求中断，需核实远端状态")
+            try? wal.change(row, state: "uncertain", error: "请求中断，需核实远端状态", mayStillComplete: blockReturned ? true : nil)
             throw CancellationError()
         } catch {
-            let state = RateLimitDetector.isRateLimitError(error) ? "not_applied" : "uncertain"
-            try? wal.change(row, state: state, error: error.localizedDescription)
+            // 只有光鸭单次改名 API 的明确 127 拒绝可直接确认未生效；写后查询限流仍需核实。
+            let explicitlyRefused: Bool
+            if !blockReturned, row.operation == "rename", drive.kind == .guangya,
+               case DriveError.rateLimited(code: 127, message: _) = error {
+                explicitlyRefused = true
+            } else { explicitlyRefused = false }
+            try? wal.change(row, state: explicitlyRefused ? "not_applied" : "uncertain", error: error.localizedDescription,
+                mayStillComplete: (blockReturned || error is GuangyaPendingOperationError) ? true : nil,
+                backgroundTaskId: (error as? GuangyaPendingOperationError)?.taskId,
+                backgroundOperation: (error as? GuangyaPendingOperationError)?.operation)
             throw error
         }
+    }
+
+    /// 身份之外的对象快照约束；目录不比较不稳定的大小／内容标记。
+    private func matchesSnapshotContents(_ expected: RemoteSnapshot, _ current: RemoteSnapshot) -> Bool {
+        expected.name == current.name && expected.directory == current.directory
+            && (expected.directory || expected.size == current.size)
+            && (expected.directory || expected.etag?.isEmpty != false || expected.etag == current.etag)
+            && (expected.directory || expected.contentMD5 == nil || current.contentMD5 == nil || expected.contentMD5 == current.contentMD5)
+    }
+
+    /// 重试未生效记录时仍约束原源对象；等待期间发生的外部改动不能被当作新的执行起点。
+    private func retrySourceSnapshot(action: String, current: RemoteSnapshot) throws -> RemoteSnapshot {
+        guard let previous = wal.find(taskId: taskId, actionId: action), previous.state == "not_applied",
+              let before = previous.before else { return current }
+        let unchanged = before.id == current.id && before.parent == current.parent && matchesSnapshotContents(before, current)
+        guard unchanged else { throw DriveError.invalidInput("等待重试期间源对象已被修改，请核实后再处理") }
+        return before.with(workLabel: current.workLabel)
     }
 
     // MARK: - 1. rename / move / moveBatch / mkdir / upload / quarantine
 
     public func rename(action: String, id: String, parent: String, name: String, operation: String = "rename") async throws -> String {
         if let existing = try known(action: action) { return try await replay(existing) }
-        let before = try await snapshot(id: id, parent: parent)
+        let current = try await snapshot(id: id, parent: parent)
+        let before = try retrySourceSnapshot(action: action, current: current)
         let siblings = try await drive.list(folderId: parent)
         guard !siblings.contains(where: { $0.fileId != id && $0.fileName.caseInsensitiveCompare(name) == .orderedSame }) else {
             throw DriveError.invalidInput("目标名称已存在，未覆盖")
@@ -525,7 +582,8 @@ public final class ReversibleTransaction: @unchecked Sendable {
 
     public func move(action: String, id: String, parent: String, dest: String, operation: String = "move", workLabel: String? = nil) async throws -> String {
         if let existing = try known(action: action) { return try await replay(existing) }
-        let before = try await snapshot(id: id, parent: parent).with(workLabel: workLabel)
+        let current = try await snapshot(id: id, parent: parent).with(workLabel: workLabel)
+        let before = try retrySourceSnapshot(action: action, current: current)
         let destList = try await drive.list(folderId: dest)
         guard !destList.contains(where: { $0.fileId != id && $0.fileName.caseInsensitiveCompare(before.name) == .orderedSame }) else {
             throw DriveError.invalidInput("目标目录已有同名对象，未覆盖")
@@ -570,7 +628,8 @@ public final class ReversibleTransaction: @unchecked Sendable {
             guard matches.count == 1 else {
                 throw DriveError.invalidInput("找不到待操作对象，未写入云盘")
             }
-            let before = RemoteSnapshot.from(matches[0], parent: item.parent, workLabel: item.workLabel)
+            let current = RemoteSnapshot.from(matches[0], parent: item.parent, workLabel: item.workLabel)
+            let before = try retrySourceSnapshot(action: item.action, current: current)
             let clash = destList.contains { $0.fileId != item.id && $0.fileName.caseInsensitiveCompare(before.name) == .orderedSame }
             guard !clash && destNames.insert(before.name.lowercased()).inserted else {
                 throw DriveError.invalidInput("目标目录已有同名对象，未覆盖")
@@ -597,8 +656,10 @@ public final class ReversibleTransaction: @unchecked Sendable {
             throw DriveError.invalidInput("任务已取消，未发送写请求")
         }
 
+        var batchReturned = false
         do {
             let moved = try await drive.moveBatch(fileIds: prepared.map(\.0.id), destParentId: dest)
+            batchReturned = true
             let afterEntries = Dictionary(try await drive.list(folderId: dest).map { ($0.fileId, $0) }, uniquingKeysWith: { first, _ in first })
             for (item, row) in prepared {
                 let newId = moved[item.id] ?? item.id
@@ -606,17 +667,31 @@ public final class ReversibleTransaction: @unchecked Sendable {
                     throw DriveError.invalidInput("网盘批量移动尚未生效，请稍后核实")
                 }
                 let after = RemoteSnapshot.from(e, parent: dest, workLabel: intended.workLabel)
-                guard after.name == intended.name && after.directory == intended.directory else {
-                    throw DriveError.invalidInput("网盘操作尚未生效，请稍后核实")
+                guard matchesSnapshotContents(intended, after) else {
+                    throw DriveError.invalidInput("批量移动结果与原对象快照不符，请稍后核实")
                 }
                 try wal.change(row, state: "applied", after: after)
                 out[item.action] = newId
             }
             return out
         } catch is CancellationError {
+            if batchReturned {
+                for (_, row) in prepared {
+                    let current = wal.find(taskId: taskId, actionId: row.actionId) ?? row
+                    try? wal.change(current, state: current.state, mayStillComplete: true)
+                }
+            }
             await Task { await self.reconcileBatch(prepared: prepared, dest: dest, errorMsg: "请求中断，需核实远端状态") }.value
             throw CancellationError()
         } catch {
+            if batchReturned || error is GuangyaPendingOperationError {
+                for (_, row) in prepared {
+                    let current = wal.find(taskId: taskId, actionId: row.actionId) ?? row
+                    try? wal.change(current, state: current.state == "applied" ? "applied" : "uncertain", error: error.localizedDescription, mayStillComplete: true,
+                        backgroundTaskId: (error as? GuangyaPendingOperationError)?.taskId,
+                        backgroundOperation: (error as? GuangyaPendingOperationError)?.operation)
+                }
+            }
             await reconcileBatch(prepared: prepared, dest: dest, errorMsg: error.localizedDescription)
             throw error
         }
@@ -626,7 +701,9 @@ public final class ReversibleTransaction: @unchecked Sendable {
         do {
             let destNow = Dictionary(try await drive.list(folderId: dest).map { ($0.fileId, $0) }, uniquingKeysWith: { first, _ in first })
             for (item, row) in prepared {
-                if let intended = row.after, let inDest = destNow[item.id], inDest.fileName == intended.name {
+                if wal.find(taskId: taskId, actionId: row.actionId)?.state == "applied" { continue }
+                if let intended = row.after, let inDest = destNow[item.id],
+                   matchesSnapshotContents(intended, RemoteSnapshot.from(inDest, parent: dest, workLabel: intended.workLabel)) {
                     try? wal.change(row, state: "applied", after: RemoteSnapshot.from(inDest, parent: dest, workLabel: intended.workLabel))
                 } else {
                     try? wal.change(row, state: "uncertain", error: errorMsg)
@@ -634,6 +711,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
             }
         } catch {
             for (_, row) in prepared {
+                if wal.find(taskId: taskId, actionId: row.actionId)?.state == "applied" { continue }
                 try? wal.change(row, state: "uncertain", error: errorMsg)
             }
         }

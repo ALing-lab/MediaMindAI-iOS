@@ -442,6 +442,8 @@ public enum Scanner {
             plan = PlanSelection.setEnabled(plan: plan, ids: disableIds, enabled: false)
         }
 
+        plan = EpisodeAssets.applyingPolicies(to: plan, global: global)
+
         // 原子持久化至独立 PlanStore
         if persistResult { _ = try? PlanStore.shared.save(plan) }
         return plan
@@ -480,7 +482,10 @@ public enum Scanner {
                     strategy: strategy, episodeGroupId: episodeGroupId, episodeGroupName: episodeGroupName,
                     policyOverride: policyOverride, hooks: hooks
                 )
-                return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
+                let merged = SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
+                let previousIds = Set(plan.actions.map(\.id))
+                let changedGroups = Set(merged.actions.filter { !previousIds.contains($0.id) }.map(\.groupId))
+                return EpisodeAssets.applyingPolicies(to: merged, global: global, groupIds: changedGroups)
             }
         }
     }
@@ -506,7 +511,10 @@ public enum Scanner {
                 let updated = try await ScannerReplan.replanFiles(
                     plan: plan, actionIds: actionIds, info: info, cloud: drive, hooks: hooks
                 )
-                return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
+                let merged = SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
+                let previousIds = Set(plan.actions.map(\.id))
+                let changedGroups = Set(merged.actions.filter { !previousIds.contains($0.id) }.map(\.groupId))
+                return EpisodeAssets.applyingPolicies(to: merged, global: global, groupIds: changedGroups)
             }
         }
     }
@@ -532,7 +540,10 @@ public enum Scanner {
                 let updated = try await ScannerReplan.replanTargetGroups(
                     plan: plan, targets: targets, info: info, cloud: drive, tmdb: provider, hooks: hooks
                 )
-                return SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
+                let merged = SeriesMerger.mergeIfEnabled(updated, enabled: mergeEnabled, appendTag: appendTag, mergeMovies: mergeMovies, mergeTv: mergeTv)
+                let previousIds = Set(plan.actions.map(\.id))
+                let changedGroups = Set(merged.actions.filter { !previousIds.contains($0.id) }.map(\.groupId))
+                return EpisodeAssets.applyingPolicies(to: merged, global: global, groupIds: changedGroups)
             }
         }
     }
