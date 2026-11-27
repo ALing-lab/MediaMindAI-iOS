@@ -806,7 +806,6 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
 
     // MARK: - 5. RetentionZoneEngine 保留区移入、恢复、保护期与清理核验
 
-    @MainActor
     func testConfirmedRetentionMoveCompletesLocalIntentWithoutAnotherCloudOperation() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("retention-confirm-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -831,6 +830,7 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         XCTAssertThrowsError(try retention.confirmAppliedMove(taskId: "run", actionId: "move", accountId: "another-account"))
     }
 
+    @MainActor
     func testRetentionZoneMoveRestoreProtectAndCleanup() async throws {
         let tmp = FileManager.default.temporaryDirectory
         let wal = ReversibleWalStore(storageURL: tmp.appendingPathComponent("ret_wal_\(UUID().uuidString).json"))
