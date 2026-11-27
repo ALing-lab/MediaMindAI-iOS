@@ -280,6 +280,138 @@ final class ScrapeAndScannerSuiteTests: XCTestCase {
         XCTAssertEqual(store.plans[0].actions.count, 2)
     }
 
+    func testLegacyTaskControlDecodesWithoutUnverifiedAssetFields() throws {
+        let previous = TaskControl(taskId: "old", accountId: "acct", mode: "undo", state: "needs_backup_choice", acceptedSubstitutions: ["poster:backup"])
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(previous)) as? [String: Any])
+        json.removeValue(forKey: "unverifiedAssetIds")
+        json.removeValue(forKey: "acceptedUnverifiedAssetIds")
+        let loaded = try JSONDecoder().decode(TaskControl.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertTrue(loaded.unverifiedAssetIds.isEmpty)
+        XCTAssertTrue(loaded.acceptedUnverifiedAssetIds.isEmpty)
+        XCTAssertEqual(loaded.acceptedSubstitutions, ["poster:backup"])
+    }
+
+    @MainActor
+    func testUnverifiedAssetConsentPersistsAndMergesAcrossChoices() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("asset-choice-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let taskId = UUID().uuidString
+        let previous = TaskControl(taskId: taskId, accountId: "acct", mode: "undo", state: "needs_asset_choice",
+            acceptedSubstitutions: ["poster:backup"], unverifiedAssetIds: ["row-second"], acceptedUnverifiedAssetIds: ["row-first"])
+        try JSONEncoder().encode([taskId: previous]).write(to: url)
+        let controls = TaskCancellation(storageURL: url)
+        let loaded = try XCTUnwrap(controls.controls[taskId])
+        XCTAssertEqual(loaded.state, "needs_asset_choice")
+        XCTAssertEqual(loaded.unverifiedAssetIds, ["row-second"])
+        let requested = try controls.request(taskId: taskId, accountId: "acct", undo: true,
+            acceptedUnverifiedAssetIds: ["row-second", "row-first"])
+        XCTAssertEqual(requested.state, "requested")
+        XCTAssertEqual(requested.acceptedUnverifiedAssetIds, ["row-first", "row-second"])
+        XCTAssertEqual(requested.acceptedSubstitutions, ["poster:backup"])
+        let reloaded = TaskCancellation(storageURL: url)
+        XCTAssertEqual(reloaded.controls[taskId]?.acceptedUnverifiedAssetIds, requested.acceptedUnverifiedAssetIds)
+        XCTAssertThrowsError(try reloaded.request(taskId: taskId, accountId: "acct", undo: true), "requested / undoing不可重复提交")
+    }
+
+    @MainActor
+    func testFix8StartedPlanRecoversUnsubmittedUnmatchedSourceAfterReload() throws {
+        for useSnapshot in [false, true] {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let store = PlanAndTaskStore(storageURL: dir)
+            var plan = makeSamplePlan()
+            plan.reviewDisposition = "started"
+            plan.groups[0].kind = "tv"
+            plan.actions[1].enabled = false
+            plan.actions[1].selected = false
+            plan.actions.append(videoAction(id: "pending-episode", fileId: "vid2", operation: "unmatched"))
+            if useSnapshot {
+                var run = sampleRun(total: 1, completed: 1, succeeded: 1)
+                run.executionSnapshot = plan.executionSnapshot(actionIds: ["a1"])
+                store.saveTask(run)
+            } else { plan.submittedActionIds = ["a1"] }
+            store.savePlan(plan)
+            let reloaded = PlanAndTaskStore(storageURL: dir)
+            let recovered = try XCTUnwrap(reloaded.pendingPlans.first)
+            XCTAssertEqual(recovered.id, plan.id)
+            XCTAssertEqual(recovered.reviewDisposition, "pending")
+            XCTAssertEqual(recovered.groups.map(\.id), ["g1"])
+            XCTAssertEqual(recovered.manualMatchActions(groupId: "g1").map(\.id), ["pending-episode"])
+            XCTAssertTrue(recovered.submittedActionIds?.contains("a1") == true)
+            XCTAssertFalse(recovered.actions.first { $0.id == "a1" }!.selected)
+            XCTAssertTrue(ExecutionEngine.executableActionIds(plan: recovered).isEmpty)
+            var edited = recovered
+            edited.actions.removeAll { $0.id == "pending-episode" }
+            edited.actions.append(videoAction(id: "recognized-episode", fileId: "vid2"))
+            try reloaded.saveEditedPlan(edited, original: recovered)
+            let afterEdit = PlanAndTaskStore(storageURL: dir)
+            if useSnapshot { afterEdit.deleteTask(id: "history") }
+            let ready = try XCTUnwrap(PlanAndTaskStore(storageURL: dir).pendingPlans.first)
+            XCTAssertTrue(ready.submittedActionIds?.contains("a1") == true, "迁移后删除旧历史仍保留提交证据")
+            XCTAssertEqual(ExecutionEngine.executableActionIds(plan: ready), ["recognized-episode"])
+            XCTAssertFalse(ExecutionEngine.executableActionIds(plan: ready).contains("a1"))
+            let begun = afterEdit.markExecutionStarted(ready, requested: ["recognized-episode"], runId: "next")
+            XCTAssertEqual(begun.reviewDisposition, "started")
+            XCTAssertTrue(afterEdit.pendingPlans.isEmpty, "已提交作品的禁用素材残留不能再生成空卡片")
+        }
+    }
+
+    @MainActor
+    func testFix8StartedRecoveryRejectsUntrustedScopeAndSubmittedSources() throws {
+        for evidence in ["absent", "empty", "stale", "same-source", "disabled-only", "done-unmatched", "wrong-account"] {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let store = PlanAndTaskStore(storageURL: dir)
+            var plan = makeSamplePlan()
+            plan.reviewDisposition = "started"
+            plan.actions[1].enabled = false
+            plan.actions[1].selected = false
+            if !["absent", "empty", "wrong-account"].contains(evidence) { plan.submittedActionIds = evidence == "stale" ? ["not-in-plan"] : ["a1"] }
+            if evidence == "empty" { plan.submittedActionIds = [] }
+            if evidence != "disabled-only" {
+                var unmatched = videoAction(id: "pending", fileId: evidence == "same-source" ? "vid1" : "vid2", operation: "unmatched")
+                unmatched.done = evidence == "done-unmatched"
+                plan.actions.append(unmatched)
+            }
+            if evidence == "wrong-account" {
+                let source = sampleRun(total: 1, completed: 1, succeeded: 1)
+                var run = TaskRun(id: source.id, planId: plan.id, accountId: "different-account", provider: source.provider,
+                    sourceLabel: source.sourceLabel, status: source.status, total: 1, completed: 1, succeeded: 1, failed: 0,
+                    message: "", startedAt: Date(), finishedAt: Date(), errors: [])
+                run.executionSnapshot = plan.executionSnapshot(actionIds: ["a1"])
+                store.saveTask(run)
+            }
+            store.savePlan(plan)
+            XCTAssertTrue(PlanAndTaskStore(storageURL: dir).pendingPlans.isEmpty, evidence)
+        }
+    }
+
+    @MainActor
+    func testFix8RecoveryDoesNotExposeCancelledOrActivePlan() throws {
+        for status in ["cancelled", "running", "paused", "queued"] {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let store = PlanAndTaskStore(storageURL: dir)
+            var plan = makeSamplePlan()
+            plan.reviewDisposition = status == "cancelled" ? "cancelled" : "started"
+            plan.submittedActionIds = ["a1"]
+            plan.actions.append(videoAction(id: "pending", fileId: "vid2", operation: "unmatched"))
+            store.savePlan(plan)
+            if status == "queued" {
+                let item = TaskQueue.shared.enqueue(plan: plan)
+                defer { TaskQueue.shared.remove(id: item.id) }
+                XCTAssertTrue(PlanAndTaskStore(storageURL: dir).pendingPlans.isEmpty)
+            } else {
+                if status != "cancelled" {
+                    var run = sampleRun(total: 1, completed: 0, succeeded: 0)
+                    run.status = status
+                    store.saveTask(run)
+                }
+                XCTAssertTrue(PlanAndTaskStore(storageURL: dir).pendingPlans.isEmpty, status)
+            }
+        }
+    }
+
     @MainActor
     func testOldPersistedGhostCardIsHiddenWithoutRemovingHistory() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

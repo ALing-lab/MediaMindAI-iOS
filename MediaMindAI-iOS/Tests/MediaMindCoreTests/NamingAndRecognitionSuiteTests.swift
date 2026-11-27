@@ -1,4 +1,5 @@
 import XCTest
+import Foundation
 #if canImport(MediaMindCore)
 @testable import MediaMindCore
 #else
@@ -9,7 +10,212 @@ import XCTest
 /// 覆盖：NamingTest / StandardNamingTest / NamingLanguageTest / MultiVersionEpisodeTest /
 /// TitleDeobfuscator / ReleaseTokenizer / ExternalIdExtractor / EpisodeRangeParser /
 /// AnimeEpisodeParser / EpisodeMapping / SequelDisambiguator / FolderContextResolver / TitleScorer
+private final class AssetReadProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "asset.test" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url else { return }
+        let body: Data
+        let status: Int
+        if request.httpMethod == "PROPFIND" {
+            let responses = ["asset.nfo", "short.nfo", "long.nfo", "denied.nfo"].map {
+                "<d:response><d:href>/dav/\($0)</d:href><d:propstat><d:prop><d:resourcetype/><d:getcontentlength>3</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+            }.joined()
+            body = Data("<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\">\(responses)</d:multistatus>".utf8)
+            status = 207
+        } else {
+            body = Data((url.lastPathComponent == "short.nfo" ? "ab" : (url.lastPathComponent == "long.nfo" ? "abcd" : "abc")).utf8)
+            status = url.lastPathComponent == "denied.nfo" ? 403 : 200
+        }
+        let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
 final class NamingAndRecognitionSuiteTests: XCTestCase {
+
+    private struct AssetMetadataDrive: CloudDrive {
+        let kind: ProviderKind
+        let accountId = "asset-test"
+        let entries: [CloudEntry]
+        let listings: [String: [CloudEntry]]?
+        init(entries: [CloudEntry] = [], listings: [String: [CloudEntry]]? = nil, kind: ProviderKind = .p123) {
+            self.entries = entries; self.listings = listings; self.kind = kind
+        }
+        func list(folderId: String) async throws -> [CloudEntry] { listings.map { $0[folderId] ?? [] } ?? entries }
+        func rename(fileId: String, newName: String) async throws -> String { throw DriveError.unsupported("test") }
+        func mkdir(parentId: String, name: String) async throws -> String { throw DriveError.unsupported("test") }
+        func move(fileId: String, destParentId: String) async throws -> String { throw DriveError.unsupported("test") }
+        func upload(parentId: String, name: String, data: Data) async throws -> String { throw DriveError.unsupported("test") }
+    }
+
+    func testAssetMD5RequiresExactIdentitySizeAndMD5Algorithm() async throws {
+        let md5 = "900150983cd24fb0d6963f7d28e17f72"
+        let valid = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3,
+                               contentHash: md5.uppercased(), hashAlgorithm: "MD5")
+        let drive: any CloudDrive = AssetMetadataDrive(entries: [valid])
+        let actual = try await drive.assetMD5(fileId: "asset", parentId: "0", expectedSize: 3)
+        XCTAssertEqual(actual, md5)
+        let wrongSize = try await drive.assetMD5(fileId: "asset", parentId: "0", expectedSize: 4)
+        XCTAssertNil(wrongSize)
+        let other = try await drive.assetMD5(fileId: "other", parentId: "0", expectedSize: 3)
+        XCTAssertNil(other)
+        let duplicate = try await AssetMetadataDrive(entries: [valid, valid]).assetMD5(fileId: "asset", parentId: "0", expectedSize: 3)
+        XCTAssertNil(duplicate)
+        let opaque = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3, etag: md5)
+        let unknown = try await AssetMetadataDrive(entries: [opaque]).assetMD5(fileId: "asset", parentId: "0", expectedSize: 3)
+        XCTAssertNil(unknown, "任意 ETag 不能隐式当作 MD5")
+    }
+
+    func testUploadReconciliationRetainsLocalMD5WhenListHasNoChecksum() async throws {
+        let expected = "900150983cd24fb0d6963f7d28e17f72"
+        for state in ["prepared", "undo_prepared"] {
+            for checksum in [nil, expected] as [String?] {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("reconcile-md5-\(UUID().uuidString).json")
+                defer { try? FileManager.default.removeItem(at: url) }
+                let wal = ReversibleWalStore(storageURL: url)
+                let row = try wal.prepare(taskId: "upload", accountId: "asset-test", actionId: "poster", operation: "upload", before: nil,
+                    after: RemoteSnapshot(id: "asset", parent: "0", name: "asset.nfo", directory: false, size: 3, contentMD5: expected))
+                try wal.change(row, state: state)
+                let entry = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3,
+                    contentHash: checksum, hashAlgorithm: checksum == nil ? nil : "MD5")
+                let report = await JournalReconciler.reconcileReversibleWal(taskId: "upload", drive: AssetMetadataDrive(entries: [entry]), wal: wal)
+                XCTAssertEqual(report.confirmedApplied, 1)
+                XCTAssertEqual(wal.find(taskId: "upload", actionId: "poster")?.after?.contentMD5, expected)
+                let reloaded = ReversibleWalStore(storageURL: url)
+                XCTAssertEqual(reloaded.find(taskId: "upload", actionId: "poster")?.after?.contentMD5, expected)
+            }
+        }
+    }
+
+    func testUploadReconciliationDoesNotAcceptSameSizeDifferentMD5() async throws {
+        let expected = "900150983cd24fb0d6963f7d28e17f72"
+        for state in ["prepared", "undo_prepared"] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("reconcile-mismatch-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let row = try wal.prepare(taskId: "upload", accountId: "asset-test", actionId: "poster", operation: "upload", before: nil,
+                after: RemoteSnapshot(id: "asset", parent: "0", name: "asset.nfo", directory: false, size: 3, contentMD5: expected))
+            try wal.change(row, state: state)
+            let entry = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3,
+                contentHash: "d41d8cd98f00b204e9800998ecf8427e", hashAlgorithm: "MD5")
+            let report = await JournalReconciler.reconcileReversibleWal(taskId: "upload", drive: AssetMetadataDrive(entries: [entry]), wal: wal)
+            XCTAssertEqual(report.stillUncertain, 1)
+            XCTAssertEqual(report.confirmedApplied, 0)
+            XCTAssertEqual(report.confirmedNotApplied, 0)
+            XCTAssertEqual(wal.find(taskId: "upload", actionId: "poster")?.state, state)
+            XCTAssertEqual(wal.find(taskId: "upload", actionId: "poster")?.after?.contentMD5, expected)
+        }
+    }
+
+    func testInterruptedStashMoveRestoresPersistedLocationAndPreservedState() async throws {
+        for kind in [ProviderKind.p123, .webdav] {
+            for preserving in [false, true] {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("stash-recovery-\(UUID().uuidString).json")
+                defer { try? FileManager.default.removeItem(at: url) }
+                let wal = ReversibleWalStore(storageURL: url)
+                let parent = kind == .webdav ? "/" : "0"
+                let stash = kind == .webdav ? "/stash" : "stash"
+                let id = kind == .webdav ? "/asset.nfo" : "asset"
+                let targetId = kind == .webdav ? "/stash/asset.nfo" : id
+                let after = RemoteSnapshot(id: id, parent: parent, name: "asset.nfo", directory: false, size: 3)
+                let destination = after.with(id: targetId, parent: stash)
+                let row = try wal.prepare(taskId: "undo", accountId: "asset-test", actionId: "asset", operation: "upload", before: nil, after: after)
+                try wal.prepareUndo(row, destination: destination, preserving: preserving)
+                let entry = CloudEntry(fileId: targetId, fileName: after.name, isDir: false, size: 3)
+                let drive = AssetMetadataDrive(listings: [parent: [], stash: [entry]], kind: kind)
+                let report = await JournalReconciler.reconcileReversibleWal(taskId: "undo", drive: drive, wal: wal)
+                XCTAssertEqual(report.confirmedReverted, 1)
+                let loaded = ReversibleWalStore(storageURL: url).find(taskId: "undo", actionId: "asset")
+                XCTAssertEqual(loaded?.state, preserving ? "preserved" : "reverted")
+                XCTAssertEqual(loaded?.undoResult?.parent, stash)
+                XCTAssertEqual(loaded?.undoResult?.id, targetId)
+                XCTAssertEqual(loaded?.preserveUnverifiedAsset, preserving)
+            }
+        }
+    }
+
+    func testStashRecoveryDoesNotGuessFromMissingSourceOrAmbiguousDestination() async throws {
+        let source = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3, etag: "old-etag")
+        let target = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3, etag: "old-etag")
+        let wrongSize = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 4, etag: "old-etag")
+        let wrongId = CloudEntry(fileId: "other", fileName: "asset.nfo", isDir: false, size: 3, etag: "old-etag")
+        let changed = CloudEntry(fileId: "asset", fileName: "asset.nfo", isDir: false, size: 3, etag: "changed-etag")
+        let cases: [([CloudEntry], [CloudEntry])] = [([], []), ([source], [target]), ([], [wrongSize]), ([], [wrongId]), ([], [changed]), ([], [target, target])]
+        for (sources, targets) in cases {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("stash-uncertain-\(UUID().uuidString).json")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let wal = ReversibleWalStore(storageURL: url)
+            let after = RemoteSnapshot.from(source, parent: "0")
+            let row = try wal.prepare(taskId: "undo", accountId: "asset-test", actionId: "asset", operation: "upload", before: nil, after: after)
+            try wal.prepareUndo(row, destination: after.with(parent: "stash"), preserving: true)
+            let report = await JournalReconciler.reconcileReversibleWal(taskId: "undo",
+                drive: AssetMetadataDrive(listings: ["0": sources, "stash": targets]), wal: wal)
+            XCTAssertEqual(report.stillUncertain, 1)
+            XCTAssertEqual(report.confirmedReverted, 0)
+            XCTAssertEqual(report.confirmedApplied, 0)
+            XCTAssertEqual(wal.find(taskId: "undo", actionId: "asset")?.state, "undo_prepared")
+        }
+    }
+
+    func testStashRecoveryRejectsKnownDigestMismatchWithoutChangingTerminalState() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("stash-digest-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let after = RemoteSnapshot(id: "/asset.nfo", parent: "/", name: "asset.nfo", directory: false, size: 3,
+            contentMD5: "900150983cd24fb0d6963f7d28e17f72")
+        let row = try wal.prepare(taskId: "undo", accountId: "asset-test", actionId: "asset", operation: "upload", before: nil, after: after)
+        try wal.prepareUndo(row, destination: after.with(id: "/stash/asset.nfo", parent: "/stash"), preserving: false)
+        let changed = CloudEntry(fileId: "/stash/asset.nfo", fileName: "asset.nfo", isDir: false, size: 3,
+            contentHash: "d41d8cd98f00b204e9800998ecf8427e", hashAlgorithm: "MD5")
+        let report = await JournalReconciler.reconcileReversibleWal(taskId: "undo",
+            drive: AssetMetadataDrive(listings: ["/": [], "/stash": [changed]], kind: .webdav), wal: wal)
+        XCTAssertEqual(report.stillUncertain, 1)
+        XCTAssertEqual(report.confirmedReverted, 0)
+        XCTAssertEqual(wal.find(taskId: "undo", actionId: "asset")?.state, "undo_prepared")
+    }
+
+    func testStashRecoveryReturnsUnmovedSourceToAppliedWithoutLosingMD5() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("stash-retry-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let expected = "900150983cd24fb0d6963f7d28e17f72"
+        let after = RemoteSnapshot(id: "/asset.nfo", parent: "/", name: "asset.nfo", directory: false, size: 3, contentMD5: expected)
+        let row = try wal.prepare(taskId: "undo", accountId: "asset-test", actionId: "asset", operation: "upload", before: nil, after: after)
+        try wal.prepareUndo(row, destination: after.with(id: "/stash/asset.nfo", parent: "/stash"), preserving: false)
+        let source = CloudEntry(fileId: after.id, fileName: after.name, isDir: false, size: 3)
+        let report = await JournalReconciler.reconcileReversibleWal(taskId: "undo",
+            drive: AssetMetadataDrive(listings: ["/": [source], "/stash": []], kind: .webdav), wal: wal)
+        XCTAssertEqual(report.confirmedApplied, 1)
+        XCTAssertEqual(report.confirmedReverted, 0)
+        XCTAssertEqual(wal.find(taskId: "undo", actionId: "asset")?.state, "applied")
+        XCTAssertEqual(wal.find(taskId: "undo", actionId: "asset")?.after?.contentMD5, expected)
+    }
+
+    func testWebDavAssetMD5StreamsAndRejectsInvalidBodies() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [AssetReadProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let drive = try WebDavDrive(accountId: "dav-test", baseUrl: "https://asset.test/dav", username: "", password: "", session: session)
+        let actual = try await drive.assetMD5(fileId: "/asset.nfo", parentId: "/", expectedSize: 3)
+        XCTAssertEqual(actual, "900150983cd24fb0d6963f7d28e17f72")
+        for name in ["short.nfo", "long.nfo", "denied.nfo"] {
+            do {
+                _ = try await drive.assetMD5(fileId: "/" + name, parentId: "/", expectedSize: 3)
+                XCTFail("不能接受错误大小或失败响应：\(name)")
+            } catch { }
+        }
+        let tooLarge = try await drive.assetMD5(fileId: "/asset.nfo", parentId: "/", expectedSize: 64 * 1024 * 1024 + 1)
+        XCTAssertNil(tooLarge)
+        do {
+            _ = try await drive.assetMD5(fileId: "/../asset.nfo", parentId: "/", expectedSize: 3)
+            XCTFail("越界路径不能读取")
+        } catch { }
+    }
 
     // MARK: - 1. StandardNaming & Multi-Version Parsing
 

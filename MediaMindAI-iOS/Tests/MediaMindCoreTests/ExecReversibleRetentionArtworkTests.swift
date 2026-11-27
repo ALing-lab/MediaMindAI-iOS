@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 #if canImport(MediaMindCore)
 @testable import MediaMindCore
 #else
@@ -446,11 +447,90 @@ final class ExecReversibleRetentionArtworkTests: XCTestCase {
         try wal.change(upload, state: "applied")
         let tx = ReversibleTransaction(taskId: "undo", drive: drive, wal: wal)
         do { try await tx.undo(); XCTFail("不能绕过缺失的素材校验信息") }
-        catch { XCTAssertTrue(error.localizedDescription.contains("云盘未提供素材校验信息")) }
+        catch let choice as UnverifiedAssetsError { XCTAssertEqual(choice.files.map(\.id), [upload.id]) }
         XCTAssertEqual(drive.node(id: poster)?.parentId, "0")
         XCTAssertEqual(drive.node(id: video)?.name, "renamed.mkv")
-        XCTAssertEqual(wal.find(taskId: "undo", actionId: "poster")?.state, "conflict")
+        XCTAssertEqual(wal.find(taskId: "undo", actionId: "poster")?.state, "applied")
         XCTAssertEqual(wal.find(taskId: "undo", actionId: "rename")?.state, "applied")
+        XCTAssertTrue(drive.trashedIds.isEmpty)
+    }
+
+    func testRollbackSummaryCountsDurablePartialResultsAndExcludesStash() throws {
+        let task = "summary-\(UUID().uuidString)"
+        let wal = ReversibleWalStore.shared
+        defer { wal.clear(taskId: task) }
+        let snapshot = RemoteSnapshot(id: "f", parent: "0", name: "poster.jpg", directory: false, size: 5)
+        for (action, operation, state) in [("one", "rename", "reverted"), ("two", "upload", "preserved"),
+                                           ("three", "move", "conflict"), ("four", "move", "applied"),
+                                           ("stash", "undo_stash", "applied"), ("skip", "upload", "skipped")] {
+            let row = try wal.prepare(taskId: task, accountId: "a", actionId: action, operation: operation, before: nil, after: snapshot)
+            try wal.change(row, state: state)
+        }
+        let summary = ExecutionEngine.rollbackSummary(runId: task, errors: ["conflict"])
+        XCTAssertEqual(summary.total, 4)
+        XCTAssertEqual(summary.undone, 2)
+        XCTAssertEqual(summary.preservedAssets, 1)
+        XCTAssertEqual(summary.failed, 1)
+        let choice = ExecutionEngine.rollbackSummary(runId: task, unverifiedAssets: [UnverifiedAsset(id: "old", actionId: "a", fileName: "poster")])
+        XCTAssertEqual(choice.undone, 2)
+        XCTAssertEqual(choice.failed, 0)
+        XCTAssertEqual(choice.unverifiedAssets.count, 1)
+    }
+
+    func testOldRemoteSnapshotDecodesWithoutDigest() throws {
+        let old = Data(#"{"id":"f","parent":"0","name":"poster.jpg","directory":false,"size":5}"#.utf8)
+        let decoded = try JSONDecoder().decode(RemoteSnapshot.self, from: old)
+        XCTAssertNil(decoded.contentMD5)
+        let next = decoded.with(contentMD5: String(repeating: "a", count: 32)).with(id: "renamed")
+        XCTAssertEqual(next.contentMD5, String(repeating: "a", count: 32))
+    }
+
+    func testExplicitUnverifiedAssetChoicePreservesAndResumesAfterReload() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("undo-choice-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let drive = InMemoryCloudDrive(accountId: "asset-choice")
+        let poster = drive.seedFile(parentId: "0", name: "poster.jpg", size: 5, etag: "", data: Data("later".utf8))
+        let entries = try await drive.list(folderId: "0")
+        let entry = try XCTUnwrap(entries.first { $0.fileId == poster })
+        let upload = try wal.prepare(taskId: "choice", accountId: drive.accountId, actionId: "poster", operation: "upload", before: nil,
+            after: RemoteSnapshot.from(entry, parent: "0"))
+        try wal.change(upload, state: "applied")
+        let tx = ReversibleTransaction(taskId: "choice", drive: drive, wal: wal)
+        try await tx.undo(acceptedUnverifiedAssets: [upload.id])
+        let saved = try XCTUnwrap(wal.find(taskId: "choice", actionId: "poster"))
+        XCTAssertEqual(saved.state, "preserved")
+        XCTAssertNotEqual(saved.undoResult?.parent, "0")
+        XCTAssertEqual(drive.node(id: poster)?.parentId, saved.undoResult?.parent)
+        XCTAssertEqual(drive.node(id: poster)?.data, Data("later".utf8))
+        let count = wal.rows(taskId: "choice").count
+        let reloaded = ReversibleWalStore(storageURL: url)
+        try await ReversibleTransaction(taskId: "choice", drive: drive, wal: reloaded).undo()
+        XCTAssertEqual(reloaded.rows(taskId: "choice").count, count)
+        XCTAssertTrue(drive.trashedIds.isEmpty)
+    }
+
+    func testUploadPersistsDigestAndMismatchCannotBeApprovedAway() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("undo-hash-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let wal = ReversibleWalStore(storageURL: url)
+        let drive = InMemoryCloudDrive(accountId: "hash-check")
+        let tx = ReversibleTransaction(taskId: "hash", drive: drive, wal: wal)
+        _ = try await tx.upload(action: "new", parent: "0", name: "new.nfo") { Data("image".utf8) }
+        XCTAssertEqual(wal.find(taskId: "hash", actionId: "new")?.after?.contentMD5,
+            Insecure.MD5.hash(data: Data("image".utf8)).map { String(format: "%02x", $0) }.joined())
+        let bad = drive.seedFile(parentId: "0", name: "poster.jpg", size: 5, etag: "",
+            contentHash: String(repeating: "b", count: 32), hashAlgorithm: "MD5")
+        let entries = try await drive.list(folderId: "0")
+        let entry = try XCTUnwrap(entries.first { $0.fileId == bad })
+        let row = try wal.prepare(taskId: "mismatch", accountId: drive.accountId, actionId: "bad", operation: "upload", before: nil,
+            after: RemoteSnapshot.from(entry, parent: "0").with(contentMD5: String(repeating: "a", count: 32)))
+        try wal.change(row, state: "applied")
+        do {
+            try await ReversibleTransaction(taskId: "mismatch", drive: drive, wal: wal).undo(acceptedUnverifiedAssets: [row.id])
+            XCTFail("已知摘要不一致不能以转存确认绕过")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("素材内容已变化")) }
+        XCTAssertEqual(drive.node(id: bad)?.parentId, "0")
         XCTAssertTrue(drive.trashedIds.isEmpty)
     }
 

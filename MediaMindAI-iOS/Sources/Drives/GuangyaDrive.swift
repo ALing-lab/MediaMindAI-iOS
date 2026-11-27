@@ -765,6 +765,24 @@ public actor GuangyaDrive: CloudDrive {
         (try? await list(folderId: rootId)) != nil
     }
 
+    public func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String? {
+        guard expectedSize >= 0 else { return nil }
+        let matches = try await list(folderId: parentId).filter { $0.fileId == fileId }
+        guard matches.count == 1, let entry = matches.first, !entry.isDir, entry.size == expectedSize else { return nil }
+        if let digest = ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash), digest.algorithm == "MD5" {
+            return digest.digest
+        }
+        // 复用已使用的文件详情接口，列表尚未提供摘要时再补查。
+        let response = try await api("/v1/file/get_info_by_file_id", body: ["fileId": fileId], idempotent: true)
+        guard let data = response["data"] as? [String: Any] else { return nil }
+        let info = (data["fileInfo"] as? [String: Any]) ?? data
+        guard Self.jsonStr(info, "fileId") == fileId,
+              Self.jsonStr(info, "parentId") == parentId,
+              Self.jsonInt64(info, "fileSize") == expectedSize,
+              Self.jsonInt64(info, "resType") != 2 else { return nil }
+        return ContentDigest.normalize(algorithm: "MD5", hash: Self.jsonStr(info, "md5"))?.digest
+    }
+
     public func parentIdOf(fileId: String) async throws -> String? {
         guard !fileId.isEmpty else { return nil }
         let o = try await api("/v1/file/get_info_by_file_id", body: ["fileId": fileId], idempotent: true)

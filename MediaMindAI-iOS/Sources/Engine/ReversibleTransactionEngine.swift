@@ -14,6 +14,8 @@ public struct RemoteSnapshot: Codable, Hashable, Sendable {
     public let size: Int64
     public let etag: String?
     public let workLabel: String?
+    /// 本地上传字节或服务器明确提供的 MD5；旧日志缺省为 nil。
+    public let contentMD5: String?
 
     public init(
         id: String,
@@ -22,7 +24,8 @@ public struct RemoteSnapshot: Codable, Hashable, Sendable {
         directory: Bool,
         size: Int64 = 0,
         etag: String? = nil,
-        workLabel: String? = nil
+        workLabel: String? = nil,
+        contentMD5: String? = nil
     ) {
         self.id = id
         self.parent = parent
@@ -31,6 +34,7 @@ public struct RemoteSnapshot: Codable, Hashable, Sendable {
         self.size = size
         self.etag = etag
         self.workLabel = workLabel
+        self.contentMD5 = ContentDigest.parseMd5OrNull(contentMD5)?.digest
     }
 
     public static func from(_ entry: CloudEntry, parent: String, workLabel: String? = nil) -> RemoteSnapshot {
@@ -41,7 +45,8 @@ public struct RemoteSnapshot: Codable, Hashable, Sendable {
             directory: entry.isDir,
             size: entry.size,
             etag: entry.etag,
-            workLabel: workLabel
+            workLabel: workLabel,
+            contentMD5: ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash).flatMap { $0.algorithm == "MD5" ? $0.digest : nil }
         )
     }
 
@@ -51,7 +56,8 @@ public struct RemoteSnapshot: Codable, Hashable, Sendable {
         name: String? = nil,
         size: Int64? = nil,
         etag: String? = nil,
-        workLabel: String? = nil
+        workLabel: String? = nil,
+        contentMD5: String? = nil
     ) -> RemoteSnapshot {
         RemoteSnapshot(
             id: id ?? self.id,
@@ -60,7 +66,8 @@ public struct RemoteSnapshot: Codable, Hashable, Sendable {
             directory: self.directory,
             size: size ?? self.size,
             etag: etag ?? self.etag,
-            workLabel: workLabel ?? self.workLabel
+            workLabel: workLabel ?? self.workLabel,
+            contentMD5: contentMD5 ?? self.contentMD5
         )
     }
 }
@@ -87,6 +94,19 @@ public struct MissingBackupsError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         "有 \(files.count) 个原备份缺失，当前文件保留，请选择处理方式"
+    }
+}
+
+public struct UnverifiedAsset: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let actionId: String
+    public let fileName: String
+}
+
+public struct UnverifiedAssetsError: LocalizedError, Sendable {
+    public let files: [UnverifiedAsset]
+    public var errorDescription: String? {
+        "有 \(files.count) 项素材缺少可核验的内容信息，需要确认是否转存当前素材到撤销保留区后继续"
     }
 }
 
@@ -127,10 +147,12 @@ public struct ReversibleWalRecord: Identifiable, Codable, Hashable, Sendable {
     public let actionId: String
     public let operation: String
     public let sequence: Int
-    public var state: String // "prepared" | "applied" | "skipped" | "not_applied" | "uncertain" | "undo_prepared" | "reverted" | "substituted" | "substitution_output" | "conflict"
+    public var state: String // "prepared" | "applied" | "skipped" | "not_applied" | "uncertain" | "undo_prepared" | "reverted" | "preserved" | "substituted" | "substitution_output" | "conflict"
     public var before: RemoteSnapshot?
     public var after: RemoteSnapshot?
     public var undoResult: RemoteSnapshot?
+    /// 撤销前落盘的旧素材转存意图，供移动成功但终态未落盘时核实。
+    public var preserveUnverifiedAsset: Bool? = nil
     public var error: String?
 
     public init(
@@ -330,9 +352,18 @@ public final class ReversibleWalStore: @unchecked Sendable {
         }
     }
 
-    public func reverted(_ rec: ReversibleWalRecord, undoResult: RemoteSnapshot?, substituted: Bool = false) throws {
+    public func prepareUndo(_ rec: ReversibleWalRecord, destination: RemoteSnapshot, preserving: Bool) throws {
         try update(rec) {
-            $0.state = substituted ? "substituted" : "reverted"
+            $0.state = "undo_prepared"
+            $0.undoResult = destination
+            $0.preserveUnverifiedAsset = preserving
+            $0.error = nil
+        }
+    }
+
+    public func reverted(_ rec: ReversibleWalRecord, undoResult: RemoteSnapshot?, substituted: Bool = false, preserved: Bool = false) throws {
+        try update(rec) {
+            $0.state = preserved ? "preserved" : (substituted ? "substituted" : "reverted")
             $0.undoResult = undoResult
             $0.error = nil
         }
@@ -419,7 +450,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
         let ok = now.name == s.name
             && now.directory == s.directory
             && (s.directory || now.size == s.size)
-            && (s.directory || s.etag == nil || now.etag == s.etag)
+            && (s.directory || s.etag?.isEmpty != false || now.etag == s.etag)
         guard ok else {
             throw DriveError.invalidInput("对象已被修改，请核实后再处理")
         }
@@ -454,10 +485,16 @@ public final class ReversibleTransaction: @unchecked Sendable {
         do {
             let id = try await block()
             guard let intended = row.after else { throw DriveError.invalidInput("日志缺少预期状态") }
-            let after = try await snapshot(id: id, parent: intended.parent).with(workLabel: intended.workLabel)
+            var after = try await snapshot(id: id, parent: intended.parent).with(workLabel: intended.workLabel)
             guard after.name == intended.name && after.directory == intended.directory
                 && (row.operation != "upload" || after.size == intended.size) else {
                 throw DriveError.invalidInput("网盘操作尚未生效，请稍后核实")
+            }
+            if row.operation == "upload", let expected = intended.contentMD5 {
+                if let actual = after.contentMD5, actual != expected {
+                    throw DriveError.invalidInput("上传结果内容校验不一致，请核实云端状态")
+                }
+                after = after.with(contentMD5: expected)
             }
             try wal.change(row, state: "applied", after: after)
             return id
@@ -688,7 +725,8 @@ public final class ReversibleTransaction: @unchecked Sendable {
         }
         let row = try wal.prepare(
             taskId: taskId, accountId: drive.accountId, actionId: action, operation: "upload",
-            before: nil, after: RemoteSnapshot(id: "", parent: parent, name: name, directory: false, size: Int64(content.count))
+            before: nil, after: RemoteSnapshot(id: "", parent: parent, name: name, directory: false, size: Int64(content.count),
+                contentMD5: Insecure.MD5.hash(data: content).map { String(format: "%02x", $0) }.joined())
         )
         _ = try await write(row) {
             _ = try await self.drive.upload(parentId: parent, name: name, data: content)
@@ -859,6 +897,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
     public func undo(
         substitutionActions: [String: PlanAction] = [:],
         acceptedSubstitutions: Set<String> = [],
+        acceptedUnverifiedAssets: Set<String> = [],
         onProgress: @Sendable (Int, Int) -> Void = { _, _ in }
     ) async throws {
         try await auditBackups(substitutionActions: substitutionActions, acceptedSubstitutions: acceptedSubstitutions)
@@ -867,6 +906,13 @@ public final class ReversibleTransaction: @unchecked Sendable {
         guard rows.allSatisfy({ $0.accountId == drive.accountId }) else {
             throw DriveError.invalidInput("撤销账号不匹配")
         }
+        let unverified = rows.compactMap { row -> UnverifiedAsset? in
+            guard row.operation == "upload", ["applied", "conflict"].contains(row.state),
+                  let after = row.after, !isStrongEtag(after.etag), after.contentMD5 == nil,
+                  !acceptedUnverifiedAssets.contains(row.id) else { return nil }
+            return UnverifiedAsset(id: row.id, actionId: row.actionId, fileName: after.name)
+        }
+        if !unverified.isEmpty { throw UnverifiedAssetsError(files: unverified) }
 
         let remap = IdRemap(pathMode: drive.kind == .webdav)
         var substitutions: [String: RemoteSnapshot] = [:]
@@ -875,7 +921,8 @@ public final class ReversibleTransaction: @unchecked Sendable {
             let rid = (try remap.resolve(s.id)) ?? s.id
             let rparent = (try remap.resolve(s.parent)) ?? s.parent
             let sub = substitutions[rid]
-            return RemoteSnapshot(id: rid, parent: rparent, name: s.name, directory: s.directory, size: sub?.size ?? s.size, etag: sub != nil ? sub?.etag : s.etag, workLabel: s.workLabel)
+            return RemoteSnapshot(id: rid, parent: rparent, name: s.name, directory: s.directory, size: sub?.size ?? s.size,
+                etag: sub != nil ? sub?.etag : s.etag, workLabel: s.workLabel, contentMD5: sub != nil ? sub?.contentMD5 : s.contentMD5)
         }
 
         for (index, row) in rows.enumerated() {
@@ -884,7 +931,7 @@ public final class ReversibleTransaction: @unchecked Sendable {
             guard let after = try row.after.map(resolved) else {
                 throw DriveError.invalidInput("撤销日志不完整")
             }
-            if row.state == "reverted" || row.state == "substituted" {
+            if row.state == "reverted" || row.state == "substituted" || row.state == "preserved" {
                 if let res = row.undoResult {
                     if row.operation == "backup" {
                         remap.rebind(res.id)
@@ -903,9 +950,17 @@ public final class ReversibleTransaction: @unchecked Sendable {
 
             do {
                 _ = try await verify(after)
+                var preserveCurrentAsset = false
                 if row.operation == "upload" {
-                    guard isStrongEtag(after.etag) else {
-                        throw DriveError.invalidInput("云盘未提供素材校验信息，无法安全移除，请手动核实")
+                    if !isStrongEtag(after.etag) {
+                        if let expected = after.contentMD5,
+                           let actual = try await drive.assetMD5(fileId: after.id, parentId: after.parent, expectedSize: after.size) {
+                            guard actual == expected else { throw DriveError.invalidInput("素材内容已变化，未撤销：\(after.name)") }
+                        } else if acceptedUnverifiedAssets.contains(row.id) {
+                            preserveCurrentAsset = true
+                        } else {
+                            throw UnverifiedAssetsError(files: [UnverifiedAsset(id: row.id, actionId: row.actionId, fileName: after.name)])
+                        }
                     }
                 }
                 if let before {
@@ -921,9 +976,25 @@ public final class ReversibleTransaction: @unchecked Sendable {
                     }
                 }
 
-                try wal.change(row, state: "undo_prepared")
-            if let err = wal.lastStorageError { throw DriveError.invalidInput(err) }
+                var stashDestination: String?
+                if row.operation == "mkdir" || row.operation == "upload" {
+                    guard before == nil else { throw DriveError.invalidInput("不是本任务创建的对象，拒绝移除") }
+                    let root = try await mkdir(action: "undo-root", parent: drive.rootId, name: ".PanScraper.Undo-\(taskId)", operation: "undo_stash")
+                    let stash = try await mkdir(action: "undo-stash:\(row.sequence)", parent: root, name: "\(row.sequence)", operation: "undo_stash")
+                    let stashItems = try await drive.list(folderId: stash)
+                    guard !stashItems.contains(where: { $0.fileName.caseInsensitiveCompare(after.name) == .orderedSame }) else {
+                        throw DriveError.invalidInput("撤销暂存目录已有同名对象")
+                    }
+                    stashDestination = stash
+                    let expectedId = drive.kind.idsArePaths ? DrivePaths.join(parent: stash, name: after.name) : after.id
+                    try wal.prepareUndo(row, destination: after.with(id: expectedId, parent: stash), preserving: preserveCurrentAsset)
+                } else {
+                    try wal.change(row, state: "undo_prepared")
+                }
+                if let err = wal.lastStorageError { throw DriveError.invalidInput(err) }
                 let restored: String
+                var restoredParent = before?.parent ?? after.parent
+                let restoredName = before?.name ?? after.name
                 switch row.operation {
                 case "rename":
                     guard let before else { throw DriveError.invalidInput("缺少改名前记录") }
@@ -932,14 +1003,9 @@ public final class ReversibleTransaction: @unchecked Sendable {
                     guard let before else { throw DriveError.invalidInput("缺少移动前记录") }
                     restored = try await drive.move(fileId: after.id, destParentId: before.parent)
                 case "mkdir", "upload":
-                    guard before == nil else { throw DriveError.invalidInput("不是本任务创建的对象，拒绝移除") }
-                    let root = try await mkdir(action: "undo-root", parent: drive.rootId, name: ".PanScraper.Undo-\(taskId)", operation: "undo_stash")
-                    let stash = try await mkdir(action: "undo-stash:\(row.sequence)", parent: root, name: "\(row.sequence)", operation: "undo_stash")
-                    let stashItems = try await drive.list(folderId: stash)
-                    guard !stashItems.contains(where: { $0.fileName.caseInsensitiveCompare(after.name) == .orderedSame }) else {
-                        throw DriveError.invalidInput("撤销暂存目录已有同名对象")
-                    }
+                    guard let stash = stashDestination else { throw DriveError.invalidInput("缺少撤销暂存位置") }
                     restored = try await drive.move(fileId: after.id, destParentId: stash)
+                    restoredParent = stash
                 default:
                     throw DriveError.invalidInput("不支持此操作的撤销")
                 }
@@ -955,7 +1021,14 @@ public final class ReversibleTransaction: @unchecked Sendable {
                 if row.operation == "retention_move" {
                     RetentionZoneEngine.shared.markRestored(taskId: taskId, actionId: row.actionId)
                 }
-                try wal.reverted(row, undoResult: after.with(id: restored, parent: before?.parent ?? after.parent, name: before?.name ?? after.name))
+                let undoSnapshot = try await snapshot(id: restored, parent: restoredParent).with(workLabel: after.workLabel)
+                guard undoSnapshot.name == restoredName && undoSnapshot.directory == after.directory
+                    && (after.directory || undoSnapshot.size == after.size) else {
+                    throw DriveError.invalidInput("逆序操作结果待核实，已停止继续撤销")
+                }
+                try wal.reverted(row, undoResult: undoSnapshot, preserved: preserveCurrentAsset)
+            } catch let choice as UnverifiedAssetsError {
+                throw choice
             } catch is CancellationError {
                 throw CancellationError()
             } catch {

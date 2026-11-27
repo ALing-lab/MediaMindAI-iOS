@@ -408,6 +408,9 @@ public struct TaskRun: Identifiable, Codable, Sendable {
     public var finishedAt: Date?
     public var errors: [String]
     public var executionSnapshot: ScrapePlan? = nil
+    /// 仅显式重试关联；每次尝试仍保留独立 ID、快照和可逆日志。
+    public var retryOfRunId: String? = nil
+    public var retryRootRunId: String? = nil
 
     public var isSuccessful: Bool {
         status == "done" && total > 0 && completed == total && succeeded > 0 && failed == 0
@@ -432,6 +435,40 @@ public struct TaskRun: Identifiable, Codable, Sendable {
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.errors = errors
+    }
+}
+
+public enum TaskRunHistory {
+    private struct LineageKey: Hashable {
+        let accountId: String
+        let planId: String
+        let rootId: String
+    }
+    public static func rootId(of run: TaskRun, in runs: [TaskRun]) -> String {
+        if let root = run.retryRootRunId, !root.isEmpty { return root }
+        var current = run
+        var seen: Set<String> = [run.id]
+        while let parentId = current.retryOfRunId,
+              let parent = runs.first(where: { $0.id == parentId && $0.accountId == run.accountId && $0.planId == run.planId }),
+              seen.insert(parent.id).inserted {
+            if let root = parent.retryRootRunId, !root.isEmpty { return root }
+            current = parent
+        }
+        return current.id
+    }
+
+    public static func attempts(for run: TaskRun, in runs: [TaskRun]) -> [TaskRun] {
+        let root = rootId(of: run, in: runs)
+        return runs.filter { $0.accountId == run.accountId && $0.planId == run.planId && rootId(of: $0, in: runs) == root }
+            .sorted { $0.startedAt == $1.startedAt ? $0.id > $1.id : $0.startedAt > $1.startedAt }
+    }
+
+    public static func representatives(in runs: [TaskRun]) -> [TaskRun] {
+        var seen = Set<LineageKey>()
+        return runs.sorted { $0.startedAt == $1.startedAt ? $0.id > $1.id : $0.startedAt > $1.startedAt }.filter { run in
+            let key = LineageKey(accountId: run.accountId, planId: run.planId, rootId: rootId(of: run, in: runs))
+            return seen.insert(key).inserted
+        }
     }
 }
 
@@ -498,7 +535,25 @@ public final class PlanAndTaskStore {
             .union(plans.first(where: { $0.id == planId })?.submittedActionIds ?? [])
     }
 
+    /// fix8 可能把尚有未识别源的计划标成 started；只有提交范围可核实时才恢复。
+    private func legacyUnmatchedGroupIds(in plan: ScrapePlan) -> Set<String> {
+        let snapshots = tasks.filter { $0.planId == plan.id && $0.accountId == plan.accountId }
+            .compactMap(\.executionSnapshot).filter { $0.id == plan.id && $0.accountId == plan.accountId }
+        let submitted = Set(plan.submittedActionIds ?? []).union(snapshots.flatMap { $0.actions.map(\.id) })
+        let currentIds = Set(plan.actions.map(\.id))
+        guard !submitted.intersection(currentIds).isEmpty || snapshots.contains(where: { !$0.actions.isEmpty }) else { return [] }
+        let submittedSources = Set(plan.actions.filter { submitted.contains($0.id) }.compactMap(\.fileId))
+            .union(snapshots.flatMap { $0.actions.compactMap(\.fileId) })
+        let remaining = Set(plan.actions.filter { action in
+            guard action.op == "unmatched", !action.done, !submitted.contains(action.id),
+                  let file = action.fileId, !file.isEmpty else { return false }
+            return !submittedSources.contains(file)
+        }.map(\.groupId))
+        return Set(plan.groups.filter { remaining.contains($0.id) }.map(\.id))
+    }
+
     private func remainingGroupIds(in plan: ScrapePlan, reserved: Set<String>) -> Set<String> {
+        if plan.reviewDisposition == "started" { return legacyUnmatchedGroupIds(in: plan) }
         let submittedActions = plan.actions.filter { reserved.contains($0.id) }
         let submittedGroups = Set(submittedActions.map(\.groupId))
         let submittedSources = Set(submittedActions.compactMap(\.fileId))
@@ -519,6 +574,8 @@ public final class PlanAndTaskStore {
         copy.submittedActionIds = reserved.sorted()
         let pending = remainingGroupIds(in: plan, reserved: reserved)
         copy.groups = plan.groups.filter { pending.contains($0.id) }
+        // 第一次明确编辑／执行恢复后的计划会持久化 pending，避免识别成功后再次消失。
+        if plan.reviewDisposition == "started", !pending.isEmpty { copy.reviewDisposition = "pending" }
         for index in copy.actions.indices where reserved.contains(copy.actions[index].id) { copy.actions[index].selected = false }
         return copy
     }
@@ -547,7 +604,7 @@ public final class PlanAndTaskStore {
         let reserved = reservedActionIds(planId: edited.id)
         var next = edited
         next.actions = edited.actions.filter { !reserved.contains($0.id) } + current.actions.filter { reserved.contains($0.id) }
-        next.submittedActionIds = current.submittedActionIds
+        next.submittedActionIds = reserved.sorted()
         next.executionRunIds = current.executionRunIds
         next.scanPriorRunIds = current.scanPriorRunIds
         next.scanListings = current.scanListings; next.scanParents = current.scanParents; next.scanBinding = current.scanBinding
@@ -556,7 +613,8 @@ public final class PlanAndTaskStore {
 
     public var pendingPlans: [ScrapePlan] {
         plans.compactMap { plan in
-            guard plan.reviewDisposition != "cancelled" && plan.reviewDisposition != "started" else { return nil }
+            guard plan.reviewDisposition != "cancelled" else { return nil }
+            if plan.reviewDisposition == "started" && legacyUnmatchedGroupIds(in: plan).isEmpty { return nil }
             guard !tasks.contains(where: { $0.planId == plan.id && ($0.status == "running" || $0.status == "paused") }),
                   !TaskQueue.shared.items.contains(where: { $0.planId == plan.id }) else { return nil }
             if plan.reviewDisposition == nil && tasks.contains(where: { $0.planId == plan.id && !$0.hasNoEffectiveOperations }) { return nil }
@@ -605,7 +663,6 @@ public final class PlanAndTaskStore {
         } else {
             tasks.insert(run, at: 0)
         }
-        if tasks.count > 50 { tasks = Array(tasks.prefix(50)) }
         if let d = try? JSONEncoder().encode(tasks) { try? d.write(to: tasksFile, options: .atomic) }
     }
 

@@ -184,6 +184,23 @@ public enum JournalReconciler {
                 entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "上传文件大小与日志不符，请人工核实"))
                 continue
             }
+            if row.operation == "upload", let after = row.after,
+               let expected = ContentDigest.parseMd5OrNull(after.contentMD5)?.digest,
+               afterList?.contains(where: { entry in
+                   guard !entry.isDir, entry.fileName.caseInsensitiveCompare(after.name) == .orderedSame,
+                         let actual = ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash),
+                         actual.algorithm == "MD5" else { return false }
+                   return actual.digest != expected
+               }) == true {
+                still += 1
+                entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "上传内容 MD5 与日志不符，请人工核实"))
+                continue
+            }
+            func reconciledSnapshot(_ entry: CloudEntry, intended: RemoteSnapshot) -> RemoteSnapshot {
+                // 列表可能不提供 MD5；恢复状态不能抹掉上传前落盘的本地摘要。
+                let actual = RemoteSnapshot.from(entry, parent: intended.parent, workLabel: intended.workLabel)
+                return row.operation == "upload" ? actual.with(contentMD5: intended.contentMD5) : actual
+            }
             func matchesSnapshot(_ entry: CloudEntry, _ snap: RemoteSnapshot) -> Bool {
                 guard entry.fileName.caseInsensitiveCompare(snap.name) == .orderedSame && entry.isDir == snap.directory else {
                     return false
@@ -211,6 +228,45 @@ public enum JournalReconciler {
 
             do {
                 if row.state == "undo_prepared" {
+                    if row.before == nil, let destination = row.undoResult, let after = row.after {
+                        guard let targetList = try? await drive.list(folderId: destination.parent) else {
+                            still += 1
+                            entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "无法读取撤销保留区，转存状态仍待核实"))
+                            continue
+                        }
+                        let targetCandidates = targetList.filter {
+                            $0.fileId == destination.id || $0.fileName.caseInsensitiveCompare(destination.name) == .orderedSame
+                        }
+                        let targetMatches = targetCandidates.filter { entry in
+                            guard entry.fileId == destination.id && entry.fileName == destination.name
+                                && entry.isDir == destination.directory
+                                && (destination.directory || entry.size == destination.size)
+                                && (destination.directory || destination.etag?.isEmpty != false || entry.etag == destination.etag) else { return false }
+                            if !destination.directory, let expected = destination.contentMD5,
+                               let actual = ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash), actual.algorithm == "MD5" {
+                                return actual.digest == expected
+                            }
+                            return true
+                        }
+                        let sourceOccupied = afterList?.contains {
+                            $0.fileId == after.id || $0.fileName.caseInsensitiveCompare(after.name) == .orderedSame
+                        } == true
+                        if !sourceOccupied, targetCandidates.count == 1, targetMatches.count == 1 {
+                            let restored = RemoteSnapshot.from(targetMatches[0], parent: destination.parent, workLabel: destination.workLabel)
+                            let preserved = row.preserveUnverifiedAsset == true
+                            try wal.reverted(row, undoResult: restored, preserved: preserved)
+                            reverted += 1
+                            entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: preserved ? "核实确认当前素材已转存保留" : "核实确认新建对象已转存撤销区"))
+                        } else if afterMatches.count == 1, targetCandidates.isEmpty {
+                            try wal.change(row, state: "applied", after: reconciledSnapshot(afterMatches[0], intended: after))
+                            applied += 1
+                            entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "转存未落地，已恢复为可重试撤销状态"))
+                        } else {
+                            still += 1
+                            entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "uncertain", detail: "撤销转存存在双态或目标快照不符，需人工核实"))
+                        }
+                        continue
+                    }
                     if let before = row.before, beforeMatches.count == 1, afterMatches.isEmpty {
                         try wal.reverted(row, undoResult: RemoteSnapshot.from(beforeMatches[0], parent: before.parent))
                         if row.operation == "retention_move" {
@@ -223,7 +279,7 @@ public enum JournalReconciler {
                         reverted += 1
                         entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "reverted", detail: "核实确认新建对象已撤销移除"))
                     } else if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
-                        try wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
+                        try wal.change(row, state: "applied", after: reconciledSnapshot(afterMatches[0], intended: after))
                         applied += 1
                         entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "撤销尚未落地，已恢复为可重试撤销状态"))
                     } else {
@@ -232,7 +288,7 @@ public enum JournalReconciler {
                     }
                 } else {
                     if let after = row.after, afterMatches.count == 1, beforeMatches.isEmpty {
-                        try wal.change(row, state: "applied", after: RemoteSnapshot.from(afterMatches[0], parent: after.parent, workLabel: after.workLabel))
+                        try wal.change(row, state: "applied", after: reconciledSnapshot(afterMatches[0], intended: after))
                         applied += 1
                         entries.append(ReconcileEntry(id: row.id, actionId: row.actionId, operation: row.operation, outcome: "applied", detail: "核实确认远端操作已生效"))
                     } else if afterMatches.isEmpty && (row.before == nil || beforeMatches.count == 1) {

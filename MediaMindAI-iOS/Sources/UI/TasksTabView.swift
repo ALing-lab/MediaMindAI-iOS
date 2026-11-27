@@ -27,6 +27,19 @@ public struct TasksTabView: View {
     @State private var cancellation = TaskCancellation.shared
     @State private var backupChoice: TaskControl? = nil
     @State private var applyingBackupChoice = false
+    @State private var assetChoice: TaskControl?
+    @State private var applyingAssetChoice = false
+
+    private var unverifiedAssetControls: [TaskControl] {
+        cancellation.controls.values.filter { $0.state == "needs_asset_choice" }
+            .sorted { $0.taskId < $1.taskId }
+    }
+
+    private var interruptedUndoControls: [TaskControl] {
+        guard !engine.isRollingBack else { return [] }
+        return cancellation.controls.values.filter { $0.mode == "undo" && ["requested", "undoing"].contains($0.state) }
+            .sorted { $0.taskId < $1.taskId }
+    }
 
     private var missingBackupControls: [TaskControl] {
         cancellation.controls.values.filter { $0.state == "needs_backup_choice" }
@@ -38,10 +51,25 @@ public struct TasksTabView: View {
         return r
     }
 
+    private var representativeRuns: [TaskRun] {
+        var runs = store.tasks
+        if let live = activeRun {
+            runs.removeAll { $0.id == live.id }
+            runs.append(live)
+        }
+        return TaskRunHistory.representatives(in: runs).filter { run in
+            !queue.items.contains { $0.isRetry(of: run, in: runs) }
+        }
+    }
+
+    private func attemptCount(_ run: TaskRun) -> Int {
+        TaskRunHistory.attempts(for: run, in: store.tasks).count
+    }
+
     /// 已暂停且尚未完成的任务记录（显示在「进行中」以便随时继续或取消）。
     private var pausedRuns: [TaskRun] {
         let activeId = activeRun?.id
-        return store.tasks.filter { $0.id != activeId && ($0.status == "paused" || $0.status == "running") }
+        return representativeRuns.filter { $0.id != activeId && ($0.status == "paused" || $0.status == "running") }
     }
 
     private var activeCount: Int {
@@ -50,7 +78,7 @@ public struct TasksTabView: View {
 
     private var completedRuns: [TaskRun] {
         let activeId = activeRun?.id
-        return store.tasks.filter { $0.id != activeId && ["done", "failed", "stopped", "no_changes"].contains($0.status) }
+        return representativeRuns.filter { $0.id != activeId && ["done", "failed", "stopped", "no_changes"].contains($0.status) }
     }
 
     public var body: some View {
@@ -72,7 +100,7 @@ public struct TasksTabView: View {
 
                     let uncertain = journal.uncertainRows()
                     let walUncertain = ReversibleWalStore.shared.uncertainRecords()
-                    let hasBanners = !missingBackupControls.isEmpty || reconcileHint != nil || !uncertain.isEmpty || !walUncertain.isEmpty
+                    let hasBanners = !missingBackupControls.isEmpty || !unverifiedAssetControls.isEmpty || !interruptedUndoControls.isEmpty || reconcileHint != nil || !uncertain.isEmpty || !walUncertain.isEmpty
                     let isTabEmpty = (selectedTab == .active && activeCount == 0) || (selectedTab == .completed && completedRuns.isEmpty)
 
                     if isTabEmpty && !hasBanners {
@@ -87,6 +115,19 @@ public struct TasksTabView: View {
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 12) {
+                                ForEach(interruptedUndoControls) { control in
+                                    Button("撤销中断，继续处理（\(control.taskId)）") {
+                                        continueUndoPreservingAssets(control, resumeExisting: true)
+                                    }
+                                    .font(.footnote).padding(12)
+                                    .disabled(applyingAssetChoice || engine.isRollingBack)
+                                }
+                                ForEach(unverifiedAssetControls) { control in
+                                    Button("撤销暂停：\(control.unverifiedAssetIds.count) 项旧素材需确认转存") {
+                                        assetChoice = control
+                                    }
+                                    .font(.footnote).padding(12).disabled(applyingAssetChoice)
+                                }
                                 ForEach(missingBackupControls) { control in
                                     Button("撤销暂停：\(control.missingBackupIds.count) 项备份缺失，选择处理方式") {
                                         backupChoice = control
@@ -186,6 +227,14 @@ public struct TasksTabView: View {
                     .interactiveDismissDisabled(applyingBackupChoice)
                 }
             }
+            .alert("确认转存旧素材？", isPresented: Binding(get: { assetChoice != nil }, set: { if !$0 { assetChoice = nil } }), presenting: assetChoice) { control in
+                Button("确认转存并继续撤销") { continueUndoPreservingAssets(control) }
+                Button("取消", role: .cancel) { assetChoice = nil }
+            } message: { control in
+                let rows = ReversibleWalStore.shared.rows(taskId: control.taskId)
+                let names = control.unverifiedAssetIds.map { id in rows.first(where: { $0.id == id })?.after?.name ?? id }
+                Text("以下旧素材缺少内容摘要，可能包含后续修改。确认后只将当前素材移动到可恢复的撤销保留区，不删除：\n" + names.joined(separator: "\n"))
+            }
             .alert("停止当前任务？", isPresented: $showStopConfirm) {
                 Button("停止并保留已完成项") {
                     let run = stoppingRun
@@ -217,6 +266,8 @@ public struct TasksTabView: View {
                                     await MainActor.run {
                                         if done.state == "completed" {
                                             reconcileHint = "任务已停止并撤销已完成操作"
+                                        } else if done.state == "needs_asset_choice" {
+                                            reconcileHint = "撤销暂停：旧素材缺少摘要，请确认是否转存保留"
                                         } else if done.state == "needs_backup_choice" {
                                             reconcileHint = "撤销暂停：缺失备份 \(done.missingBackupIds.count) 项，请在任务中心选择处理方式"
                                         } else {
@@ -241,24 +292,28 @@ public struct TasksTabView: View {
                 Text("选择停止方式：保留已完成项，或尝试把本轮已执行的云端操作逐条回滚。")
             }
             .alert(
-                "确认删除任务记录？",
+                "删除本次尝试记录？",
                 isPresented: Binding(get: { pendingDeleteRun != nil }, set: { if !$0 { pendingDeleteRun = nil } }),
                 presenting: pendingDeleteRun
             ) { target in
-                Button("删除记录", role: .destructive) {
+                Button("删除本次记录", role: .destructive) {
                     let isActive = engine.currentRun?.id == target.id && (engine.isRunning || engine.isPaused)
                     store.deleteTask(id: target.id, allowPaused: !isActive)
                     pendingDeleteRun = nil
                 }
                 Button("取消", role: .cancel) { pendingDeleteRun = nil }
             } message: { _ in
-                Text("仅移除本地任务卡片，不影响网盘已有文件。若后续需要一键撤销回滚，建议保留该记录。")
+                Text("仅删除本次尝试的本地记录；其它尝试仍保留，较早的一次可能重新显示在任务中心。不影响网盘文件。若需要撤销本次操作，请保留此记录。")
             }
         }
     }
 
     private func continueUndoWithSubstitutions(_ control: TaskControl) {
         guard !applyingBackupChoice else { return }
+        guard !engine.isRollingBack && (!engine.isRunning || engine.currentRun?.id == control.taskId) else {
+            reconcileHint = "其他任务正在执行或撤销，请等待其停止后重试"
+            return
+        }
         guard let account = AccountStore.shared.accounts.first(where: { $0.id == control.accountId }) else {
             reconcileHint = "原任务所属云盘账号已删除或不可用"
             backupChoice = nil
@@ -268,6 +323,10 @@ public struct TasksTabView: View {
         Task { @MainActor in
             defer { applyingBackupChoice = false; backupChoice = nil }
             do {
+                guard !engine.isRollingBack && (!engine.isRunning || engine.currentRun?.id == control.taskId) else {
+                    reconcileHint = "其他任务正在执行或撤销，请等待其停止后重试"
+                    return
+                }
                 let drive = try AccountStore.shared.buildDrive(for: account)
                 let request = try cancellation.request(taskId: control.taskId, accountId: control.accountId, undo: true,
                                                        acceptedSubstitutions: control.missingBackupIds)
@@ -276,6 +335,45 @@ public struct TasksTabView: View {
             } catch {
                 reconcileHint = "继续撤销失败：\(error.localizedDescription)"
             }
+        }
+    }
+
+    private func continueUndoPreservingAssets(_ control: TaskControl, resumeExisting: Bool = false) {
+        guard !applyingAssetChoice && !engine.isRollingBack else { return }
+        guard !engine.isRunning || engine.currentRun?.id == control.taskId else {
+            reconcileHint = "其他任务正在执行，请等待其停止后重试"
+            return
+        }
+        guard let account = AccountStore.shared.get(id: control.accountId),
+              let drive = try? AccountStore.shared.buildDrive(for: account) else {
+            reconcileHint = "原任务所属云盘账号不可用，未执行转存"
+            assetChoice = nil
+            return
+        }
+        applyingAssetChoice = true
+        assetChoice = nil
+        Task { @MainActor in
+            defer { applyingAssetChoice = false }
+            do {
+                guard !engine.isRollingBack && (!engine.isRunning || engine.currentRun?.id == control.taskId) else {
+                    reconcileHint = "其他任务正在执行或撤销，请等待其停止后重试"
+                    return
+                }
+                let request: TaskControl
+                if resumeExisting {
+                    guard let current = cancellation.controls[control.taskId], current.mode == "undo",
+                          ["requested", "undoing"].contains(current.state) else { return }
+                    request = current
+                } else {
+                    request = try cancellation.request(taskId: control.taskId, accountId: control.accountId, undo: true,
+                        acceptedUnverifiedAssetIds: control.unverifiedAssetIds)
+                }
+                let result = await cancellation.apply(control: request, drive: drive)
+                let summary = ExecutionEngine.rollbackSummary(runId: control.taskId)
+                reconcileHint = result.state == "completed"
+                    ? "撤销完成：已处理 \(summary.undone) 项，其中转存保留 \(summary.preservedAssets) 项"
+                    : "撤销暂停：已处理 \(summary.undone) 项，其中转存保留 \(summary.preservedAssets) 项，请核实后继续"
+            } catch { reconcileHint = "继续撤销失败：\(error.localizedDescription)" }
         }
     }
 
@@ -445,6 +543,12 @@ public struct TasksTabView: View {
             }
 
             cardFooterRow(fileCount: fileCount, folderCount: folderCount, extraCount: nil, date: run.startedAt)
+            NavigationLink {
+                CompletedTaskDetailScreen(run: run)
+            } label: {
+                Text("查看执行详情（\(max(1, attemptCount(run))) 次尝试）")
+                    .font(.caption).foregroundStyle(MMTheme.accent)
+            }
         }
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -456,13 +560,11 @@ public struct TasksTabView: View {
             return
         }
         let ids = captured.actions.filter { !$0.done && ExecutionEngine.execOps.contains($0.op) }.map(\.id)
-        guard Set(ids).isSubset(of: Set(plan.actions.map(\.id))), engine.enqueueOrStart(plan: plan, drive: drive, actionIds: ids) else {
+        guard Set(ids).isSubset(of: Set(plan.actions.map(\.id))), engine.enqueueOrStart(plan: plan, drive: drive, actionIds: ids, retryOfRunId: run.id) else {
             reconcileHint = engine.lastStartError ?? "原动作已变更，请重新扫描确认"
             return
         }
-        var old = run
-        old.status = "stopped"; old.message = "已发起限定原范围的续跑任务"
-        store.saveTask(old)
+        // 父尝试仅在引擎实际启动重试时收口；排队或启动失败不提前改写暂停状态。
     }
 
     private func pausedTaskCard(_ run: TaskRun) -> some View {
@@ -556,6 +658,20 @@ public struct TasksTabView: View {
 
     // MARK: - 2. 排队等待卡片
 
+    private func startQueuedTask(_ item: QueuedTaskItem) {
+        guard !engine.isRunning && !engine.isRollingBack else { return }
+        guard let plan = store.plans.first(where: { $0.id == item.planId && $0.accountId == item.accountId }),
+              let account = AccountStore.shared.get(id: item.accountId),
+              let drive = try? AccountStore.shared.buildDrive(for: account) else {
+            reconcileHint = "排队任务的计划或账号不可用，请移出队列后重新扫描"
+            return
+        }
+        if engine.start(plan: plan, drive: drive, actionIds: item.actionIds,
+                        retryOfRunId: item.retryOfRunId, retryRootRunId: item.retryRootRunId) {
+            queue.remove(id: item.id)
+        } else { reconcileHint = engine.lastStartError ?? "任务未启动，排队记录已保留" }
+    }
+
     private func queuedTaskCard(_ item: QueuedTaskItem) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             cardHeaderRow(
@@ -572,11 +688,15 @@ public struct TasksTabView: View {
             ])
 
             HStack {
-                Label("排队等待当前任务完成后自动开始（\(item.actionCount) 项操作）", systemImage: "clock.fill")
+                Label(item.retryOfRunId != nil ? "重试尝试排队中（\(item.actionCount) 项操作）" : "排队等待当前任务完成后自动开始（\(item.actionCount) 项操作）", systemImage: "clock.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
+                if !engine.isRunning && !engine.isRollingBack {
+                    Button("开始任务") { startQueuedTask(item) }
+                        .font(.caption.weight(.medium)).foregroundStyle(MMTheme.accent)
+                }
                 Button("移出队列") {
                     queue.remove(id: item.id)
                 }
@@ -587,6 +707,16 @@ public struct TasksTabView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            if !engine.isRunning, let reason = engine.lastStartError {
+                Text(reason).font(.caption).foregroundStyle(MMTheme.redErr)
+            }
+            if let previous = TaskRunHistory.representatives(in: store.tasks).first(where: { item.isRetry(of: $0, in: store.tasks) }) {
+                NavigationLink {
+                    CompletedTaskDetailScreen(run: previous)
+                } label: {
+                    Text("查看历史尝试").font(.caption).foregroundStyle(MMTheme.accent)
+                }
+            }
         }
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -632,7 +762,7 @@ public struct TasksTabView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(MMTheme.greenOk)
                             .font(.subheadline)
-                        Text("任务执行完成")
+                        Text(attemptCount(run) > 1 || run.retryOfRunId != nil ? "最近尝试已完成" : "任务执行完成")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(MMTheme.greenOk)
                     } else if run.hasNoEffectiveOperations {
@@ -673,6 +803,11 @@ public struct TasksTabView: View {
                     }
                 }
 
+                if attemptCount(run) > 1 {
+                    Text("共 \(attemptCount(run)) 次尝试 · 当前显示最近一次，点开可查看全部记录")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+
                 cardFooterRow(
                     fileCount: fileCount,
                     folderCount: folderCount,
@@ -702,7 +837,7 @@ public struct TasksTabView: View {
                 Button(role: .destructive) {
                     pendingDeleteRun = run
                 } label: {
-                    Label("删除记录", systemImage: "trash")
+                    Label("删除本次尝试记录", systemImage: "trash")
                 }
             }
         }

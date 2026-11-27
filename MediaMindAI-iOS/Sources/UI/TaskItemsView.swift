@@ -193,7 +193,7 @@ public struct TaskItemsView: View {
             retryPlan.actions[i].selected = true
         }
         PlanAndTaskStore.shared.savePlan(retryPlan)
-        guard ExecutionEngine.shared.enqueueOrStart(plan: retryPlan, drive: drive, actionIds: idsToRun) else {
+        guard ExecutionEngine.shared.enqueueOrStart(plan: retryPlan, drive: drive, actionIds: idsToRun, retryOfRunId: run.id) else {
             retryHint = ExecutionEngine.shared.lastStartError
             return
         }

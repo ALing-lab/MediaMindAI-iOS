@@ -140,6 +140,7 @@ public protocol CloudDrive: Sendable {
     func upload(parentId: String, name: String, data: Data) async throws -> String
     func trash(fileId: String) async throws -> String
     func parentIdOf(fileId: String) async throws -> String?
+    func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String?
     func exists(parentId: String, name: String) async throws -> Bool
     func ping() async -> Bool
 }
@@ -164,6 +165,16 @@ public extension CloudDrive {
     }
 
     func parentIdOf(fileId: String) async throws -> String? { nil }
+
+    /// 仅采用当前目录中同一文件、同一大小的明确 MD5，不把任意 ETag 当作内容摘要。
+    func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String? {
+        guard expectedSize >= 0 else { return nil }
+        let matches = try await list(folderId: parentId).filter { $0.fileId == fileId }
+        guard matches.count == 1, let entry = matches.first, !entry.isDir, entry.size == expectedSize,
+              let digest = ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash),
+              digest.algorithm == "MD5" else { return nil }
+        return digest.digest
+    }
 
     func exists(parentId: String, name: String) async throws -> Bool {
         try await list(folderId: parentId).contains { $0.fileName.caseInsensitiveCompare(name) == .orderedSame }

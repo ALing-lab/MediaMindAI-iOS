@@ -231,7 +231,11 @@ public final class ExecutionEngine {
     }
 
     @discardableResult
-    public func enqueueOrStart(plan: ScrapePlan, drive: any CloudDrive, actionIds: [String]? = nil) -> Bool {
+    public func enqueueOrStart(plan: ScrapePlan, drive: any CloudDrive, actionIds: [String]? = nil, retryOfRunId: String? = nil) -> Bool {
+        guard !isRollingBack else {
+            lastStartError = "正在撤销任务，请等待完成后执行"
+            return false
+        }
         if let binding = plan.scanBinding, !binding.isEmpty && binding != drive.approvalBinding {
             lastStartError = "账号凭据或端点已变化，请重新扫描确认后执行"
             return false
@@ -241,55 +245,93 @@ public final class ExecutionEngine {
             return false
         }
         lastStartError = nil
+        let history = PlanAndTaskStore.shared.tasks
+        let parent = history.first { $0.id == retryOfRunId && $0.accountId == plan.accountId && $0.planId == plan.id }
+        if let parent, TaskQueue.shared.items.contains(where: { $0.isRetry(of: parent, in: history) }) {
+            lastStartError = "该任务已有排队中的重试，请先等待执行或移出队列"
+            return false
+        }
         if isRunning {
-            TaskQueue.shared.enqueue(plan: plan, actionIds: actionIds)
+            if let parent, let current = currentRun, current.accountId == parent.accountId && current.planId == parent.planId,
+               TaskRunHistory.rootId(of: current, in: history) == TaskRunHistory.rootId(of: parent, in: history) {
+                lastStartError = "该任务正在执行，请等待当前尝试结束后重试"
+                return false
+            }
+            TaskQueue.shared.enqueue(plan: plan, actionIds: actionIds, retryOfRunId: parent?.id,
+                retryRootRunId: parent.map { TaskRunHistory.rootId(of: $0, in: PlanAndTaskStore.shared.tasks) })
             return true
         }
-        return start(plan: plan, drive: drive, actionIds: actionIds)
+        return start(plan: plan, drive: drive, actionIds: actionIds, retryOfRunId: retryOfRunId)
     }
 
-    public func rollback(runId: String, drive: any CloudDrive) async -> RollbackSummary {
-        if currentRun?.id == runId {
-            await stopAndWait()
+    /// 汇总实际 WAL 终态；中途暂停也保留已撤销项，不把暂存辅助目录算作业务操作。
+    public nonisolated static func rollbackSummary(
+        runId: String, errors: [String] = [], missingBackups: [MissingBackup] = [], unverifiedAssets: [UnverifiedAsset] = []
+    ) -> RollbackSummary {
+        let ignored: Set<String> = ["skipped", "not_applied", "substitution_output"]
+        let rows = ReversibleWalStore.shared.rows(taskId: runId).filter { $0.operation != "undo_stash" && !ignored.contains($0.state) }
+        let terminal: Set<String> = ["reverted", "substituted", "preserved"]
+        let undone = rows.filter { terminal.contains($0.state) }.count
+        let needsChoice = !missingBackups.isEmpty || !unverifiedAssets.isEmpty
+        return RollbackSummary(total: rows.count, undone: undone,
+            failed: needsChoice ? 0 : (errors.isEmpty ? 0 : max(1, rows.filter { ["conflict", "uncertain", "undo_prepared", "prepared"].contains($0.state) }.count)), errors: errors,
+            missingBackups: missingBackups, unverifiedAssets: unverifiedAssets,
+            preservedAssets: rows.filter { $0.state == "preserved" }.count)
+    }
+
+    public func rollback(
+        runId: String, drive: any CloudDrive, substitutionActions: [String: PlanAction] = [:],
+        acceptedSubstitutions: Set<String> = [], acceptedUnverifiedAssets: Set<String> = [],
+        journal: OperationJournal = .shared
+    ) async -> RollbackSummary {
+        guard !isRollingBack,
+              !isRunning || currentRun?.id == runId else {
+            return RollbackSummary(total: 0, undone: 0, failed: 1, errors: ["其他任务正在执行或撤销，请等待其停止后重试"])
         }
+        // 在等待正向任务结束之前占用逆向锁，阻止重入和队列启动。
         isRollingBack = true
+        defer { isRollingBack = false }
+        if currentRun?.id == runId { await stopAndWait() }
         rollbackMessage = "正在按逆序回滚网盘操作…"
         let walRows = ReversibleWalStore.shared.rows(taskId: runId)
         if !walRows.isEmpty {
             let tx = ReversibleTransaction(taskId: runId, drive: drive)
-            let subActions: [String: PlanAction] = {
-                guard let run = PlanAndTaskStore.shared.tasks.first(where: { $0.id == runId }),
-                      let plan = PlanAndTaskStore.shared.plans.first(where: { $0.id == run.planId }) else { return [:] }
-                return Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
-            }()
+            var subActions = substitutionActions
+            if subActions.isEmpty,
+               let run = PlanAndTaskStore.shared.tasks.first(where: { $0.id == runId }),
+               let plan = PlanAndTaskStore.shared.plans.first(where: { $0.id == run.planId }) {
+                subActions = Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+            }
+            var messages: [String] = []
+            var missing: [MissingBackup] = []
+            var unverified: [UnverifiedAsset] = []
             do {
-                try await tx.undo(substitutionActions: subActions) { done, total in
+                try await tx.undo(substitutionActions: subActions, acceptedSubstitutions: acceptedSubstitutions,
+                    acceptedUnverifiedAssets: acceptedUnverifiedAssets) { done, total in
                     Task { @MainActor in self.rollbackMessage = "正在逆序回滚 \(done)/\(total)…" }
                 }
-                for jRow in OperationJournal.shared.rows(forRunId: runId) where jRow.status == .applied {
-                    OperationJournal.shared.markStatus(rowId: jRow.id, status: .undone)
+            } catch let choice as MissingBackupsError {
+                missing = choice.files; messages = [choice.localizedDescription]
+            } catch let choice as UnverifiedAssetsError {
+                unverified = choice.files; messages = [choice.localizedDescription]
+            } catch { messages = [error.localizedDescription] }
+            let terminal: Set<String> = ["reverted", "substituted", "preserved"]
+            let actual = ReversibleWalStore.shared.rows(taskId: runId)
+            for row in journal.rows(forRunId: runId) where row.status == .applied {
+                let related = actual.filter { $0.actionId == row.actionId || $0.actionId.hasPrefix(row.actionId + ":") }
+                    .filter { $0.operation != "undo_stash" && !["skipped", "not_applied", "substitution_output"].contains($0.state) }
+                if !related.isEmpty && related.allSatisfy({ terminal.contains($0.state) }) {
+                    journal.markStatus(rowId: row.id, status: .undone)
                 }
-                let summary = RollbackSummary(total: walRows.count, undone: walRows.count, failed: 0, errors: [])
-                rollbackMessage = "回滚完成：已安全撤销 \(walRows.count) 项"
-                isRollingBack = false
-                return summary
-            } catch let mb as MissingBackupsError {
-                let msg = mb.localizedDescription
-                rollbackMessage = msg
-                isRollingBack = false
-                return RollbackSummary(total: walRows.count, undone: 0, failed: mb.files.count, errors: [msg])
-            } catch {
-                let msg = error.localizedDescription
-                rollbackMessage = "回滚中止：\(msg)"
-                isRollingBack = false
-                return RollbackSummary(total: walRows.count, undone: 0, failed: 1, errors: [msg])
             }
+            let summary = Self.rollbackSummary(runId: runId, errors: messages, missingBackups: missing, unverifiedAssets: unverified)
+            rollbackMessage = messages.first ?? "回滚完成：已撤销 \(summary.undone) 项，其中转存保留 \(summary.preservedAssets) 项"
+            return summary
         }
-        let summary = await ReversibleOperations.rollback(runId: runId, drive: drive) { msg in
+        let summary = await ReversibleOperations.rollback(runId: runId, drive: drive, journal: journal) { msg in
             Task { @MainActor in self.rollbackMessage = msg }
         }
         rollbackMessage = "回滚完成：已撤销 \(summary.undone) 项，失败 \(summary.failed) 项"
-        isRollingBack = false
         return summary
     }
 
@@ -376,6 +418,27 @@ public final class ExecutionEngine {
         return VideoScanResult(videos: videos, complete: true)
     }
 
+    /// 在创建尝试、预留动作或收口旧暂停记录之前完成同步启动检查。
+    private func startBlockReason(plan: ScrapePlan, drive: any CloudDrive) -> String? {
+        if !drive.approvalBinding.isEmpty,
+           AccountStore.shared.approvalBinding(for: drive.accountId) != drive.approvalBinding {
+            return "账号凭据或服务器地址已变更，为防止误操作已中止执行，请重新扫描确认"
+        }
+        if ReversibleWalStore.shared.hasStorageCorruption {
+            return ReversibleWalStore.shared.lastStorageError ?? "可逆日志已损坏，已阻止写入以保护历史记录"
+        }
+        let accountRuns = Set(PlanAndTaskStore.shared.tasks.filter { $0.accountId == plan.accountId }.map(\.id))
+        let journalRows = OperationJournal.shared.uncertainRows().filter { accountRuns.contains($0.runId) }
+        let walRows = ReversibleWalStore.shared.uncertainRecords().filter { $0.accountId.isEmpty || $0.accountId == plan.accountId }
+        if !journalRows.isEmpty || !walRows.isEmpty {
+            if journalRows.contains(where: { $0.status == .undoPrepared }) || walRows.contains(where: { $0.state == "undo_prepared" }) {
+                return "存在撤销中断的操作，请先在任务中心核实日志后再继续"
+            }
+            return "存在 \(journalRows.count + walRows.count) 条待核实的云盘操作，已拦截写入"
+        }
+        return nil
+    }
+
     // MARK: - 2. 完整五阶段批处理状态机（1:1 对标 ExecutionEngine.run）
 
     @discardableResult
@@ -383,9 +446,15 @@ public final class ExecutionEngine {
         plan: ScrapePlan,
         drive: any CloudDrive,
         actionIds: [String]? = nil,
-        skipDelaysForTest: Bool = false
+        skipDelaysForTest: Bool = false,
+        retryOfRunId: String? = nil,
+        retryRootRunId: String? = nil
     ) -> Bool {
         guard !isRunning else { return false }
+        guard !isRollingBack else {
+            lastStartError = "正在撤销任务，请等待完成后执行"
+            return false
+        }
         if let binding = plan.scanBinding, !binding.isEmpty && binding != drive.approvalBinding {
             lastStartError = "账号凭据或端点已变化，请重新扫描确认后执行"
             return false
@@ -407,6 +476,10 @@ public final class ExecutionEngine {
         let requestedIds = prepared.actionIds
         guard !requestedIds.isEmpty else {
             lastStartError = "所选目录已完成，没有新的可执行操作"
+            return false
+        }
+        if let reason = startBlockReason(plan: plan, drive: drive) {
+            lastStartError = reason
             return false
         }
         lastStartError = nil
@@ -435,6 +508,26 @@ public final class ExecutionEngine {
             errors: []
         )
         run.executionSnapshot = plan.executionSnapshot(actionIds: requestedIds)
+        if let parent = PlanAndTaskStore.shared.tasks.first(where: {
+            $0.id == retryOfRunId && $0.accountId == plan.accountId && $0.planId == plan.id
+        }) {
+            run.retryOfRunId = parent.id
+            run.retryRootRunId = TaskRunHistory.rootId(of: parent, in: PlanAndTaskStore.shared.tasks)
+        } else if let parentId = retryOfRunId, let root = retryRootRunId,
+                  !PlanAndTaskStore.shared.tasks.contains(where: { $0.id == parentId }) {
+            // 队列已在提交时核对账号及计划；父记录删除后仍保留明确链路。
+            run.retryOfRunId = parentId
+            run.retryRootRunId = root
+        }
+        if run.retryOfRunId != nil {
+            let pausedAttempts = TaskRunHistory.attempts(for: run, in: PlanAndTaskStore.shared.tasks).filter { $0.status == "paused" }
+            for var previous in pausedAttempts {
+                previous.status = "stopped"
+                previous.finishedAt = Date()
+                previous.message = "已发起新的重试尝试，未完成项仍保留在本次历史记录中"
+                PlanAndTaskStore.shared.saveTask(previous)
+            }
+        }
         currentRun = run
         PlanAndTaskStore.shared.saveTask(run)
 
@@ -442,54 +535,6 @@ public final class ExecutionEngine {
             let profile = DriveRateProfile.forDrive(drive)
             let gate = AdaptiveConcurrencyGate(levels: profile.writeConcurrencyLevels)
             let journal = OperationJournal.shared
-
-            if !drive.approvalBinding.isEmpty {
-                let currentBinding = AccountStore.shared.approvalBinding(for: drive.accountId)
-                if currentBinding != drive.approvalBinding {
-                    run.status = "stopped"
-                    run.finishedAt = Date()
-                    run.message = "账号凭据或服务器地址已变更，为防止误操作已中止执行，请重新扫描确认"
-                    currentRun = run
-                    PlanAndTaskStore.shared.saveTask(run)
-                    activeTask = nil
-                    isRunning = false
-                    BackgroundTaskManager.shared.end()
-                    return
-                }
-            }
-
-            // 启动前 WAL 安全检查：若 WAL 存储已损坏则立即 fail-closed 拦截写入
-            if ReversibleWalStore.shared.hasStorageCorruption {
-                run.status = "failed"
-                run.finishedAt = Date()
-                run.message = ReversibleWalStore.shared.lastStorageError ?? "可逆日志已损坏，已阻止写入以保护历史记录"
-                currentRun = run
-                PlanAndTaskStore.shared.saveTask(run)
-                activeTask = nil
-                isRunning = false
-                BackgroundTaskManager.shared.end()
-                return
-            }
-            // 启动前 WAL 安全检查：仅按当前账号范围拦截未收口操作日志，避免跨账号永久死锁
-            let acctRunIds = Set(PlanAndTaskStore.shared.tasks.filter { $0.accountId == plan.accountId }.map(\.id))
-            let uncertainAtStart = journal.uncertainRows().filter { acctRunIds.isEmpty || acctRunIds.contains($0.runId) }
-            let uncertainWalAtStart = ReversibleWalStore.shared.uncertainRecords().filter { $0.accountId.isEmpty || $0.accountId == plan.accountId }
-            if !uncertainAtStart.isEmpty || !uncertainWalAtStart.isEmpty {
-                let hasUndoPrepared = uncertainAtStart.contains { $0.status == .undoPrepared }
-                    || uncertainWalAtStart.contains { $0.state == "undo_prepared" }
-                let totalUncertain = uncertainAtStart.count + uncertainWalAtStart.count
-                run.status = "stopped"
-                run.finishedAt = Date()
-                run.message = hasUndoPrepared
-                    ? "存在撤销中断的操作，请先在任务中心核实日志后再继续"
-                    : "存在 \(totalUncertain) 条待核实的云盘操作，已拦截写入"
-                currentRun = run
-                PlanAndTaskStore.shared.saveTask(run)
-                activeTask = nil
-                isRunning = false
-                BackgroundTaskManager.shared.end()
-                return
-            }
 
             var updatedPlan = plan
             var planActions = Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
@@ -1232,8 +1277,13 @@ public final class ExecutionEngine {
                         TaskQueue.shared.remove(id: candidate.id)
                         continue
                     }
+                    if let reason = startBlockReason(plan: nextPlan, drive: nextDrive) {
+                        lastStartError = reason
+                        break // 安全拦截是临时阻塞，保留队首及其后的排队范围。
+                    }
                     _ = TaskQueue.shared.popNext()
-                    if start(plan: nextPlan, drive: nextDrive, actionIds: candidate.actionIds) { break }
+                    if start(plan: nextPlan, drive: nextDrive, actionIds: candidate.actionIds,
+                             retryOfRunId: candidate.retryOfRunId, retryRootRunId: candidate.retryRootRunId) { break }
                 }
             }
         }

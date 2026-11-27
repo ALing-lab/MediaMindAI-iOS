@@ -11,7 +11,7 @@ public enum JournalRowStatus: String, Codable, Sendable {
     case undone
 }
 
-/// 使用当次快照关联作品日志；无法归属的任务级辅助日志仅保留在“全部日志”。
+/// 使用当次快照关联作品日志；无法归属的任务级辅助日志不混入单部作品。
 public struct TaskLogScope: Sendable {
     private let actionIds: Set<String>
     private let allActionIds: Set<String>
@@ -44,6 +44,50 @@ public struct TaskLogScope: Sendable {
             if allActionIds.contains(base) { return actionIds.contains(base) }
         }
         return actionIds.contains(base)
+    }
+}
+
+/// 纯展示合并：保留说明与真实错误，WAL 状态优先于较早的 Journal。
+public struct TaskLogStatus: Sendable {
+    public enum Tone: Sendable, Equatable { case success, neutral, warning, failure }
+    public let state: String
+    public let label: String
+    public let tone: Tone
+    public let error: String?
+    public let note: String?
+
+    public init(journalState: String? = nil, journalError: String? = nil, walState: String? = nil, walError: String? = nil) {
+        var resolved = walState ?? journalState ?? "uncertain"
+        // 兼容旧回滚仅在 Journal 落盘的记录；冲突/撤销中等 WAL 保护态仍优先。
+        if journalState == "undone", ["applied", "skipped", "not_applied", "prepared"].contains(resolved) { resolved = "undone" }
+        state = resolved
+        let messages = [walError, journalError].compactMap { value -> String? in
+            guard let text = value?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+            return text
+        }.reduce(into: [String]()) { result, text in if !result.contains(text) { result.append(text) } }
+        let skipReason = (walState != nil ? walError : journalError)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let benignSkip = skipReason.isEmpty
+            || ["已存在", "已存在，未覆盖", "批量移动回退逐条执行"].contains(skipReason)
+            || skipReason.hasPrefix("没有可用的图片 URL：") || skipReason == "TMDB 暂无该集剧照，已跳过"
+        switch resolved {
+        case "applied": label = "成功"; tone = .success
+        case "undone", "reverted": label = "已回滚"; tone = .neutral
+        case "preserved": label = "已转存保留"; tone = .neutral
+        case "substituted": label = "已替代恢复"; tone = .neutral
+        case "substitution_output": label = "补齐文件已生成"; tone = .neutral
+        case "not_applied": label = "未生效"; tone = .neutral
+        case "skipped": label = benignSkip ? "跳过" : "失败"; tone = benignSkip ? .neutral : .failure
+        case "prepared", "uncertain": label = "待核实"; tone = .warning
+        case "undo_prepared": label = "撤销待核实"; tone = .warning
+        case "conflict": label = "冲突"; tone = .failure
+        case "failed": label = "失败"; tone = .failure
+        default: label = resolved; tone = .neutral
+        }
+        let text = messages.isEmpty ? nil : messages.joined(separator: "；")
+        switch tone {
+        case .failure, .warning: error = text; note = nil
+        case .success, .neutral: error = nil; note = text
+        }
     }
 }
 
@@ -223,12 +267,19 @@ public struct RollbackSummary: Sendable {
     public let undone: Int
     public let failed: Int
     public let errors: [String]
+    public let missingBackups: [MissingBackup]
+    public let unverifiedAssets: [UnverifiedAsset]
+    public let preservedAssets: Int
 
-    public init(total: Int, undone: Int, failed: Int, errors: [String]) {
+    public init(total: Int, undone: Int, failed: Int, errors: [String], missingBackups: [MissingBackup] = [],
+                unverifiedAssets: [UnverifiedAsset] = [], preservedAssets: Int = 0) {
         self.total = total
         self.undone = undone
         self.failed = failed
         self.errors = errors
+        self.missingBackups = missingBackups
+        self.unverifiedAssets = unverifiedAssets
+        self.preservedAssets = preservedAssets
     }
 }
 
@@ -336,8 +387,10 @@ public struct QueuedTaskItem: Identifiable, Codable, Hashable, Sendable {
     public let actionCount: Int
     public let actionIds: [String]?
     public let enqueuedAt: Date
+    public var retryOfRunId: String? = nil
+    public var retryRootRunId: String? = nil
 
-    public init(id: String = String(UUID().uuidString.prefix(8).lowercased()), planId: String, accountId: String, provider: String, sourceLabel: String, actionCount: Int, actionIds: [String]? = nil, enqueuedAt: Date = Date()) {
+    public init(id: String = String(UUID().uuidString.prefix(8).lowercased()), planId: String, accountId: String, provider: String, sourceLabel: String, actionCount: Int, actionIds: [String]? = nil, enqueuedAt: Date = Date(), retryOfRunId: String? = nil, retryRootRunId: String? = nil) {
         self.id = id
         self.planId = planId
         self.accountId = accountId
@@ -346,6 +399,22 @@ public struct QueuedTaskItem: Identifiable, Codable, Hashable, Sendable {
         self.actionCount = actionCount
         self.actionIds = actionIds
         self.enqueuedAt = enqueuedAt
+        self.retryOfRunId = retryOfRunId
+        self.retryRootRunId = retryRootRunId
+    }
+
+    public func isRetry(of run: TaskRun, in runs: [TaskRun]) -> Bool {
+        guard accountId == run.accountId && planId == run.planId else { return false }
+        let root: String?
+        if let stored = retryRootRunId, !stored.isEmpty {
+            root = stored
+        } else if let parent = runs.first(where: { $0.id == retryOfRunId && $0.accountId == accountId && $0.planId == planId }) {
+            root = TaskRunHistory.rootId(of: parent, in: runs)
+        } else {
+            root = nil
+        }
+        guard let root else { return false }
+        return root == TaskRunHistory.rootId(of: run, in: runs)
     }
 }
 
@@ -373,12 +442,12 @@ public final class TaskQueue {
     }
 
     @discardableResult
-    public func enqueue(plan: ScrapePlan, actionIds: [String]? = nil) -> QueuedTaskItem {
+    public func enqueue(plan: ScrapePlan, actionIds: [String]? = nil, retryOfRunId: String? = nil, retryRootRunId: String? = nil) -> QueuedTaskItem {
         // 固定排队时确认的动作 ID，避免消费队列时执行后来新增的识别结果。
         let acceptedIds = ExecutionEngine.executableActionIds(plan: plan, requested: actionIds)
         let actionIds: [String]? = acceptedIds
         if let existing = items.first(where: { item in
-            guard item.planId == plan.id else { return false }
+            guard item.planId == plan.id && item.retryOfRunId == retryOfRunId else { return false }
             switch (item.actionIds, actionIds) {
             case (nil, nil): return true
             case let (a?, b?): return Set(a) == Set(b)
@@ -392,7 +461,9 @@ public final class TaskQueue {
             provider: plan.provider,
             sourceLabel: plan.roots.map(\.name).joined(separator: "、"),
             actionCount: count,
-            actionIds: actionIds
+            actionIds: actionIds,
+            retryOfRunId: retryOfRunId,
+            retryRootRunId: retryRootRunId
         )
         items.append(item)
         persist()

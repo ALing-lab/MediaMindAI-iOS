@@ -12,6 +12,54 @@ import Observation
 /// AI（AiResponseParser 全链路容错解析）以及 Core（NetLog / HistoryStore / UpdateChecker / HostMatch / AppDirs）。
 final class DrivesTmdbAiCoreSuiteTests: XCTestCase {
 
+    func testTaskLogNormalSkipKeepsExplanationWithoutFailure() {
+        for reason in ["已存在", "已存在，未覆盖", "TMDB 暂无该集剧照，已跳过", "没有可用的图片 URL：poster.jpg", "批量移动回退逐条执行"] {
+            let status = TaskLogStatus(journalState: "skipped", journalError: reason)
+            XCTAssertEqual(status.label, "跳过")
+            XCTAssertEqual(status.tone, .neutral)
+            XCTAssertNil(status.error)
+            XCTAssertEqual(status.note, reason)
+        }
+    }
+
+    func testTaskLogActualSkipFailureRetainsError() {
+        let status = TaskLogStatus(journalState: "skipped", journalError: "移动失败：权限不足")
+        XCTAssertEqual(status.tone, .failure)
+        XCTAssertEqual(status.label, "失败")
+        XCTAssertEqual(status.error, "移动失败：权限不足")
+    }
+
+    func testTaskLogDurableWalResultOverridesInterruptedJournal() {
+        let status = TaskLogStatus(journalState: "prepared", journalError: "请求中断", walState: "applied")
+        XCTAssertEqual(status.state, "applied")
+        XCTAssertEqual(status.label, "成功")
+        XCTAssertNil(status.error)
+        XCTAssertEqual(status.note, "请求中断", "旧错误保留为历史说明，不把已核实成功标成失败")
+        let skipped = TaskLogStatus(journalState: "skipped", journalError: "旧请求失败", walState: "skipped")
+        XCTAssertEqual(skipped.label, "跳过")
+        XCTAssertEqual(skipped.note, "旧请求失败")
+    }
+
+    func testTaskLogRollbackAndConflictAreNotHiddenByJournalSuccess() {
+        let restored = TaskLogStatus(journalState: "applied", walState: "reverted")
+        XCTAssertEqual(restored.label, "已回滚")
+        XCTAssertEqual(TaskLogStatus(journalState: "undone").label, restored.label)
+        XCTAssertEqual(TaskLogStatus(journalState: "undone", walState: "applied").label, restored.label)
+        let conflict = TaskLogStatus(journalState: "undone", walState: "conflict", walError: "原位置被占用")
+        XCTAssertEqual(conflict.label, "冲突")
+        XCTAssertEqual(conflict.error, "原位置被占用")
+        XCTAssertEqual(conflict.tone, .failure)
+    }
+
+    func testTaskLogPendingUndoAndSubstitutionHaveExplicitLabels() {
+        XCTAssertEqual(TaskLogStatus(walState: "prepared").label, "待核实")
+        XCTAssertEqual(TaskLogStatus(walState: "undo_prepared").label, "撤销待核实")
+        XCTAssertEqual(TaskLogStatus(walState: "substituted").label, "已替代恢复")
+        XCTAssertEqual(TaskLogStatus(walState: "substitution_output").label, "补齐文件已生成")
+        XCTAssertEqual(TaskLogStatus(walState: "preserved").label, "已转存保留")
+        XCTAssertEqual(TaskLogStatus(walState: "not_applied", walError: "核实确认远端未发生变化").note, "核实确认远端未发生变化")
+    }
+
     func testSettingsObservationAndConcurrentAccess() throws {
         let suite = "settings-regression-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

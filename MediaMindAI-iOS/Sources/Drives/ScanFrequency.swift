@@ -317,6 +317,13 @@ public final class PacedDrive: CloudDrive, @unchecked Sendable {
         return try await pacedRead { try await delegate.list(folderId: folderId) }
     }
 
+    public func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String? {
+        try await validateBinding()
+        return try await pacedRead {
+            try await delegate.assetMD5(fileId: fileId, parentId: parentId, expectedSize: expectedSize)
+        }
+    }
+
     public func rename(fileId: String, newName: String) async throws -> String {
         try await validateBinding()
         return try await delegate.rename(fileId: fileId, newName: newName)

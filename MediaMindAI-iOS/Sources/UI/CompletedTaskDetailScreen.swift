@@ -13,20 +13,61 @@ public struct CompletedTaskDetailScreen: View {
 
     @State private var logRequest: TaskLogRequest?
     @State private var rollingBack = false
+    @State private var cancellation = TaskCancellation.shared
+    @State private var assetChoice: TaskControl?
     @State private var rollbackHint: String?
     @State private var retryHint: String?
     @State private var showRollbackConfirm = false
     @State private var showRetryConfirm = false
+    @State private var selectedAttemptId: String?
 
     public init(run: TaskRun) {
         self.initialRun = run
     }
 
     private var run: TaskRun {
-        if ExecutionEngine.shared.currentRun?.id == initialRun.id, let live = ExecutionEngine.shared.currentRun {
+        let id = selectedAttemptId ?? initialRun.id
+        if ExecutionEngine.shared.isRunning, ExecutionEngine.shared.currentRun?.id == id, let live = ExecutionEngine.shared.currentRun {
             return live
         }
-        return PlanAndTaskStore.shared.tasks.first(where: { $0.id == initialRun.id }) ?? initialRun
+        return PlanAndTaskStore.shared.tasks.first(where: { $0.id == id }) ?? initialRun
+    }
+
+    private var attempts: [TaskRun] {
+        var runs = PlanAndTaskStore.shared.tasks
+        if ExecutionEngine.shared.isRunning, let live = ExecutionEngine.shared.currentRun, live.accountId == initialRun.accountId {
+            runs.removeAll { $0.id == live.id }; runs.append(live)
+        }
+        if !runs.contains(where: { $0.id == initialRun.id }) { runs.append(initialRun) }
+        return TaskRunHistory.attempts(for: initialRun, in: runs)
+    }
+
+    private var attemptSelector: some View {
+        Menu {
+            ForEach(attempts) { attempt in
+                Button {
+                    selectedAttemptId = attempt.id
+                    logRequest = nil; retryHint = nil; rollbackHint = nil
+                } label: {
+                    Text("\(attempt.id) · \(attemptStatus(attempt.status)) · \(attempt.startedAt.formatted(date: .abbreviated, time: .shortened))")
+                }
+            }
+        } label: {
+            Label("执行尝试 (\(attempts.count)) · 当前 \(run.id)", systemImage: "clock.arrow.circlepath")
+                .font(.footnote).foregroundStyle(MMTheme.accent)
+        }
+        .disabled(rollingBack)
+    }
+
+    private func attemptStatus(_ status: String) -> String {
+        switch status {
+        case "running": return "进行中"
+        case "paused": return "已暂停"
+        case "done": return "已完成"
+        case "failed": return "失败"
+        case "stopped": return "已停止"
+        default: return "无变更"
+        }
     }
 
     private var journalRows: [JournalRow] {
@@ -79,6 +120,7 @@ public struct CompletedTaskDetailScreen: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if attempts.count > 1 { attemptSelector }
                     // 顶部任务 ID 与文件数
                     HStack(spacing: 6) {
                         Text("任务 ID：\(run.id)，\(countSummary)")
@@ -105,7 +147,7 @@ public struct CompletedTaskDetailScreen: View {
                         }
                     } else {
                         if run.executionSnapshot == nil {
-                            Text("旧版记录未保存当次执行快照，仅展示原始计数和日志，不关联当前预览计划。")
+                            Text("旧版记录未保存当次执行快照，仅展示原始计数；无法可靠归属作品的日志不在此展示。")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         fallbackSummaryCard
@@ -134,6 +176,14 @@ public struct CompletedTaskDetailScreen: View {
                             .font(.footnote)
                             .foregroundStyle(MMTheme.accent)
                             .padding(.horizontal, 4)
+                    }
+                    if let control = cancellation.controls[run.id], control.state == "needs_asset_choice" {
+                        Button("撤销暂停：\(control.unverifiedAssetIds.count) 项旧素材需确认转存") { assetChoice = control }
+                            .font(.footnote).disabled(rollingBack)
+                    } else if let control = cancellation.controls[run.id], control.mode == "undo",
+                              ["requested", "undoing"].contains(control.state), !ExecutionEngine.shared.isRollingBack {
+                        Button("撤销中断，继续处理") { Task { await runRollback(accepting: control) } }
+                            .font(.footnote).disabled(rollingBack)
                     }
                     if let rollbackHint {
                         Text(rollbackHint)
@@ -177,6 +227,17 @@ public struct CompletedTaskDetailScreen: View {
         } message: {
             Text("尝试按逆序撤销本次任务已执行的操作。遇到文件变更、冲突或素材校验信息不足时会停止，并保留日志。")
         }
+        .alert("确认转存旧素材？", isPresented: Binding(get: { assetChoice != nil }, set: { if !$0 { assetChoice = nil } }), presenting: assetChoice) { control in
+            Button("确认转存并继续撤销") {
+                assetChoice = nil
+                Task { await runRollback(accepting: control) }
+            }
+            Button("取消", role: .cancel) { assetChoice = nil }
+        } message: { control in
+            let rows = ReversibleWalStore.shared.rows(taskId: control.taskId)
+            let names = control.unverifiedAssetIds.map { id in rows.first(where: { $0.id == id })?.after?.name ?? id }
+            Text("以下旧素材缺少内容摘要，可能包含后续修改。确认后只将当前素材移动到可恢复的撤销保留区，不删除：\n" + names.joined(separator: "\n"))
+        }
     }
 
     // MARK: - 顶部结果大头
@@ -219,14 +280,18 @@ public struct CompletedTaskDetailScreen: View {
     }
 
     private var heroTitle: String {
-        if isAllSucceeded { return "全部成功" }
+        let isRetry = attempts.count > 1 || run.retryOfRunId != nil
+        if run.status == "running" { return isRetry ? "本次尝试执行中" : "正在执行" }
+        if isAllSucceeded { return isRetry ? "本次尝试成功" : "全部成功" }
         if run.hasNoEffectiveOperations { return "无有效操作" }
-        return "任务未完成"
+        return isRetry ? "本次尝试未完成" : "任务未完成"
     }
 
     private var heroSubtitle: String {
+        if run.status == "running" { return "当前尝试已完成 \(run.completed)/\(run.total) 项，可在任务中心暂停或停止。" }
         if run.hasNoEffectiveOperations { return "本条记录没有成功执行的操作，不能作为整理完成的依据。" }
         if isAllSucceeded {
+            if attempts.count > 1 || run.retryOfRunId != nil { return "本次尝试成功 \(run.succeeded)/\(run.total) 项；其它尝试请在上方切换查看。" }
             return "智能整理和刮削影视库，帮助你轻松管理媒体库，秒出海报墙"
         }
         if run.status == "stopped" {
@@ -502,26 +567,51 @@ public struct CompletedTaskDetailScreen: View {
             retryHint = "原计划已重新识别或变更，请从任务中心重新预览确认"
             return
         }
-        guard ExecutionEngine.shared.enqueueOrStart(plan: livePlan, drive: drive, actionIds: targetIds) else {
+        guard ExecutionEngine.shared.enqueueOrStart(plan: livePlan, drive: drive, actionIds: targetIds, retryOfRunId: run.id) else {
             retryHint = ExecutionEngine.shared.lastStartError
             return
         }
         retryHint = "已将 \(targetIds.count) 项失败/未完成操作重新提交执行队列"
     }
 
-    private func runRollback() async {
-        guard let acct = AccountStore.shared.get(id: run.accountId),
+    private func runRollback(accepting control: TaskControl? = nil) async {
+        guard !rollingBack && !ExecutionEngine.shared.isRollingBack else { return }
+        let taskId = control?.taskId ?? run.id
+        let accountId = control?.accountId ?? run.accountId
+        if ExecutionEngine.shared.isRunning && ExecutionEngine.shared.currentRun?.id != taskId {
+            rollbackHint = "其他任务正在执行，请等待其停止后再撤销本次尝试"
+            return
+        }
+        guard let acct = AccountStore.shared.get(id: accountId),
               let drive = try? AccountStore.shared.buildDrive(for: acct) else {
             rollbackHint = "找不到可用的云盘账号，无法撤销"
             return
         }
         rollingBack = true
         defer { rollingBack = false }
-        let summary = await ExecutionEngine.shared.rollback(runId: run.id, drive: drive)
-        if summary.failed == 0 {
-            rollbackHint = "撤销完成：共回滚 \(summary.undone)/\(summary.total) 项操作"
-        } else {
-            rollbackHint = "撤销部分完成：成功 \(summary.undone) 项，失败 \(summary.failed) 项（\(summary.errors.first ?? "")）"
+        do {
+            let request: TaskControl
+            if let current = cancellation.controls[taskId], current.mode == "undo", ["requested", "undoing"].contains(current.state) {
+                request = current
+            } else {
+                request = try cancellation.request(taskId: taskId, accountId: accountId, undo: true,
+                    acceptedUnverifiedAssetIds: control?.unverifiedAssetIds ?? [])
+            }
+            let result = await cancellation.apply(control: request, drive: drive)
+            let summary = ExecutionEngine.rollbackSummary(runId: taskId)
+            let legacy = ReversibleWalStore.shared.rows(taskId: taskId).isEmpty
+                ? OperationJournal.shared.rows(forRunId: taskId).filter { $0.status == .undone }.count : 0
+            let counts = "已处理 \(summary.undone + legacy) 项，其中转存保留 \(summary.preservedAssets) 项"
+            switch result.state {
+            case "completed": rollbackHint = "撤销完成：" + counts
+            case "needs_asset_choice": rollbackHint = "撤销暂停：" + counts + "。旧素材缺少摘要，请确认是否转存保留。"
+            case "needs_backup_choice": rollbackHint = "撤销暂停：" + counts + "。原备份缺失，请在任务中心选择处理方式。"
+            default:
+                let reason = PlanAndTaskStore.shared.tasks.first(where: { $0.id == taskId })?.message ?? "请核实冲突或待核实日志后继续"
+                rollbackHint = "撤销暂停：" + counts + "。" + reason
+            }
+        } catch {
+            rollbackHint = "撤销未继续：\(error.localizedDescription)"
         }
     }
 }
@@ -563,12 +653,17 @@ private struct TaskExecutionLogSheet: View {
     private var entries: [TaskLogEntry] {
         var result: [TaskLogEntry] = []
         var seenActionIds = Set<String>()
+        let walByAction = Dictionary(walRows.map { ($0.actionId, $0) }, uniquingKeysWith: { first, second in
+            first.sequence >= second.sequence ? first : second
+        })
 
         for row in journalRows {
             seenActionIds.insert(row.actionId)
             let isScrape = row.op == "artwork"
             let title = humanTitle(op: row.op, kind: row.kind, newName: row.newName)
-            let (stLabel, stColor) = statusPresentation(row.status.rawValue, hasError: row.error != nil)
+            let wal = walByAction[row.actionId]
+            let status = TaskLogStatus(journalState: row.status.rawValue, journalError: row.error, walState: wal?.state, walError: wal?.error)
+            let (stLabel, stColor) = statusPresentation(status)
             let detail: String = {
                 if !row.oldName.isEmpty && !row.newName.isEmpty && row.oldName != row.newName {
                     return "\(row.oldName) → \(row.newName)"
@@ -581,8 +676,8 @@ private struct TaskExecutionLogSheet: View {
                 title: title,
                 statusLabel: stLabel,
                 statusColor: stColor,
-                detail: detail,
-                error: row.error,
+                detail: status.note.map { detail + "\n" + $0 } ?? detail,
+                error: status.error,
                 timestamp: row.timestamp
             ))
         }
@@ -591,7 +686,8 @@ private struct TaskExecutionLogSheet: View {
             let isScrape = row.operation == "artwork" || row.operation == "upload"
             let primaryName = row.after?.name ?? row.before?.name ?? row.actionId
             let title = humanTitle(op: row.operation, kind: "", newName: primaryName)
-            let (stLabel, stColor) = statusPresentation(row.state, hasError: !(row.error ?? "").isEmpty)
+            let status = TaskLogStatus(walState: row.state, walError: row.error)
+            let (stLabel, stColor) = statusPresentation(status)
             let detail: String = {
                 if let b = row.before?.name, let a = row.after?.name, !b.isEmpty, !a.isEmpty, b != a {
                     return "\(b) → \(a)"
@@ -604,8 +700,8 @@ private struct TaskExecutionLogSheet: View {
                 title: title,
                 statusLabel: stLabel,
                 statusColor: stColor,
-                detail: detail,
-                error: row.error,
+                detail: status.note.map { detail + "\n" + $0 } ?? detail,
+                error: status.error,
                 timestamp: run.startedAt
             ))
         }
@@ -741,14 +837,12 @@ private struct TaskExecutionLogSheet: View {
         }
     }
 
-    private func statusPresentation(_ state: String, hasError: Bool) -> (String, Color) {
-        if hasError { return ("失败", MMTheme.redErr) }
-        switch state {
-        case "applied": return ("成功", MMTheme.accent)
-        case "skipped": return ("跳过", .secondary)
-        case "reverted": return ("已回滚", .secondary)
-        case "failed", "uncertain", "conflict": return ("失败", MMTheme.redErr)
-        default: return (state, .secondary)
+    private func statusPresentation(_ status: TaskLogStatus) -> (String, Color) {
+        switch status.tone {
+        case .success: return (status.label, MMTheme.accent)
+        case .neutral: return (status.label, .secondary)
+        case .warning: return (status.label, .orange)
+        case .failure: return (status.label, MMTheme.redErr)
         }
     }
 

@@ -7,9 +7,11 @@ public struct TaskControl: Identifiable, Codable, Hashable, Sendable {
     public let taskId: String
     public let accountId: String
     public var mode: String // "keep" | "undo"
-    public var state: String // "requested" | "undoing" | "conflict" | "needs_backup_choice" | "completed"
+    public var state: String // "requested" | "undoing" | "conflict" | "needs_backup_choice" | "needs_asset_choice" | "completed"
     public var missingBackupIds: [String]
     public var acceptedSubstitutions: [String]
+    public var unverifiedAssetIds: [String]
+    public var acceptedUnverifiedAssetIds: [String]
     public var updatedAt: Date
 
     public var id: String { taskId }
@@ -21,6 +23,8 @@ public struct TaskControl: Identifiable, Codable, Hashable, Sendable {
         state: String = "requested",
         missingBackupIds: [String] = [],
         acceptedSubstitutions: [String] = [],
+        unverifiedAssetIds: [String] = [],
+        acceptedUnverifiedAssetIds: [String] = [],
         updatedAt: Date = Date()
     ) {
         self.taskId = taskId
@@ -29,11 +33,13 @@ public struct TaskControl: Identifiable, Codable, Hashable, Sendable {
         self.state = state
         self.missingBackupIds = missingBackupIds
         self.acceptedSubstitutions = acceptedSubstitutions
+        self.unverifiedAssetIds = unverifiedAssetIds
+        self.acceptedUnverifiedAssetIds = acceptedUnverifiedAssetIds
         self.updatedAt = updatedAt
     }
 
     enum CodingKeys: String, CodingKey {
-        case taskId, accountId, mode, state, missingBackupIds, acceptedSubstitutions, updatedAt
+        case taskId, accountId, mode, state, missingBackupIds, acceptedSubstitutions, unverifiedAssetIds, acceptedUnverifiedAssetIds, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -44,6 +50,8 @@ public struct TaskControl: Identifiable, Codable, Hashable, Sendable {
         state = try c.decode(String.self, forKey: .state)
         missingBackupIds = (try? c.decodeIfPresent([String].self, forKey: .missingBackupIds)) ?? []
         acceptedSubstitutions = (try? c.decodeIfPresent([String].self, forKey: .acceptedSubstitutions)) ?? []
+        unverifiedAssetIds = (try? c.decodeIfPresent([String].self, forKey: .unverifiedAssetIds)) ?? []
+        acceptedUnverifiedAssetIds = (try? c.decodeIfPresent([String].self, forKey: .acceptedUnverifiedAssetIds)) ?? []
         updatedAt = (try? c.decodeIfPresent(Date.self, forKey: .updatedAt)) ?? Date()
     }
 }
@@ -55,6 +63,7 @@ public final class TaskCancellation: @unchecked Sendable {
 
     public private(set) var controls: [String: TaskControl] = [:]
     private let fileUrl: URL
+    @ObservationIgnored private var applyingTasks: Set<String> = []
 
     public init(storageURL: URL? = nil) {
         if let storageURL {
@@ -71,9 +80,9 @@ public final class TaskCancellation: @unchecked Sendable {
         }
     }
 
-    public func request(taskId: String, accountId: String, undo: Bool, acceptedSubstitutions: [String] = []) throws -> TaskControl {
+    public func request(taskId: String, accountId: String, undo: Bool, acceptedSubstitutions: [String] = [], acceptedUnverifiedAssetIds: [String] = []) throws -> TaskControl {
         if let existing = controls[taskId],
-           existing.state != "conflict" && existing.state != "needs_backup_choice" && existing.state != "completed" {
+           existing.state != "conflict" && existing.state != "needs_backup_choice" && existing.state != "needs_asset_choice" && existing.state != "completed" {
             throw DriveError.invalidInput("取消请求已保存，请等待处理")
         }
         let ctrl = TaskControl(
@@ -81,7 +90,8 @@ public final class TaskCancellation: @unchecked Sendable {
             accountId: accountId,
             mode: undo ? "undo" : "keep",
             state: "requested",
-            acceptedSubstitutions: Array(Set(controls[taskId]?.acceptedSubstitutions ?? []).union(acceptedSubstitutions)).sorted()
+            acceptedSubstitutions: Array(Set(controls[taskId]?.acceptedSubstitutions ?? []).union(acceptedSubstitutions)).sorted(),
+            acceptedUnverifiedAssetIds: Array(Set(controls[taskId]?.acceptedUnverifiedAssetIds ?? []).union(acceptedUnverifiedAssetIds)).sorted()
         )
         controls[taskId] = ctrl
         persist()
@@ -115,6 +125,8 @@ public final class TaskCancellation: @unchecked Sendable {
         substitutionActions: [String: PlanAction] = [:],
         journal: OperationJournal = .shared
     ) async -> TaskControl {
+        guard applyingTasks.insert(control.taskId).inserted else { return controls[control.taskId] ?? control }
+        defer { applyingTasks.remove(control.taskId) }
         var next = control
         if !control.accountId.isEmpty && drive.accountId != control.accountId {
             next.state = "conflict"
@@ -122,6 +134,14 @@ public final class TaskCancellation: @unchecked Sendable {
             controls[control.taskId] = next
             persist()
             syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "撤销暂停：任务账号与当前网盘不匹配")
+            return next
+        }
+        if control.mode == "undo", ExecutionEngine.shared.isRollingBack
+            || (ExecutionEngine.shared.isRunning && ExecutionEngine.shared.currentRun?.id != control.taskId) {
+            next.state = "conflict"
+            next.updatedAt = Date()
+            controls[control.taskId] = next
+            persist()
             return next
         }
         // 确保在途正向云盘写入任务已彻底退出，再进入保留/撤销收口，杜绝并发写/撤销竞态
@@ -140,45 +160,30 @@ public final class TaskCancellation: @unchecked Sendable {
         controls[control.taskId] = next
         persist()
 
-        let walRows = ReversibleWalStore.shared.rows(taskId: control.taskId)
-        if !walRows.isEmpty {
-            let tx = ReversibleTransaction(taskId: control.taskId, drive: drive)
-            var subs = substitutionActions
-            if subs.isEmpty,
-               let run = PlanAndTaskStore.shared.tasks.first(where: { $0.id == control.taskId }),
-               let plan = PlanAndTaskStore.shared.plans.first(where: { $0.id == run.planId }) {
-                subs = Dictionary(plan.actions.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
-            }
-            do {
-                try await tx.undo(
-                    substitutionActions: subs,
-                    acceptedSubstitutions: Set(control.acceptedSubstitutions)
-                )
-                for jRow in OperationJournal.shared.rows(forRunId: control.taskId) where jRow.status == .applied {
-                    OperationJournal.shared.markStatus(rowId: jRow.id, status: .undone)
-                }
-                next.state = "completed"
-                next.missingBackupIds = []
-                syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "任务已停止并撤销已完成操作")
-            } catch let mb as MissingBackupsError {
-                next.state = "needs_backup_choice"
-                next.missingBackupIds = mb.files.map(\.actionId)
-                syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "撤销暂停：缺失备份，请在任务中心选择补齐方式")
-            } catch {
-                next.state = "conflict"
-                syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "撤销暂停：\(error.localizedDescription)")
-            }
-            next.updatedAt = Date()
-            controls[control.taskId] = next
-            persist()
-            return next
+        let summary = await ExecutionEngine.shared.rollback(
+            runId: control.taskId, drive: drive,
+            substitutionActions: substitutionActions,
+            acceptedSubstitutions: Set(control.acceptedSubstitutions),
+            acceptedUnverifiedAssets: Set(control.acceptedUnverifiedAssetIds),
+            journal: journal
+        )
+        next.missingBackupIds = summary.missingBackups.map(\.actionId)
+        next.unverifiedAssetIds = summary.unverifiedAssets.map(\.id)
+        let message: String
+        if !summary.missingBackups.isEmpty {
+            next.state = "needs_backup_choice"
+            message = "撤销暂停：缺失备份，请在任务中心选择补齐方式"
+        } else if !summary.unverifiedAssets.isEmpty {
+            next.state = "needs_asset_choice"
+            message = "撤销暂停：素材缺少校验信息，请确认是否转存后继续"
+        } else if summary.failed > 0 {
+            next.state = "conflict"
+            message = "撤销暂停：\(summary.errors.joined(separator: "；"))"
+        } else {
+            next.state = "completed"
+            message = "任务已停止并撤销已完成操作"
         }
-
-        let summary = await ReversibleOperations.rollback(runId: control.taskId, drive: drive, journal: journal)
-        next.state = summary.failed == 0 ? "completed" : "conflict"
-        if next.state == "completed" {
-            syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: "任务已停止并撤销已完成操作")
-        }
+        syncTaskRunStatus(taskId: control.taskId, status: "stopped", message: message)
         next.updatedAt = Date()
         controls[control.taskId] = next
         persist()

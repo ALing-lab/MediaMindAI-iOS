@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// WebDAV 地址填写说明与实时解析（1:1 复刻 Android `WebDavAddress.kt`）。
 public enum WebDavAddress {
@@ -428,6 +429,52 @@ public final class WebDavDrive: CloudDrive, @unchecked Sendable {
         default:
             try await fail("建文件夹", status: status)
         }
+    }
+
+    public func assetMD5(fileId: String, parentId: String, expectedSize: Int64) async throws -> String? {
+        let limit: Int64 = 64 * 1024 * 1024
+        guard expectedSize >= 0 && expectedSize <= limit else { return nil }
+        let path = try norm(fileId)
+        let parent = try norm(parentId)
+        guard path != "/", DrivePaths.parentOf(path) == parent else {
+            throw DriveError.invalidInput("素材校验的文件与父目录不匹配")
+        }
+        let matches = try await list(folderId: parent).filter { $0.fileId == path }
+        guard matches.count == 1, let entry = matches.first, !entry.isDir, entry.size == expectedSize else { return nil }
+        if let digest = ContentDigest.normalize(algorithm: entry.hashAlgorithm, hash: entry.contentHash), digest.algorithm == "MD5" {
+            return digest.digest
+        }
+        let url = try urlFor(path, isDir: false)
+        var request = makeRequest(url, method: "GET")
+        request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+        let (bytes, response) = try await session.bytes(for: request)
+        defer { bytes.task.cancel() }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              http.url == url, http.value(forHTTPHeaderField: "Content-Range") == nil else {
+            throw DriveError.api(code: (response as? HTTPURLResponse)?.statusCode ?? 0, message: "素材校验读取失败或返回了部分内容")
+        }
+        guard response.expectedContentLength < 0 || response.expectedContentLength == expectedSize else {
+            throw DriveError.invalidInput("素材校验读取大小与预期不符")
+        }
+        var hasher = Insecure.MD5()
+        var count: Int64 = 0
+        var chunk = Data()
+        chunk.reserveCapacity(4096)
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            guard count < expectedSize && count < limit else {
+                throw DriveError.invalidInput("素材校验读取超过预期大小")
+            }
+            count += 1
+            chunk.append(byte)
+            if chunk.count == 4096 {
+                hasher.update(data: chunk)
+                chunk.removeAll(keepingCapacity: true)
+            }
+        }
+        guard count == expectedSize else { throw DriveError.invalidInput("素材校验读取不完整") }
+        hasher.update(data: chunk)
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     public func upload(parentId: String, name: String, data: Data) async throws -> String {
